@@ -1,6 +1,13 @@
 node_modules/
 dist/
-.env*
+coverage/
+.env
+.env.*
 !.env.example
-public/data.json
+.local/
+public/data.local.json
 *.tsbuildinfo
+__pycache__/
+.venv/
+.pytest_cache/
+.wrangler/

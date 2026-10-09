@@ -2,6 +2,7 @@ import { Suspense, lazy, useDeferredValue, useMemo } from 'react'
 import { DrillDialog } from '@/components/DrillDialog'
 import { FilterBar } from '@/components/FilterBar'
 import { Header } from '@/components/Header'
+import { SyncStatus } from '@/components/SyncStatus'
 import { EmptyNote } from '@/components/Primitives'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDataset } from '@/data/useRows'
@@ -37,6 +38,7 @@ export default function App() {
   return (
     <div className="mx-auto max-w-295 px-5 pb-14 pt-7 max-sm:px-4 max-sm:pb-10 max-sm:pt-5">
       <Header total={m.total} all={allRows?.length ?? 0} updatedAt={data?.updatedAt ?? null} noYear={noYear} />
+      <SyncStatus />
 
       {error ? (
         <div role="alert" className="mt-6 rounded-[10px] border border-st-critical/40 bg-surface p-4 text-[13px] text-ink-soft">
@@ -62,7 +64,11 @@ export default function App() {
       )}
 
       <footer className="mt-11 flex flex-wrap justify-between gap-2 border-t border-line pt-4.5 text-xs text-muted">
-        <span>Fonte: BaseLicitacao (aba "Base Governo") · SharePoint GOVERNO2 · CTC Pré-Vendas — somente leitura</span>
+        <span>
+          {data?.isMock
+            ? 'Demonstração local: dados sintéticos — sem conexão com SharePoint'
+            : 'Fonte: BaseLicitacao (aba "Base Governo") · SharePoint GOVERNO2 · CTC Pré-Vendas — somente leitura'}
+        </span>
         <span>Radar Pré-Vendas — uso interno do time</span>
       </footer>
       <DrillDialog />

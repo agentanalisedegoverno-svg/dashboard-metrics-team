@@ -2,23 +2,21 @@
 
 Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4 + componentes no padrão shadcn/ui**, preservando 100% da usabilidade e das regras já validadas.
 
-> **Dados internos:** este repositório é público e não contém o dataset de produção. `public/data.json` é ignorado pelo Git; não o force no commit. O app precisa receber os dados por uma URL configurada em `VITE_DATA_URL` ou por um arquivo local, e a fonte de produção deve exigir autenticação.
-
 ## Rodar
 
 ```bash
 npm install
-npm run test       # regras de filtro + paridade numérica
+npm run mock:api   # terminal 1: API local de demonstração (somente loopback)
+npm run dev        # terminal 2: painel em http://localhost:5173
+npm run test       # regras de filtro + paridade numérica com o painel HTML
 npm run build      # typecheck + bundle de produção (dist/)
 ```
 
-Para desenvolvimento, disponibilize uma cópia autorizada do dataset em `public/data.json` (não commitada) ou configure `VITE_DATA_URL` em `.env.local`:
+No desenvolvimento, o Vite encaminha `/api` para `http://127.0.0.1:8000`. O painel tenta primeiro `GET /api/rows` e, se a API estiver indisponível, usa o arquivo de fallback configurado em `VITE_DATA_URL`. A resposta aceita `[...]` ou `{ "rows": [...], "updatedAt": "..." }`.
 
-```bash
-npm run dev        # desenvolvimento
-```
+`public/data.json` contém exclusivamente linhas **sintéticas** para demonstração. A base real não deve ser colocada em `public/`, no bundle, nem no Git. Para mantê-la neste clone local, use `.local/data.json` (já ignorado pelo Git); não a sirva pelo Vite ou por um host público.
 
-O endpoint aceita `[...]` ou `{ "rows": [...], "updatedAt": "..." }`. Consulte `.env.example` para a variável de URL.
+O mock oferece `GET /api/rows`, `GET /api/status` e `POST /api/sync`. O botão do painel apenas relê o mock e atualiza o cache; ele não acessa nem altera o SharePoint. O status mostra explicitamente “API de demonstração”.
 
 ## Regras que não mudam (herdadas do painel)
 
@@ -54,29 +52,32 @@ O endpoint aceita `[...]` ou `{ "rows": [...], "updatedAt": "..." }`. Consulte `
 src/
   domain/      regras puras (filters, metrics, maturity, plano, types) — testáveis
   store/       zustand (filters, drill)
-  data/        leitura do dataset (somente leitura)
+  data/        leitura API-first com fallback e validação Zod
   components/  UI compartilhada (+ ui/ no padrão shadcn)
   features/    exec · inter · ops · meta · plano
+scripts/
+  mock-api.mjs API local de demonstração, sem dependências adicionais
 ```
+
+## Segurança e publicação
+
+- O repositório e o build não devem conter a planilha interna nem credenciais. `.local/`, `.env*` (exceto `.env.example`), `dist/` e arquivos temporários estão ignorados.
+- `public/_headers` aplica headers de segurança ao site estático. `wrangler.toml` configura a saída `dist/` para Cloudflare Pages.
+- O workflow em `.github/workflows/ci.yml` executa `npm ci`, testes e build em pushes e pull requests.
+- Para publicar manualmente: `npm run build` e `npx wrangler pages deploy dist`. Crie o projeto Pages e autentique o Wrangler antes da publicação.
+- Cloudflare Access precisa ser habilitado no painel Cloudflare para proteger o site por e-mail. Se a API real usar outro host, ela também precisa exigir autenticação; proteger somente o frontend não protege os dados.
+- O backend real de leitura do SharePoint permanece pendente de configuração do tenant, app registration, permissões Graph e URL do workbook. Não configure esses valores em arquivos versionados; use variáveis/segredos no ambiente de execução.
 
 ## Verificação feita
 
-- `tsc` sem erros e `vite build` ok.
-- `npm test`: 9 testes — o `computeMetrics`/`computeMaturity` do React é **idêntico** ao do painel HTML em 5 recortes (2025, 2026, 2025+2026, 2025·ITS, 2026·No Go) e na base completa. O teste de paridade é ignorado automaticamente se o HTML legado não estiver ao lado do projeto.
+- `npm test`: cobre as regras de filtro e, quando o HTML legado está disponível ao lado do projeto, compara métricas e maturidade com ele.
+- `npm run build`: valida TypeScript e gera o bundle de produção.
 - Smoke test no navegador (Chromium): filtro de Ano, "Selecionar todos" de Mês, drill-down de status e de No Go, tooltips, 5 abas e layout mobile (390 px), sem erros de console.
 
-## Publicação no Cloudflare Pages
+## Lacunas / próximos passos
 
-1. Crie um projeto **Cloudflare Pages** conectado a este repositório, com branch de produção `main`, comando `npm ci && npm run build` e diretório de saída `dist`.
-2. Defina `NODE_VERSION` como `22` nas variáveis de ambiente do build.
-3. Configure o **Cloudflare Access** para exigir autenticação por e-mail para o hostname de produção e todas as rotas, incluindo a URL de dados. Restrinja a política aos e-mails autorizados.
-4. Não publique o dataset em um endpoint público. Se `VITE_DATA_URL` apontar para outro host, proteja esse host também e configure CORS para o domínio do painel.
-5. Teste uma janela anônima: sem autenticação, tanto a página quanto a URL de dados devem negar acesso. Verifique também que o domínio `pages.dev` não permita contornar a proteção aplicada ao domínio customizado.
-
-`public/_headers` aplica headers básicos de segurança. HTTPS é fornecido pelo Cloudflare Pages. O dataset não é parte do deploy deste repositório; configure uma origem de dados autenticada antes de liberar o painel.
-
-## Próximos passos
-
-- Definir e provisionar a origem autenticada do dataset em produção.
-- A aba Metodologia ainda descreve a atualização como "disparo manual", fiel ao processo atual; ajustar o texto se o fluxo mudar.
-- Testes de componente (Testing Library) e e2e (Playwright) ainda não foram adicionados.
+1. **API real do SharePoint**: substituir o mock por um backend de leitura Graph autenticado e validar o mapeamento com as colunas reais.
+2. **Autenticação e publicação**: configurar Cloudflare Access, domínio, secrets e proteção da API em ambiente Cloudflare.
+3. A aba Metodologia ainda descreve a atualização como "disparo manual", fiel ao processo atual; ajustar o texto se o fluxo mudar.
+4. Opcional: colapsar os chips de filtro quando todos os meses estão marcados (hoje segue o comportamento original, 1 chip por mês).
+5. Testes de componente (Testing Library) e e2e (Playwright) ainda não foram adicionados.

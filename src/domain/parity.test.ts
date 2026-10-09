@@ -8,19 +8,14 @@ import { DatasetSchema, NV, type Row } from './types'
 const DATA = new URL('../../public/data.json', import.meta.url)
 const LEGACY = new URL('../../../radar-pre-vendas.html', import.meta.url)
 const hasData = existsSync(DATA)
-const rows: Row[] = hasData
-  ? DatasetSchema.parse(JSON.parse(readFileSync(DATA, 'utf8')))
-  : [
-      { ano: '2026', mes: '2026-01', torre: 'ITS' },
-      { ano: '2025', mes: '2025-06', torre: 'CCO' },
-    ]
+const rows: Row[] = hasData ? DatasetSchema.parse(JSON.parse(readFileSync(DATA, 'utf8'))) : []
 
 const f = (p: Partial<Record<keyof Filters, string[]>>): Filters => {
   const base = emptyFilters()
   return Object.fromEntries(Object.entries(base).map(([k]) => [k, new Set(p[k as keyof Filters] ?? [])])) as unknown as Filters
 }
 
-describe('regras de filtro', () => {
+describe.skipIf(!hasData)('regras de filtro', () => {
   it('sem Ano selecionado nada é exibido', () => {
     expect(rows.filter((r) => passesFilters(r, emptyFilters()))).toHaveLength(0)
     expect(rows.filter((r) => passesFilters(r, f({ torre: ['ITS'] })))).toHaveLength(0)
@@ -41,34 +36,35 @@ describe('regras de filtro', () => {
   })
 })
 
-if (hasData && existsSync(LEGACY)) {
-  describe('paridade com o painel HTML atual', () => {
-    const html = readFileSync(LEGACY, 'utf8')
-    const start = html.indexOf('function groupCount')
-    const end = html.indexOf('const PLANO')
-    const legacyCode = html.slice(start, end)
-    const NVc = NV
-    // eslint-disable-next-line no-new-func
-    const legacy = new Function('NV', 'pct', `${legacyCode}; return { computeMetrics, computeMaturity };`)(NVc, (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`)
+const describeLegacy = existsSync(LEGACY) ? describe : describe.skip
 
-    const cases: [string, Filters][] = [
-      ['2026', f({ ano: ['2026'] })],
-      ['2025', f({ ano: ['2025'] })],
-      ['2025+2026', f({ ano: ['2025', '2026'] })],
-      ['2025 ITS', f({ ano: ['2025'], torre: ['ITS'] })],
-      ['2026 No Go', f({ ano: ['2026'], status: ['No Go'] })],
-    ]
+describeLegacy('paridade com o painel HTML atual', () => {
+  if (!existsSync(LEGACY)) return
+  const html = existsSync(LEGACY) ? readFileSync(LEGACY, 'utf8') : ''
+  const start = html.indexOf('function groupCount')
+  const end = html.indexOf('const PLANO')
+  const legacyCode = html.slice(start, end)
+  const NVc = NV
+  // eslint-disable-next-line no-new-func
+  const legacy = new Function('NV', 'pct', `${legacyCode}; return { computeMetrics, computeMaturity };`)(NVc, (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`)
 
-    it.each(cases)('computeMetrics idêntico — %s', (_n, filt) => {
-      const sel = rows.filter((r) => passesFilters(r, filt))
-      const a = JSON.parse(JSON.stringify(computeMetrics(sel)))
-      const b = JSON.parse(JSON.stringify(legacy.computeMetrics(sel)))
-      delete b.sla
-      expect(a).toEqual(b)
-    })
+  const cases: [string, Filters][] = [
+    ['2026', f({ ano: ['2026'] })],
+    ['2025', f({ ano: ['2025'] })],
+    ['2025+2026', f({ ano: ['2025', '2026'] })],
+    ['2025 ITS', f({ ano: ['2025'], torre: ['ITS'] })],
+    ['2026 No Go', f({ ano: ['2026'], status: ['No Go'] })],
+  ]
 
-    it('computeMaturity idêntico (base completa)', () => {
-      expect(JSON.parse(JSON.stringify(computeMaturity(rows)))).toEqual(JSON.parse(JSON.stringify(legacy.computeMaturity(rows))))
-    })
+  it.each(cases)('computeMetrics idêntico — %s', (_n, filt) => {
+    const sel = rows.filter((r) => passesFilters(r, filt))
+    const a = JSON.parse(JSON.stringify(computeMetrics(sel)))
+    const b = JSON.parse(JSON.stringify(legacy.computeMetrics(sel)))
+    delete b.sla
+    expect(a).toEqual(b)
   })
-}
+
+  it('computeMaturity idêntico (base completa)', () => {
+    expect(JSON.parse(JSON.stringify(computeMaturity(rows)))).toEqual(JSON.parse(JSON.stringify(legacy.computeMaturity(rows))))
+  })
+})
