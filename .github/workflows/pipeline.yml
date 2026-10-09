@@ -24,6 +24,11 @@ env:
 jobs:
   ci:
     name: CI
+    # Um workflow reutilizável não pode pedir mais permissão do que o chamador concede
+    # (dependency-review comenta no PR); sem isto o run falha com startup_failure.
+    permissions:
+      contents: read
+      pull-requests: write
     uses: ./.github/workflows/ci.yml
 
   preview:
