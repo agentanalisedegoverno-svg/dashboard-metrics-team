@@ -3,11 +3,11 @@ import { cn } from '@/lib/utils'
 
 export type TagKind = 'confirmado' | 'inferido' | 'lacuna' | 'premissa' | 'recomendacao'
 const TAG: Record<TagKind, string> = {
-  confirmado: 'bg-[color-mix(in_srgb,var(--st-good)_14%,transparent)] text-st-good',
-  inferido: 'bg-[color-mix(in_srgb,var(--series-blue)_14%,transparent)] text-series-blue',
-  lacuna: 'bg-[color-mix(in_srgb,var(--st-critical)_12%,transparent)] text-st-critical',
-  premissa: 'bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] text-gold',
-  recomendacao: 'bg-[color-mix(in_srgb,var(--series-violet)_14%,transparent)] text-series-violet',
+  confirmado: 'bg-[color-mix(in_srgb,var(--st-good)_14%,transparent)] text-[color-mix(in_srgb,var(--st-good)_55%,var(--ink))]',
+  inferido: 'bg-[color-mix(in_srgb,var(--series-blue)_14%,transparent)] text-[color-mix(in_srgb,var(--series-blue)_55%,var(--ink))]',
+  lacuna: 'bg-[color-mix(in_srgb,var(--st-critical)_12%,transparent)] text-[color-mix(in_srgb,var(--st-critical)_55%,var(--ink))]',
+  premissa: 'bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] text-[color-mix(in_srgb,var(--gold)_55%,var(--ink))]',
+  recomendacao: 'bg-[color-mix(in_srgb,var(--series-violet)_14%,transparent)] text-[color-mix(in_srgb,var(--series-violet)_55%,var(--ink))]',
 }
 const TAG_LABEL: Record<TagKind, string> = {
   confirmado: 'Confirmado', inferido: 'Inferido', lacuna: 'Lacuna', premissa: 'Premissa', recomendacao: 'Recomendação',

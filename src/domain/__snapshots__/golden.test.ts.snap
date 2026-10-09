@@ -1,0 +1,458 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`métricas — snapshot da base sintética > computeMaturity (base completa) 1`] = `
+[
+  {
+    "detail": "Status preenchido em 100% das 12 linhas",
+    "dim": "Cobertura de status / triagem",
+    "level": 4,
+  },
+  {
+    "detail": "No Go com motivo em 100%; Lost com motivo em 100%",
+    "dim": "Rastreabilidade de motivo",
+    "level": 4,
+  },
+  {
+    "detail": "Orçamento em 100%; Valor CTC em 66,7% da base",
+    "dim": "Dados financeiros",
+    "level": 4,
+  },
+  {
+    "detail": "Sem campo de data de decisão Go/No Go",
+    "dim": "Dados temporais / SLA",
+    "level": 1,
+  },
+  {
+    "detail": "Vistoria "Omissa" em 16,7% dos casos",
+    "dim": "Padronização operacional",
+    "level": 3,
+  },
+  {
+    "detail": "100% com responsável nomeado",
+    "dim": "Atribuição / governança",
+    "level": 4,
+  },
+]
+`;
+
+exports[`métricas — snapshot da base sintética > computeMetrics 2025 1`] = `
+{
+  "analistas": [
+    {
+      "count": 2,
+      "label": "Analista Demo A",
+      "pctAtrib": 33.33333333333333,
+      "pctBase": 33.33333333333333,
+    },
+    {
+      "count": 2,
+      "label": "Analista Demo B",
+      "pctAtrib": 33.33333333333333,
+      "pctBase": 33.33333333333333,
+    },
+    {
+      "count": 2,
+      "label": "Analista Demo C",
+      "pctAtrib": 33.33333333333333,
+      "pctBase": 33.33333333333333,
+    },
+  ],
+  "atribCount": 6,
+  "backlogCount": 0,
+  "financeiro": {
+    "backlog": {
+      "comOrcamento": 0,
+      "count": 0,
+      "sum": 0,
+    },
+    "orcamento": {
+      "count": 6,
+      "sum": 7100000,
+    },
+    "valorCtc": {
+      "count": 4,
+      "sum": 4950000,
+    },
+    "valorVencedor": {
+      "count": 3,
+      "sum": 2960000,
+    },
+  },
+  "gargaloFinanceiroCount": 0,
+  "gargaloServicoCount": 0,
+  "gargaloTecnicoCount": 0,
+  "linhaServico": [
+    {
+      "count": 2,
+      "label": "Desenvolvimento",
+      "pct": 33.33333333333333,
+    },
+    {
+      "count": 2,
+      "label": "Service Desk",
+      "pct": 33.33333333333333,
+    },
+    {
+      "count": 1,
+      "label": "Dados",
+      "pct": 16.666666666666664,
+    },
+    {
+      "count": 1,
+      "label": "Infraestrutura",
+      "pct": 16.666666666666664,
+    },
+  ],
+  "lost": {
+    "comMotivo": 1,
+    "count": 1,
+  },
+  "nogoMotivos": [
+    {
+      "count": 1,
+      "drill": [
+        "Prazo",
+      ],
+      "label": "Prazo",
+      "pct": 100,
+    },
+  ],
+  "nogoRows": [
+    {
+      "acaoIA": null,
+      "analista": "Analista Demo A",
+      "ano": "2025",
+      "contaVinculada": null,
+      "dataPregao": "05/03/2025",
+      "descritivo": "Projeto fictício de dados",
+      "linhaServico": "Dados",
+      "mes": "2025-03",
+      "motivoLost": null,
+      "motivoNoGo": "Prazo",
+      "orcamento": 600000,
+      "orgao": "Órgão de Demonstração C",
+      "processo": "DEMO-003",
+      "sla": 12,
+      "status": "No Go",
+      "torre": "DIGITAL",
+      "uf": "RJ",
+      "valorCtc": null,
+      "valorVencedor": null,
+      "vistoria": "Não",
+    },
+  ],
+  "status": [
+    {
+      "color": "var(--st-good)",
+      "count": 2,
+      "label": "Win",
+      "pct": 33.33333333333333,
+    },
+    {
+      "color": "var(--series-orange)",
+      "count": 1,
+      "label": "Lost",
+      "pct": 16.666666666666664,
+    },
+    {
+      "color": "var(--st-critical)",
+      "count": 1,
+      "label": "No Go",
+      "pct": 16.666666666666664,
+    },
+    {
+      "color": "var(--muted)",
+      "count": 1,
+      "label": "Suspended",
+      "pct": 16.666666666666664,
+    },
+    {
+      "color": "var(--muted)",
+      "count": 1,
+      "label": "Canceled",
+      "pct": 16.666666666666664,
+    },
+  ],
+  "torre": [
+    {
+      "count": 3,
+      "label": "DIGITAL",
+      "pct": 50,
+    },
+    {
+      "count": 3,
+      "label": "ITS",
+      "pct": 50,
+    },
+  ],
+  "total": 6,
+  "uf": [
+    {
+      "count": 1,
+      "label": "DF",
+    },
+    {
+      "count": 1,
+      "label": "SP",
+    },
+    {
+      "count": 1,
+      "label": "RJ",
+    },
+    {
+      "count": 1,
+      "label": "MG",
+    },
+    {
+      "count": 1,
+      "label": "PR",
+    },
+    {
+      "count": 1,
+      "label": "BA",
+    },
+  ],
+  "viaveis": {
+    "cvNao": 0,
+    "cvSem": 4,
+    "cvSim": 0,
+    "total": 4,
+    "vvPreenchido": 2,
+  },
+  "vistoria": [
+    {
+      "count": 2,
+      "label": "Opcional",
+      "pct": 33.33333333333333,
+    },
+    {
+      "count": 2,
+      "label": "Sim",
+      "pct": 33.33333333333333,
+    },
+    {
+      "count": 1,
+      "label": "Não",
+      "pct": 16.666666666666664,
+    },
+    {
+      "count": 1,
+      "label": "Omissa",
+      "pct": 16.666666666666664,
+    },
+  ],
+  "winCount": 2,
+  "winRate": 66.66666666666666,
+}
+`;
+
+exports[`métricas — snapshot da base sintética > computeMetrics 2026 1`] = `
+{
+  "analistas": [
+    {
+      "count": 2,
+      "label": "Analista Demo A",
+      "pctAtrib": 33.33333333333333,
+      "pctBase": 33.33333333333333,
+    },
+    {
+      "count": 2,
+      "label": "Analista Demo B",
+      "pctAtrib": 33.33333333333333,
+      "pctBase": 33.33333333333333,
+    },
+    {
+      "count": 2,
+      "label": "Analista Demo C",
+      "pctAtrib": 33.33333333333333,
+      "pctBase": 33.33333333333333,
+    },
+  ],
+  "atribCount": 6,
+  "backlogCount": 0,
+  "financeiro": {
+    "backlog": {
+      "comOrcamento": 0,
+      "count": 0,
+      "sum": 0,
+    },
+    "orcamento": {
+      "count": 6,
+      "sum": 10820000,
+    },
+    "valorCtc": {
+      "count": 4,
+      "sum": 6450000,
+    },
+    "valorVencedor": {
+      "count": 3,
+      "sum": 5000000,
+    },
+  },
+  "gargaloFinanceiroCount": 0,
+  "gargaloServicoCount": 0,
+  "gargaloTecnicoCount": 0,
+  "linhaServico": [
+    {
+      "count": 2,
+      "label": "Dados",
+      "pct": 33.33333333333333,
+    },
+    {
+      "count": 2,
+      "label": "Infraestrutura",
+      "pct": 33.33333333333333,
+    },
+    {
+      "count": 1,
+      "label": "Desenvolvimento",
+      "pct": 16.666666666666664,
+    },
+    {
+      "count": 1,
+      "label": "Service Desk",
+      "pct": 16.666666666666664,
+    },
+  ],
+  "lost": {
+    "comMotivo": 2,
+    "count": 2,
+  },
+  "nogoMotivos": [
+    {
+      "count": 1,
+      "drill": [
+        "Capacidade",
+      ],
+      "label": "Capacidade",
+      "pct": 100,
+    },
+  ],
+  "nogoRows": [
+    {
+      "acaoIA": null,
+      "analista": "Analista Demo B",
+      "ano": "2026",
+      "contaVinculada": null,
+      "dataPregao": "03/02/2026",
+      "descritivo": "Ambiente de demonstração",
+      "linhaServico": "Infraestrutura",
+      "mes": "2026-02",
+      "motivoLost": null,
+      "motivoNoGo": "Capacidade",
+      "orcamento": 3000000,
+      "orgao": "Órgão de Demonstração H",
+      "processo": "DEMO-008",
+      "sla": 14,
+      "status": "No Go",
+      "torre": "ITS",
+      "uf": "GO",
+      "valorCtc": null,
+      "valorVencedor": null,
+      "vistoria": "Não",
+    },
+  ],
+  "status": [
+    {
+      "color": "var(--series-orange)",
+      "count": 2,
+      "label": "Lost",
+      "pct": 33.33333333333333,
+    },
+    {
+      "color": "var(--st-critical)",
+      "count": 1,
+      "label": "No Go",
+      "pct": 16.666666666666664,
+    },
+    {
+      "color": "var(--st-good)",
+      "count": 1,
+      "label": "Win",
+      "pct": 16.666666666666664,
+    },
+    {
+      "color": "var(--muted)",
+      "count": 1,
+      "label": "Suspended",
+      "pct": 16.666666666666664,
+    },
+    {
+      "color": "var(--muted)",
+      "count": 1,
+      "label": "Canceled",
+      "pct": 16.666666666666664,
+    },
+  ],
+  "torre": [
+    {
+      "count": 3,
+      "label": "DIGITAL",
+      "pct": 50,
+    },
+    {
+      "count": 3,
+      "label": "ITS",
+      "pct": 50,
+    },
+  ],
+  "total": 6,
+  "uf": [
+    {
+      "count": 1,
+      "label": "SC",
+    },
+    {
+      "count": 1,
+      "label": "GO",
+    },
+    {
+      "count": 1,
+      "label": "PE",
+    },
+    {
+      "count": 1,
+      "label": "CE",
+    },
+    {
+      "count": 1,
+      "label": "RS",
+    },
+    {
+      "count": 1,
+      "label": "AM",
+    },
+  ],
+  "viaveis": {
+    "cvNao": 0,
+    "cvSem": 3,
+    "cvSim": 0,
+    "total": 3,
+    "vvPreenchido": 1,
+  },
+  "vistoria": [
+    {
+      "count": 2,
+      "label": "Opcional",
+      "pct": 33.33333333333333,
+    },
+    {
+      "count": 2,
+      "label": "Sim",
+      "pct": 33.33333333333333,
+    },
+    {
+      "count": 1,
+      "label": "Não",
+      "pct": 16.666666666666664,
+    },
+    {
+      "count": 1,
+      "label": "Omissa",
+      "pct": 16.666666666666664,
+    },
+  ],
+  "winCount": 1,
+  "winRate": 33.33333333333333,
+}
+`;

@@ -68,16 +68,47 @@ scripts/
 - Cloudflare Access precisa ser habilitado no painel Cloudflare para proteger o site por e-mail. Se a API real usar outro host, ela também precisa exigir autenticação; proteger somente o frontend não protege os dados.
 - O backend real de leitura do SharePoint permanece pendente de configuração do tenant, app registration, permissões Graph e URL do workbook. Não configure esses valores em arquivos versionados; use variáveis/segredos no ambiente de execução.
 
-## Verificação feita
+## API real (Cloudflare Pages Functions → Microsoft Graph)
 
-- `npm test`: cobre as regras de filtro e, quando o HTML legado está disponível ao lado do projeto, compara métricas e maturidade com ele.
-- `npm run build`: valida TypeScript e gera o bundle de produção.
-- Smoke test no navegador (Chromium): filtro de Ano, "Selecionar todos" de Mês, drill-down de status e de No Go, tooltips, 5 abas e layout mobile (390 px), sem erros de console.
+`functions/api/[[path]].ts` serve `GET /api/rows`, `GET /api/status` e `POST /api/sync` (somente leitura do workbook; `sync` apenas invalida o cache de 5 min). Toda chamada exige o JWT do **Cloudflare Access** (`functions/_lib/access.ts`) — sem token válido a resposta é 401, e sem configuração é 503.
+
+Variáveis (Pages → Settings → Environment variables; segredos como *Secret*, nunca no Git):
+
+| Variável | Descrição |
+|---|---|
+| `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` | domínio do time Zero Trust e AUD da aplicação Access |
+| `GRAPH_TENANT_ID` / `GRAPH_CLIENT_ID` / `GRAPH_CLIENT_SECRET` | app registration (client credentials) com `Sites.Read.All`/`Files.Read.All` (Application) |
+| `GRAPH_DRIVE_ID` / `GRAPH_ITEM_ID` | drive e item do workbook `BaseLicitacao` |
+| `GRAPH_SHEET_NAME` | opcional, padrão `Base Governo` |
+
+O mapeamento de colunas (`functions/_lib/rows.ts`) é por nome de cabeçalho (sem acento/caixa) e falha de forma explícita se `Status`/`Data Pregão` mudarem. **Pendente de validação com a planilha real** (nenhuma credencial foi usada nesta entrega).
+
+## Esteira CI/CD (`.github/workflows`)
+
+`pipeline.yml` (PR, push na `main`, `workflow_dispatch`) chama `ci.yml` e depois publica:
+
+| Etapa | O que garante |
+|---|---|
+| quality | `tsc`, Vitest com cobertura (regras, snapshots de métricas, mapeador Graph, validação do JWT) |
+| build | build de produção + `check:dist` (orçamento de bundle e **bloqueio de dados reais em `dist/`**) |
+| e2e | Playwright desktop + mobile, console sem erros, axe WCAG A/AA (claro e escuro), sem rolagem horizontal |
+| audit | `npm audit` (prod, high) + assinaturas de pacotes; revisão de dependências no PR |
+| ci-ok | gate único para proteção de branch |
+| preview | cada PR vira `https://pr-N.radar-prevendas.pages.dev` com comentário automático |
+| production | `main` → Cloudflare Pages (environment `production`), smoke test (200, headers, API não pública) |
+| codeql / dependabot | análise estática semanal e atualizações agrupadas (actions fixadas por SHA) |
+
+**Configuração única:** secrets `CLOUDFLARE_API_TOKEN` (permissão *Pages: Edit*) e `CLOUDFLARE_ACCOUNT_ID`; variável `DEMO_MODE=true` enquanto a integração SharePoint não existe (publica com banner de dados sintéticos; remova para o modo real, em que API fora do ar vira erro visível). Opcional: `SITE_URL` (domínio próprio), revisores obrigatórios no environment `production` e proteção da `main` exigindo o check *CI ok*. **Rollback:** Actions → Pipeline → *Run workflow* com `ref` = commit/tag anterior.
+
+## Verificação
+
+- `npm run check` (typecheck + testes + build) e `npm run check:dist`; `npm run test:e2e` (Playwright; `npx playwright install chromium` na primeira vez).
+- Os testes de paridade com o HTML legado (`parity.test.ts`) só rodam se `../radar-pre-vendas.html` existir; a regressão contínua vem dos snapshots em `src/domain/__snapshots__` (mudou regra → `vitest -u` e revisar o diff).
+- ESLint não foi adicionado: `typescript-eslint` ainda não suporta TypeScript 7 (o gate de tipos é o `tsc`).
 
 ## Lacunas / próximos passos
 
-1. **API real do SharePoint**: substituir o mock por um backend de leitura Graph autenticado e validar o mapeamento com as colunas reais.
-2. **Autenticação e publicação**: configurar Cloudflare Access, domínio, secrets e proteção da API em ambiente Cloudflare.
-3. A aba Metodologia ainda descreve a atualização como "disparo manual", fiel ao processo atual; ajustar o texto se o fluxo mudar.
-4. Opcional: colapsar os chips de filtro quando todos os meses estão marcados (hoje segue o comportamento original, 1 chip por mês).
-5. Testes de componente (Testing Library) e e2e (Playwright) ainda não foram adicionados.
+1. Validar `functions/` com a planilha real (app registration, IDs, nomes de coluna) e configurar o Cloudflare Access.
+2. A aba Metodologia ainda descreve a atualização como "disparo manual".
+3. Opcional: colapsar os chips de filtro quando todos os meses estão marcados.
+4. Adotar ESLint quando `typescript-eslint` suportar TS 7.
