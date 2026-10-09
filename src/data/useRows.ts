@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { getAccessToken } from '@/auth/auth'
 import { DatasetSchema, type Row } from '@/domain/types'
 
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
@@ -30,8 +31,10 @@ async function requestJson(path: string, signal: AbortSignal, init?: RequestInit
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   try {
+    const token = await getAccessToken()
     const res = await fetch(`${API_URL}${path}`, {
       ...init,
+      headers: token ? { ...init?.headers, authorization: `Bearer ${token}` } : init?.headers,
       signal: controller.signal,
       cache: 'no-cache',
     })
