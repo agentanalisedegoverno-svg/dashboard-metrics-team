@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.env*
+!.env.example
+public/data.json
+*.tsbuildinfo

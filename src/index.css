@@ -1,0 +1,76 @@
+@import "tailwindcss";
+@import "@fontsource-variable/fraunces";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/* Tokens idênticos ao painel atual (claro / escuro pelo sistema). */
+:root {
+  color-scheme: light;
+  --page: #f4f5f7; --surface: #ffffff; --surface-2: #edeff3;
+  --ink: #151b2b; --ink-soft: #4a5169; --muted: #7b8296; --line: #dce0e8; --line-soft: #e9ecf1;
+  --brand: #16233f; --brand-ink: #0e1830;
+  --gold: #a66a17; --gold-soft: #f4e6d0;
+  --series-blue: #2a78d6; --series-orange: #eb6834; --series-gold: #c98500;
+  --series-green: #008300; --series-red: #e34948; --series-violet: #4a3aa7;
+  --st-good: #0ca30c; --st-warn: #c98200; --st-serious: #c9633f; --st-critical: #d03b3b;
+  --shadow: 0 1px 2px rgba(15,20,35,.04), 0 8px 24px -12px rgba(15,20,35,.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0e1320; --surface: #161d2e; --surface-2: #1d2538;
+    --ink: #eef0f6; --ink-soft: #c4c9d8; --muted: #8b93a8; --line: #2a3349; --line-soft: #232b40;
+    --brand: #c7d2e8; --brand-ink: #eef0f6;
+    --gold: #e0a94a; --gold-soft: #3a2e17;
+    --series-blue: #3987e5; --series-orange: #d95926; --series-gold: #c98500;
+    --series-green: #1f9d1f; --series-red: #e66767; --series-violet: #9085e9;
+    --st-good: #2fbf2f; --st-warn: #e0a94a; --st-serious: #e08a68; --st-critical: #e2564c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-series-blue: var(--series-blue);
+  --color-series-orange: var(--series-orange);
+  --color-series-gold: var(--series-gold);
+  --color-series-green: var(--series-green);
+  --color-series-red: var(--series-red);
+  --color-series-violet: var(--series-violet);
+  --color-st-good: var(--st-good);
+  --color-st-warn: var(--st-warn);
+  --color-st-serious: var(--st-serious);
+  --color-st-critical: var(--st-critical);
+  --shadow-card: var(--shadow);
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-serif: "Fraunces Variable", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--font-serif); font-weight: 600; text-wrap: balance; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+}

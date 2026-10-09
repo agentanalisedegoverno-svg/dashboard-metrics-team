@@ -1,0 +1,10 @@
+export type Prioridade = 'Alta' | 'Média' | 'Baixa'
+export type AcaoPlano = { n: number; h: string; p: string; prioridade: Prioridade; responsavel: string; proximoPasso: string }
+
+export const PLANO: AcaoPlano[] = [
+  { n: 1, h: 'Checklist Fast-Track de pré-qualificação', p: 'Matriz com critérios eliminatórios imediatos (atestados no repositório central × linha de serviço operante). Se não atende, o No Go é registrado sem alocar horas completas de análise.', prioridade: 'Alta', responsavel: 'Pré-Vendas + Produtos', proximoPasso: 'Desenhar a matriz com os principais motivos de No Go técnico e validar com Produtos' },
+  { n: 2, h: 'Matriz cadastral de acervo técnico', p: 'Inventário atualizado de atestados e certificações disponíveis, consultável pela Pré-Vendas antes da triagem detalhada.', prioridade: 'Alta', responsavel: 'Engenharia/Operações', proximoPasso: 'Levantar atestados vigentes por linha de serviço e publicar em base compartilhada' },
+  { n: 3, h: 'Feedback loop com Produtos/Go-to-Market', p: 'Usar os No Go por falta de atestado/certificação/time técnico para subsidiar roadmap de novos produtos, consórcios ou certificações estratégicas.', prioridade: 'Média', responsavel: 'Produtos', proximoPasso: 'Ranking trimestral dos motivos de No Go técnico como insumo de roadmap' },
+  { n: 4, h: 'Padronização do preenchimento financeiro (MC CTC)', p: 'Enforce de preenchimento obrigatório dos campos financeiros e orçamentários sempre que a oportunidade atingir status Go ou On going.', prioridade: 'Média', responsavel: 'Financeiro/Pricing', proximoPasso: 'Regra de validação na planilha/processo para status Go sem Valor CTC preenchido' },
+  { n: 5, h: 'Campo de data de decisão Go/No Go', p: 'Incluir campo de data da decisão para permitir medir o SLA real de triagem — hoje só é possível medir um proxy via Data de Pregão.', prioridade: 'Média', responsavel: 'Pré-Vendas (processo)', proximoPasso: 'Adicionar coluna e retroalimentar decisões futuras a partir desta semana' },
+]
