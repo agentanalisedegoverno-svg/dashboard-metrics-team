@@ -4,6 +4,10 @@ import { DatasetSchema, type Row } from '@/domain/types'
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 const DATA_URL = import.meta.env.VITE_DATA_URL || '/data.json'
 const REQUEST_TIMEOUT_MS = 5_000
+// O fallback estático é sintético: só vale em desenvolvimento ou quando a
+// publicação o habilita de forma explícita (demonstração). Em produção real,
+// API fora do ar deve virar erro visível, nunca números falsos.
+const ALLOW_MOCK_FALLBACK = import.meta.env.DEV || import.meta.env.VITE_ALLOW_MOCK_FALLBACK === 'true'
 
 export type Dataset = { rows: Row[]; updatedAt: string | null; isMock: boolean }
 
@@ -68,6 +72,10 @@ async function fetchDataset(signal: AbortSignal): Promise<Dataset> {
   } catch (error) {
     if (signal.aborted) throw error
     apiError = error
+  }
+
+  if (!ALLOW_MOCK_FALLBACK) {
+    throw new Error(`API indisponível. ${apiError instanceof Error ? apiError.message : 'erro desconhecido'}`)
   }
 
   try {

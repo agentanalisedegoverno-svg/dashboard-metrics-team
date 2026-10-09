@@ -1,0 +1,142 @@
+name: Pipeline
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Commit/tag a publicar (rollback). Vazio = HEAD da main.'
+        required: false
+        type: string
+
+concurrency:
+  group: pipeline-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  PAGES_PROJECT: radar-prevendas
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  preview:
+    name: Preview do PR
+    needs: ci
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Verifica credenciais Cloudflare
+        id: creds
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::Secrets da Cloudflare ausentes; preview ignorado."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: steps.creds.outputs.ok == 'true'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: steps.creds.outputs.ok == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Build de demonstração
+        if: steps.creds.outputs.ok == 'true'
+        run: npm ci && npm run build:demo && npm run check:dist
+      - name: Deploy do preview
+        if: steps.creds.outputs.ok == 'true'
+        run: npx wrangler pages deploy dist --project-name="$PAGES_PROJECT" --branch="pr-${{ github.event.number }}" --commit-hash="${{ github.event.pull_request.head.sha }}" --commit-dirty=true
+      - name: Comenta a URL no PR
+        if: steps.creds.outputs.ok == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const url = `https://pr-${context.issue.number}.${process.env.PAGES_PROJECT}.pages.dev`
+            const marker = '<!-- preview-url -->'
+            const body = `${marker}\n🔍 **Preview** (dados de demonstração): ${url}\nCommit: \`${context.payload.pull_request.head.sha.slice(0, 7)}\``
+            const { data: comments } = await github.rest.issues.listComments({ ...context.repo, issue_number: context.issue.number })
+            const prev = comments.find((c) => c.body?.includes(marker))
+            if (prev) await github.rest.issues.updateComment({ ...context.repo, comment_id: prev.id, body })
+            else await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body })
+
+  production:
+    name: Deploy produção
+    needs: ci
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Aprovação manual opcional: configure "Required reviewers" no environment "production".
+    environment:
+      name: production
+      url: ${{ steps.url.outputs.value }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # DEMO_MODE=true (repository variable) publica o build com banner de dados sintéticos
+      # enquanto a integração SharePoint não está configurada.
+      DEMO_MODE: ${{ vars.DEMO_MODE }}
+      SITE_URL: ${{ vars.SITE_URL }}
+    steps:
+      - name: Exige credenciais Cloudflare
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Configure os secrets CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID."
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: |
+          if [ "$DEMO_MODE" = "true" ]; then npm run build:demo; else npm run build; fi
+          npm run check:dist
+      - name: Garante que o projeto Pages existe
+        run: npx wrangler pages project create "$PAGES_PROJECT" --production-branch=main || true
+      - name: Deploy
+        run: npx wrangler pages deploy dist --project-name="$PAGES_PROJECT" --branch=main --commit-hash="$(git rev-parse HEAD)" --commit-dirty=true
+      - name: URL
+        id: url
+        run: echo "value=${SITE_URL:-https://$PAGES_PROJECT.pages.dev}" >> "$GITHUB_OUTPUT"
+      - name: Smoke test pós-deploy
+        run: |
+          url="${{ steps.url.outputs.value }}"
+          code=000
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url/" || true)
+            [ "$code" = 200 ] && break
+            echo "tentativa $i: HTTP $code"; sleep 10
+          done
+          test "$code" = 200
+          headers=$(curl -sI "$url/")
+          echo "$headers" | grep -i '^x-frame-options: DENY'
+          echo "$headers" | grep -i '^content-security-policy:'
+          # Com a integração real, a API nunca pode responder 200 sem autenticação.
+          api=$(curl -s -o /dev/null -w '%{http_code}' "$url/api/rows" || true)
+          echo "GET /api/rows sem credencial -> HTTP $api"
+          if [ "$api" = 200 ] && [ "$DEMO_MODE" != "true" ]; then
+            echo "::error::API respondeu 200 sem autenticação."
+            exit 1
+          fi

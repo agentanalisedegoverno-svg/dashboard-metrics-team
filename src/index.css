@@ -11,9 +11,9 @@
 :root {
   color-scheme: light;
   --page: #f4f5f7; --surface: #ffffff; --surface-2: #edeff3;
-  --ink: #151b2b; --ink-soft: #4a5169; --muted: #7b8296; --line: #dce0e8; --line-soft: #e9ecf1;
+  --ink: #151b2b; --ink-soft: #4a5169; --muted: #5d6479; --line: #dce0e8; --line-soft: #e9ecf1;
   --brand: #16233f; --brand-ink: #0e1830;
-  --gold: #a66a17; --gold-soft: #f4e6d0;
+  --gold: #8a560d; --gold-soft: #f4e6d0;
   --series-blue: #2a78d6; --series-orange: #eb6834; --series-gold: #c98500;
   --series-green: #008300; --series-red: #e34948; --series-violet: #4a3aa7;
   --st-good: #0ca30c; --st-warn: #c98200; --st-serious: #c9633f; --st-critical: #d03b3b;

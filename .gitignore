@@ -11,3 +11,8 @@ __pycache__/
 .venv/
 .pytest_cache/
 .wrangler/
+!.env.e2e
+playwright-report/
+test-results/
+coverage/
+!.env.demo
