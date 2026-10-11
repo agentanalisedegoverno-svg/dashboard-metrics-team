@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless'
 import { verifyAccessJwt } from '../_lib/access'
 
-type Env = { DATABASE_URL?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string }
+type Env = { DATABASE_URL?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string; ACESSO_PUBLICO?: string }
 type Ctx = { request: Request; env: Env; params: { path?: string | string[] } }
 
 const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'private, no-store' }
@@ -13,14 +13,16 @@ const send = (status: number, body: unknown) => new Response(JSON.stringify(body
  * Falha fechada: sem Cloudflare Access configurado e um JWT válido, nada é devolvido.
  */
 export const onRequest = async ({ request, env, params }: Ctx): Promise<Response> => {
-  if (!env.CF_ACCESS_TEAM_DOMAIN || !env.CF_ACCESS_AUD) {
-    return send(503, { error: 'Autenticação (Cloudflare Access) não configurada.' })
+    if (env.ACESSO_PUBLICO !== 'true') {
+    if (!env.CF_ACCESS_TEAM_DOMAIN || !env.CF_ACCESS_AUD) {
+      return send(503, { error: 'Autenticação (Cloudflare Access) não configurada.' })
+    }
+    const authorized = await verifyAccessJwt(request.headers.get('cf-access-jwt-assertion'), {
+      teamDomain: env.CF_ACCESS_TEAM_DOMAIN,
+      audience: env.CF_ACCESS_AUD,
+    })
+    if (!authorized) return send(401, { error: 'Não autorizado.' })
   }
-  const authorized = await verifyAccessJwt(request.headers.get('cf-access-jwt-assertion'), {
-    teamDomain: env.CF_ACCESS_TEAM_DOMAIN,
-    audience: env.CF_ACCESS_AUD,
-  })
-  if (!authorized) return send(401, { error: 'Não autorizado.' })
   if (!env.DATABASE_URL) return send(503, { error: 'Banco de dados não configurado.' })
 
   const route = [params.path].flat().join('/')

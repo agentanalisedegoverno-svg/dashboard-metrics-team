@@ -1,3 +1,8 @@
 name = "dashboard-metrics-team"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-10-09"
+
+# ATENÇÃO — ACESSO ABERTO (temporário): com "true" a API devolve os dados SEM exigir login.
+# Para fechar: remova esta linha (ou use "false") e configure o Cloudflare Access (CF_ACCESS_*).
+[vars]
+ACESSO_PUBLICO = "true"
