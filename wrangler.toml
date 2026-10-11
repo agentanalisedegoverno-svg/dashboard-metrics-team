@@ -1,3 +1,10 @@
 name = "dashboard-metrics-team"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-10-09"
+
+# Identificadores (não são segredos) do workbook BaseLicitacao.xlsx no SharePoint GOVERNO2.
+# O acesso é decidido pelo token Microsoft de cada usuário.
+[vars]
+GRAPH_DRIVE_ID = "b!CLxZnv93iEiZpGzQ6DiPEvlY0WGvMu9Fls3ZquPmV8vnPjGQ6yj9SKgYneGWN1M6"
+GRAPH_ITEM_ID = "01FBRTFC37BP4VB7SBB5DLSPVTQ2JOIUHY"
+GRAPH_SHEET_NAME = "Base Governo"

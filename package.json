@@ -19,6 +19,7 @@
     "build:demo": "tsc -b && vite build --mode demo"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.25.0",
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
