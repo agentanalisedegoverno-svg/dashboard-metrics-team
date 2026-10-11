@@ -14,7 +14,7 @@ Cole o bloco "Prompt do agente" abaixo no agente do Claude Code que alimenta o b
   Ela fica visível só para o seu usuário do Windows. Reabra o terminal depois de definir.
 - **Agendamento a cada 2 dias (Agendador de Tarefas do Windows):**
   ```powershell
-  $acao = New-ScheduledTaskAction -Execute "claude" -Argument '-p "Execute o roteiro de carga do docs/AGENTE-DE-CARGA.md" --allowedTools "Bash,Read,Write"' -WorkingDirectory "C:\caminho\doepositorio"
+  $acao = New-ScheduledTaskAction -Execute "claude" -Argument '-p "Leia docs/AGENTE-DE-CARGA.md e execute o bloco Prompt do agente" --model claude-sonnet-5-5 --allowedTools "Bash,Read,Write"' -WorkingDirectory "C:\Users\CTC\Downloads\radar-prevendas-react\radar-prevendas-react"
   $gatilho = New-ScheduledTaskTrigger -Daily -DaysInterval 2 -At 7:00am
   Register-ScheduledTask -TaskName "RadarPreVendas-Carga" -Action $acao -Trigger $gatilho
   ```
