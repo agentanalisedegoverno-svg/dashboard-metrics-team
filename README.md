@@ -68,20 +68,20 @@ scripts/
 - Cloudflare Access precisa ser habilitado no painel Cloudflare para proteger o site por e-mail. Se a API real usar outro host, ela também precisa exigir autenticação; proteger somente o frontend não protege os dados.
 - O backend real de leitura do SharePoint permanece pendente de configuração do tenant, app registration, permissões Graph e URL do workbook. Não configure esses valores em arquivos versionados; use variáveis/segredos no ambiente de execução.
 
-## API real (Cloudflare Pages Functions → Microsoft Graph)
+## Dados: Postgres (Neon) alimentado por agente
 
-`functions/api/[[path]].ts` serve `GET /api/rows`, `GET /api/status` e `POST /api/sync` (somente leitura do workbook; `sync` apenas invalida o cache de 5 min). Toda chamada exige o JWT do **Cloudflare Access** (`functions/_lib/access.ts`) — sem token válido a resposta é 401, e sem configuração é 503.
+**Fluxo:** um agente lê a planilha (`BaseLicitacao.xlsx`, aba "Base Governo") e substitui a base no Postgres a cada execução (ver [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md)). O painel lê do banco por `functions/api/[[path]].ts` (`GET /api/rows`, `GET /api/status`, `POST /api/sync` só relê), com o papel somente-leitura `radar_leitor`. Esquema em `db/schema.sql`.
 
-Variáveis (Pages → Settings → Environment variables; segredos como *Secret*, nunca no Git):
+**Proteção:** a API **falha fechada**: só responde com um JWT válido do **Cloudflare Access**. Sem Access configurado, devolve 503.
 
-| Variável | Descrição |
-|---|---|
-| `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` | domínio do time Zero Trust e AUD da aplicação Access |
-| `GRAPH_TENANT_ID` / `GRAPH_CLIENT_ID` / `GRAPH_CLIENT_SECRET` | app registration (client credentials) com `Sites.Read.All`/`Files.Read.All` (Application) |
-| `GRAPH_DRIVE_ID` / `GRAPH_ITEM_ID` | drive e item do workbook `BaseLicitacao` |
-| `GRAPH_SHEET_NAME` | opcional, padrão `Base Governo` |
+| Onde | Variável | Observação |
+|---|---|---|
+| Cloudflare Pages → Settings → Variables and Secrets | `DATABASE_URL` (**Secret**) | string do papel `radar_leitor` (somente leitura) |
+| idem | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | domínio do time Zero Trust e AUD da aplicação Access |
+| Ambiente do agente de carga | `DATABASE_URL_WRITER` | papel `radar_escritor` (só executa a função de carga) |
+| GitHub → variables | remover `DEMO_MODE` | só depois de Access e `DATABASE_URL` configurados |
 
-O mapeamento de colunas (`functions/_lib/rows.ts`) é por nome de cabeçalho (sem acento/caixa) e falha de forma explícita se `Status`/`Data Pregão` mudarem. **Pendente de validação com a planilha real** (nenhuma credencial foi usada nesta entrega).
+Enquanto `DEMO_MODE=true`, o site publica o build com dados sintéticos e banner. `functions/_lib/rows.ts` converte a matriz bruta da planilha (cabeçalho real conferido, 33 colunas) e é usado por `scripts/load-db.mjs --raw`.
 
 ## Esteira CI/CD (`.github/workflows`)
 
@@ -108,7 +108,7 @@ O mapeamento de colunas (`functions/_lib/rows.ts`) é por nome de cabeçalho (se
 
 ## Lacunas / próximos passos
 
-1. Validar `functions/` com a planilha real (app registration, IDs, nomes de coluna) e configurar o Cloudflare Access.
+1. Configurar o Cloudflare Access e o secret `DATABASE_URL`, rodar a primeira carga real e remover `DEMO_MODE`.
 2. A aba Metodologia ainda descreve a atualização como "disparo manual".
 3. Opcional: colapsar os chips de filtro quando todos os meses estão marcados.
 4. Adotar ESLint quando `typescript-eslint` suportar TS 7.
