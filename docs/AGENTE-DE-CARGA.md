@@ -2,11 +2,23 @@
 
 Cole o bloco "Prompt do agente" abaixo no agente do Claude Code que alimenta o banco. Ele é autocontido e não contém credenciais.
 
-## Pré-requisitos (uma vez)
-- Node 22.18+ e este repositório clonado (o agente roda `scripts/load-db.mjs` e precisa de `npm ci`).
-- Variável de ambiente `DATABASE_URL_WRITER` com a string do papel `radar_escritor` (fora do Git).
-- Acesso de **leitura** à planilha `BaseLicitacao.xlsx`, aba **Base Governo**, por um destes meios: conector Microsoft 365/SharePoint do Claude, ou cópia sincronizada do OneDrive no disco.
-- Agendamento a cada 2 dias: `/schedule` (rotina na nuvem, se o agente tiver acesso à planilha e ao segredo) ou `/loop 2d` / tarefa agendada do Windows rodando `claude -p "<prompt>"` na máquina que já tem o OneDrive sincronizado.
+## Pré-requisitos (uma vez) — execução na máquina local (Windows)
+- Node 22.18+ e este repositório clonado, com `npm ci` já executado.
+- **Planilha pelo OneDrive sincronizado:** no Explorer, clique com o botão direito no arquivo `BaseLicitacao.xlsx` (ou na pasta) → *Sempre manter neste dispositivo*. Sem isso, o arquivo pode ser só um "espaço reservado" na nuvem e a leitura falha.
+- **Leitura sem travar o Excel:** o agente deve **copiar** o arquivo para uma pasta temporária e ler a cópia (nunca abrir o original), para não conflitar com quem estiver editando.
+- **Plano B pelo conector Microsoft 365:** se o arquivo local não estiver atualizado, ler a aba pelo conector (SharePoint GOVERNO2) em vez do disco.
+- Variável de ambiente do usuário com a string do `radar_escritor` (fora do Git):
+  ```powershell
+  [Environment]::SetEnvironmentVariable("DATABASE_URL_WRITER", "<string>", "User")
+  ```
+  Ela fica visível só para o seu usuário do Windows. Reabra o terminal depois de definir.
+- **Agendamento a cada 2 dias (Agendador de Tarefas do Windows):**
+  ```powershell
+  $acao = New-ScheduledTaskAction -Execute "claude" -Argument '-p "Execute o roteiro de carga do docs/AGENTE-DE-CARGA.md" --allowedTools "Bash,Read,Write"' -WorkingDirectory "C:\caminho\doepositorio"
+  $gatilho = New-ScheduledTaskTrigger -Daily -DaysInterval 2 -At 7:00am
+  Register-ScheduledTask -TaskName "RadarPreVendas-Carga" -Action $acao -Trigger $gatilho
+  ```
+  A máquina precisa estar ligada e com o OneDrive sincronizado no horário (marque "executar assim que possível após horário perdido" nas configurações da tarefa).
 
 ## Prompt do agente
 
@@ -21,7 +33,10 @@ REGRAS INEGOCIÁVEIS
 - Se qualquer validação falhar, NÃO carregue: pare e relate o motivo. Nunca "conserte" dados inventando valores.
 
 PASSOS
-1. Leia a aba "Base Governo" inteira (valores calculados, não fórmulas). A primeira linha é o cabeçalho.
+1. Localize o arquivo BaseLicitacao.xlsx no OneDrive sincronizado e COPIE-O para uma pasta temporária (leia só a cópia).
+   Se o arquivo local estiver ausente, em modo "somente nuvem" ou com data de modificação mais antiga que a do SharePoint,
+   use o conector Microsoft 365 para ler a aba. Leia a aba "Base Governo" inteira (valores calculados, não fórmulas).
+   A primeira linha é o cabeçalho. (Ex.: Python openpyxl com data_only=True sobre a cópia.)
    Gere um arquivo JSON temporário (aba.json) com a matriz: [ [cabeçalhos...], [linha 1...], ... ].
    - Datas: serialize como texto ISO "AAAA-MM-DD" (ou mantenha o número serial do Excel). Nunca como objeto.
    - Números e valores monetários: números (não texto com "R$"). Células vazias: null.
@@ -35,7 +50,7 @@ PASSOS
 3. Carregue (substitui a base inteira, em uma transação):
       node scripts/load-db.mjs aba.json --raw --fonte "agente-claude"
    A saída esperada é "✓ N linhas carregadas". N deve ser igual ao número de linhas de dados lidas.
-4. Apague o aba.json temporário (contém dados de licitações).
+4. Apague a cópia temporária da planilha e o aba.json (contêm dados de licitações) (contém dados de licitações).
 5. Relate em 5 linhas: horário, linhas lidas, linhas carregadas, validações, e qualquer anomalia.
 
 EM CASO DE ERRO
