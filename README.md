@@ -68,20 +68,22 @@ scripts/
 - Cloudflare Access precisa ser habilitado no painel Cloudflare para proteger o site por e-mail. Se a API real usar outro host, ela também precisa exigir autenticação; proteger somente o frontend não protege os dados.
 - O backend real de leitura do SharePoint permanece pendente de configuração do tenant, app registration, permissões Graph e URL do workbook. Não configure esses valores em arquivos versionados; use variáveis/segredos no ambiente de execução.
 
-## API real e login Microsoft
+## Dados: Postgres (Neon) alimentado por agente
 
-**Fluxo:** o usuário entra com a conta Microsoft da empresa (MSAL, código + PKCE, sem segredo no navegador). O painel envia o token delegado a `functions/api/[[path]].ts`, que o repassa ao Graph e lê `BaseLicitacao.xlsx` (aba "Base Governo"). O acesso à planilha é decidido pelo SharePoint, conforme as permissões de cada pessoa; não há segredo nem cache compartilhado no servidor. Rotas: `GET /api/rows`, `GET /api/status`, `POST /api/sync` (só relê).
+**Fluxo:** um agente lê a planilha (`BaseLicitacao.xlsx`, aba "Base Governo") e substitui a base no Postgres a cada execução (ver [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md)). O painel lê do banco por `functions/api/[[path]].ts` (`GET /api/rows`, `GET /api/status`, `POST /api/sync` só relê), com o papel somente-leitura `radar_leitor`. Esquema em `db/schema.sql`.
 
-**Configuração:**
+**Proteção:** a API **falha fechada**: só responde com um JWT válido do **Cloudflare Access**. Sem Access configurado, devolve 503.
 
-| Onde | O quê |
-|---|---|
-| `wrangler.toml` `[vars]` | `GRAPH_DRIVE_ID`, `GRAPH_ITEM_ID`, `GRAPH_SHEET_NAME` (identificadores, não segredos) |
-| GitHub → variables | `MS_CLIENT_ID`, `MS_TENANT_ID` (públicos) e remover `DEMO_MODE` para ativar o login |
-| Entra ID (app registration) | plataforma **SPA** com redirect URI `https://radar-prevendas.pages.dev`; permissão delegada somente leitura (`Files.Read.All`) com **consentimento de administrador** |
-| Build | `VITE_MS_SCOPES` (opcional, padrão `Files.Read.All`) |
+| Onde | Variável | Observação |
+|---|---|---|
+| Cloudflare Pages → Settings → Variables and Secrets | `DATABASE_URL` (**Secret**) | string do papel `radar_leitor` (somente leitura) |
+| idem | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | domínio do time Zero Trust e AUD da aplicação Access |
+| Ambiente do agente de carga | `DATABASE_URL_WRITER` | papel `radar_escritor` (só executa a função de carga) |
+| GitHub → variables | remover `DEMO_MODE` | só depois de Access e `DATABASE_URL` configurados |
 
-Sem `VITE_MS_CLIENT_ID` (dev/demo) o login fica desligado. O mapeamento de colunas (`functions/_lib/rows.ts`) foi conferido com o cabeçalho real da planilha (33 colunas). `functions/_lib/access.ts` (validação do JWT do Cloudflare Access) não é usado hoje; fica disponível como camada extra opcional.
+Enquanto `DEMO_MODE=true`, o site publica o build com dados sintéticos e banner. `functions/_lib/rows.ts` converte a matriz bruta da planilha (cabeçalho real conferido, 33 colunas) e é usado por `scripts/load-db.mjs --raw`.
+
+> O código de login Microsoft (MSAL + repasse de token, `src/auth/`) segue no repositório, **desligado**: só ativa com `VITE_MS_CLIENT_ID`/`VITE_MS_TENANT_ID`, que não são definidos. A fonte de dados oficial é o banco.
 
 ## Esteira CI/CD (`.github/workflows`)
 
@@ -108,7 +110,7 @@ Sem `VITE_MS_CLIENT_ID` (dev/demo) o login fica desligado. O mapeamento de colun
 
 ## Lacunas / próximos passos
 
-1. Registrar o app no Entra (SPA + consentimento de admin) e validar o login ponta a ponta com dados reais.
+1. Configurar o Cloudflare Access e o secret `DATABASE_URL`, rodar a primeira carga real e remover `DEMO_MODE`.
 2. A aba Metodologia ainda descreve a atualização como "disparo manual".
 3. Opcional: colapsar os chips de filtro quando todos os meses estão marcados.
 4. Adotar ESLint quando `typescript-eslint` suportar TS 7.

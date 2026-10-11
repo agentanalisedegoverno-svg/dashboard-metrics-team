@@ -1,65 +1,70 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const sqlMock = vi.fn()
+vi.mock('@neondatabase/serverless', () => ({ neon: () => sqlMock }))
+const verify = vi.fn()
+vi.mock('../_lib/access', () => ({ verifyAccessJwt: (...a: unknown[]) => verify(...a) }))
+
 import { onRequest } from './[[path]]'
 
-const env = { GRAPH_DRIVE_ID: 'd1', GRAPH_ITEM_ID: 'i1', GRAPH_SHEET_NAME: 'Base Governo' }
-const header = ['Status', 'Data Pregão', 'Processo']
-const call = (path: string, init: RequestInit = {}, e = env) =>
-  onRequest({ request: new Request(`https://x.test/api/${path}`, init), env: e, params: { path } })
-const auth = { headers: { authorization: 'Bearer tok-do-usuario' } }
+const env = { DATABASE_URL: 'postgres://leitor@h/db', CF_ACCESS_TEAM_DOMAIN: 't.cloudflareaccess.com', CF_ACCESS_AUD: 'aud' }
+const call = (path: string, method = 'GET', e: Record<string, string | undefined> = env) =>
+  onRequest({ request: new Request(`https://x.test/api/${path}`, { method, headers: { 'cf-access-jwt-assertion': 'jwt' } }), env: e, params: { path } })
 
-afterEach(() => vi.unstubAllGlobals())
+beforeEach(() => {
+  sqlMock.mockReset()
+  verify.mockReset().mockResolvedValue(true)
+})
 
-describe('API de leitura', () => {
-  it('sem Bearer -> 401, sem chamar o Graph', async () => {
-    const f = vi.fn()
-    vi.stubGlobal('fetch', f)
-    expect((await call('rows')).status).toBe(401)
-    expect(f).not.toHaveBeenCalled()
+describe('API de leitura (Postgres)', () => {
+  it('falha fechada sem Cloudflare Access configurado', async () => {
+    const res = await call('rows', 'GET', { DATABASE_URL: env.DATABASE_URL })
+    expect(res.status).toBe(503)
+    expect(sqlMock).not.toHaveBeenCalled()
   })
 
-  it('sem configuração -> 503', async () => {
-    expect((await call('rows', auth, {} as typeof env)).status).toBe(503)
+  it('JWT inválido -> 401 e nenhuma consulta ao banco', async () => {
+    verify.mockResolvedValue(false)
+    expect((await call('rows')).status).toBe(401)
+    expect(sqlMock).not.toHaveBeenCalled()
+  })
+
+  it('sem DATABASE_URL -> 503', async () => {
+    expect((await call('rows', 'GET', { ...env, DATABASE_URL: undefined })).status).toBe(503)
   })
 
   it('rota desconhecida e método errado -> 404', async () => {
-    vi.stubGlobal('fetch', vi.fn())
-    expect((await call('outra', auth)).status).toBe(404)
-    expect((await call('rows', { ...auth, method: 'POST' })).status).toBe(404)
+    expect((await call('outra')).status).toBe(404)
+    expect((await call('rows', 'POST')).status).toBe(404)
   })
 
-  it('repassa o token do usuário ao Graph e mapeia as linhas', async () => {
-    const f = vi.fn(async (url: string) =>
-      new Response(JSON.stringify(url.includes('usedRange') ? { values: [header, ['Win', '15/01/2025', 'P-1']] } : { lastModifiedDateTime: '2026-10-09T19:12:37Z' })),
-    )
-    vi.stubGlobal('fetch', f)
-    const res = await call('rows', auth)
+  it('rows devolve as linhas e a data da última carga, sem cache', async () => {
+    sqlMock
+      .mockResolvedValueOnce([{ ultima_carga_em: '2026-10-11T00:08:41.960Z', total_linhas: 1, erro: null }])
+      .mockResolvedValueOnce([{ ano: '2026', status: 'Win', orcamento: 10 }])
+    const res = await call('rows')
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toContain('no-store')
-    const body = (await res.json()) as { rows: { processo: string; ano: string }[]; updatedAt: string; isMock: boolean }
-    expect(body).toMatchObject({ updatedAt: '2026-10-09T19:12:37Z', isMock: false })
-    expect(body.rows[0]).toMatchObject({ processo: 'P-1', ano: '2025' })
-    for (const [, init] of f.mock.calls as unknown as [string, RequestInit][]) {
-      expect(init.headers).toEqual({ authorization: 'Bearer tok-do-usuario' })
-    }
+    expect(await res.json()).toEqual({ rows: [{ ano: '2026', status: 'Win', orcamento: 10 }], updatedAt: '2026-10-11T00:08:41.960Z', isMock: false })
   })
 
-  it('status devolve contagem e data do arquivo', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
-      new Response(JSON.stringify(url.includes('usedRange') ? { values: [header, ['Win', '15/01/2025', 'P-1'], ['Lost', '16/01/2025', 'P-2']] } : {})),
-    ))
-    expect(await (await call('status', auth)).json()).toMatchObject({ rowCount: 2, isMock: false, error: null })
+  it('status e sync respondem com contagem e erro da última carga', async () => {
+    const row = { ultima_carga_em: '2026-10-11T00:08:41.960Z', total_linhas: 590, erro: null }
+    sqlMock.mockResolvedValue([row])
+    expect(await (await call('status')).json()).toEqual({ lastSyncAt: '2026-10-11T00:08:41.960Z', rowCount: 590, error: null, isMock: false })
+    expect((await call('sync', 'POST')).status).toBe(200)
   })
 
-  it.each([401, 403])('Graph %i -> mesmo status para o cliente', async (status) => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status })))
-    expect((await call('rows', auth)).status).toBe(status)
+  it('banco sem nenhuma carga ainda -> lastSyncAt nulo', async () => {
+    sqlMock.mockResolvedValue([{ ultima_carga_em: null, total_linhas: 0, erro: null }])
+    expect(await (await call('status')).json()).toMatchObject({ lastSyncAt: null, rowCount: 0 })
   })
 
-  it('falha do Graph (500) -> 502 sem vazar detalhes', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })))
+  it('erro do banco -> 502 sem vazar detalhes', async () => {
+    sqlMock.mockRejectedValue(new Error('password authentication failed for user radar_leitor'))
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    const res = await call('rows', auth)
+    const res = await call('rows')
     expect(res.status).toBe(502)
-    expect(JSON.stringify(await res.json())).not.toMatch(/graph|500/i)
+    expect(JSON.stringify(await res.json())).not.toMatch(/password|radar_leitor/i)
   })
 })
