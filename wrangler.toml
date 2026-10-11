@@ -2,7 +2,10 @@ name = "dashboard-metrics-team"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-10-09"
 
-# ATENÇÃO — ACESSO ABERTO (temporário): com "true" a API devolve os dados SEM exigir login.
-# Para fechar: remova esta linha (ou use "false") e configure o Cloudflare Access (CF_ACCESS_*).
+# Cloudflare Access (Zero Trust): login por código enviado ao e-mail @ctctech.com.br.
+# Não são segredos. A API valida o JWT do Access em QUALQUER endereço do projeto
+# (inclusive os <hash>.radar-prevendas.pages.dev de cada deploy).
+# Para reabrir o acesso temporariamente: adicionar ACESSO_PUBLICO = "true" (não recomendado).
 [vars]
-ACESSO_PUBLICO = "true"
+CF_ACCESS_TEAM_DOMAIN = "ctctech-radar.cloudflareaccess.com"
+CF_ACCESS_AUD = "ef8c10001baa8332266db6f525b1bb2bf7239bc352c01c809682ae60ee22925f"
