@@ -16,3 +16,7 @@ playwright-report/
 test-results/
 coverage/
 !.env.demo
+
+# Skills de agentes instaladas localmente (nao versionar)
+.claude/skills/
+skills-lock.json

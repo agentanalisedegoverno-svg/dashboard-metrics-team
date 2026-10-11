@@ -77,11 +77,12 @@ scripts/
 | Onde | Variável | Observação |
 |---|---|---|
 | Cloudflare Pages → Settings → Variables and Secrets | `DATABASE_URL` (**Secret**) | string do papel `radar_leitor` (somente leitura) |
-| idem | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | domínio do time Zero Trust e AUD da aplicação Access |
+| `wrangler.toml` `[vars]` | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | time `ctctech-radar` e AUD da aplicação Access "Radar Pré-Vendas" (não são segredos) |
 | Ambiente do agente de carga | `DATABASE_URL_WRITER` | papel `radar_escritor` (só executa a função de carga) |
-| GitHub → variables | remover `DEMO_MODE` | só depois de Access e `DATABASE_URL` configurados |
 
-Enquanto `DEMO_MODE=true`, o site publica o build com dados sintéticos e banner. `functions/_lib/rows.ts` converte a matriz bruta da planilha (cabeçalho real conferido, 33 colunas) e é usado por `scripts/load-db.mjs --raw`.
+**Acesso:** Cloudflare Access (Zero Trust, plano Free) com login por código (*One-time PIN*) enviado ao e-mail; política *Allow* para `@ctctech.com.br`. Para liberar outro e-mail ou domínio: Zero Trust → Access → Applications → Radar Pré-Vendas → Policies. A API valida o JWT em qualquer endereço do projeto, inclusive os `<hash>.radar-prevendas.pages.dev` de cada deploy. O flag `ACESSO_PUBLICO="true"` reabre a API sem login (uso temporário; não recomendado).
+
+Com `DEMO_MODE=true` (variável do GitHub), o site publica o build com dados sintéticos e banner; sem a variável, publica o build de produção. `functions/_lib/rows.ts` converte a matriz bruta da planilha (cabeçalho real conferido, 33 colunas) e é usado por `scripts/load-db.mjs --raw`.
 
 > O código de login Microsoft (MSAL + repasse de token, `src/auth/`) segue no repositório, **desligado**: só ativa com `VITE_MS_CLIENT_ID`/`VITE_MS_TENANT_ID`, que não são definidos. A fonte de dados oficial é o banco.
 
