@@ -23,6 +23,15 @@ describe('API de leitura (Postgres)', () => {
     expect(sqlMock).not.toHaveBeenCalled()
   })
 
+  it('ACESSO_PUBLICO=true dispensa o Access, mas só com o valor exato "true"', async () => {
+    sqlMock.mockResolvedValue([{ ultima_carga_em: null, total_linhas: 0, erro: null }])
+    verify.mockResolvedValue(false)
+    expect((await call('status', 'GET', { DATABASE_URL: env.DATABASE_URL, ACESSO_PUBLICO: 'true' })).status).toBe(200)
+    expect(verify).not.toHaveBeenCalled()
+    expect((await call('status', 'GET', { DATABASE_URL: env.DATABASE_URL, ACESSO_PUBLICO: '1' })).status).toBe(503)
+    expect((await call('status', 'GET', { ...env, ACESSO_PUBLICO: 'false' })).status).toBe(401)
+  })
+
   it('JWT inválido -> 401 e nenhuma consulta ao banco', async () => {
     verify.mockResolvedValue(false)
     expect((await call('rows')).status).toBe(401)

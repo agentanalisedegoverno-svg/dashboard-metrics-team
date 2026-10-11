@@ -146,18 +146,23 @@ jobs:
             echo "$headers" | grep -i '^x-frame-options: DENY'
             echo "$headers" | grep -i '^content-security-policy:'
           else
-            # Produção real: o domínio inteiro fica atrás do Cloudflare Access.
-            # Sem credencial, a raiz e a API devem redirecionar ao login (nunca devolver dados).
-            for path in "/" "/api/rows"; do
-              code=000
-              for i in 1 2 3 4 5 6; do
-                out=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$url$path" || true)
-                code=${out%% *}
-                [ "$code" = 302 ] && break
-                echo "$path tentativa $i: $out"; sleep 10
-              done
-              echo "GET $path sem credencial -> $out"
-              test "$code" = 302
-              case "$out" in *cloudflareaccess.com*) ;; *) echo "::error::$path não redireciona ao Cloudflare Access."; exit 1;; esac
+            # Produção real: ou o domínio está atrás do Cloudflare Access (302 ao login) ou o acesso
+            # aberto está ligado de propósito (ACESSO_PUBLICO no wrangler.toml; a API deve servir os dados).
+            out=000
+            for i in 1 2 3 4 5 6; do
+              out=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$url/" || true)
+              case "$out" in 200\ *|302\ *) break;; esac
+              echo "tentativa $i: $out"; sleep 10
             done
+            echo "GET / -> $out"
+            case "$out" in
+              302\ *cloudflareaccess.com*)
+                api=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$url/api/rows" || true)
+                echo "GET /api/rows sem credencial -> $api"
+                case "$api" in 302\ *cloudflareaccess.com*) ;; *) echo "::error::API sem proteção do Access."; exit 1;; esac ;;
+              200\ *)
+                echo "::warning::Acesso ABERTO: o painel está público (ACESSO_PUBLICO=true)."
+                curl -sf "$url/api/status" | grep -q '"rowCount"' ;;
+              *) echo "::error::Resposta inesperada na raiz."; exit 1 ;;
+            esac
           fi
