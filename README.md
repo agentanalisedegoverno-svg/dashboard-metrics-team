@@ -2,6 +2,18 @@
 
 Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4 + componentes no padrão shadcn/ui**, preservando 100% da usabilidade e das regras já validadas.
 
+## Documentação
+
+| Documento | Conteúdo |
+|---|---|
+| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Desenho completo (planilha → agente → banco → API → painel → usuário), diagramas, modelo de dados, decisões e riscos |
+| [docs/OPERACAO.md](docs/OPERACAO.md) | Configurações e segredos, rotinas, solução de problemas, troca de senhas e tokens |
+| [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md) | Contrato de dados e uso do `scripts/load-db.mjs` |
+| [docs/AGENTE-DE-CARGA.md](docs/AGENTE-DE-CARGA.md) | Prompt do agente e agendamento a cada 2 dias |
+| [db/schema.sql](db/schema.sql) | Esquema, função de carga e privilégios do banco |
+
+**Em uma frase:** um agente copia a aba *Base Governo* da planilha para o Postgres (Neon) a cada 2 dias; o painel lê desse banco por uma API protegida pelo Cloudflare Access (login por código no e-mail `@ctctech.com.br`).
+
 ## Rodar
 
 ```bash
