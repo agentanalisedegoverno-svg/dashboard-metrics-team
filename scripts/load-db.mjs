@@ -1,6 +1,7 @@
 // Carga da base no Postgres (Neon). Substitui TODAS as linhas de forma atômica.
 //
 // Uso (o agente chama este script):
+//   (--dry-run valida e converte sem gravar e dispensa DATABASE_URL_WRITER)
 //   DATABASE_URL_WRITER=postgresql://radar_escritor:...@host/neondb?sslmode=require \
 //     node scripts/load-db.mjs linhas.json [--fonte "agente-claude"]
 //
@@ -14,13 +15,15 @@ import { readFile } from 'node:fs/promises'
 import { neon } from '@neondatabase/serverless'
 
 const args = process.argv.slice(2)
-const file = args.find((a) => !a.startsWith('--') && a !== args[args.indexOf('--fonte') + 1])
+const fonteIdx = args.indexOf('--fonte')
+const fonte = fonteIdx >= 0 ? args[fonteIdx + 1] : 'agent'
+const file = args.find((a, i) => !a.startsWith('--') && (fonteIdx < 0 || i !== fonteIdx + 1))
 const raw = args.includes('--raw')
-const fonte = args.includes('--fonte') ? args[args.indexOf('--fonte') + 1] : 'agent'
+const dryRun = args.includes('--dry-run')
 const url = process.env.DATABASE_URL_WRITER
 
-if (!file || !url) {
-  console.error('Uso: DATABASE_URL_WRITER=... node scripts/load-db.mjs <arquivo.json> [--raw] [--fonte nome]')
+if (!file || (!url && !dryRun)) {
+  console.error('Uso: DATABASE_URL_WRITER=... node scripts/load-db.mjs <arquivo.json> [--raw] [--dry-run] [--fonte nome]')
   process.exit(2)
 }
 
@@ -33,6 +36,11 @@ if (raw) {
 if (!Array.isArray(rows) || rows.length === 0) {
   console.error('Nada a carregar: o arquivo não contém linhas.')
   process.exit(1)
+}
+
+if (dryRun) {
+  console.log(`✓ dry-run: ${rows.length} linhas válidas para carga (nada foi gravado)`)
+  process.exit(0)
 }
 
 const sql = neon(url)
