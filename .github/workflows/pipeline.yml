@@ -133,20 +133,31 @@ jobs:
       - name: Smoke test pós-deploy
         run: |
           url="${{ steps.url.outputs.value }}"
-          code=000
-          for i in 1 2 3 4 5 6; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "$url/" || true)
-            [ "$code" = 200 ] && break
-            echo "tentativa $i: HTTP $code"; sleep 10
-          done
-          test "$code" = 200
-          headers=$(curl -sI "$url/")
-          echo "$headers" | grep -i '^x-frame-options: DENY'
-          echo "$headers" | grep -i '^content-security-policy:'
-          # Com a integração real, a API nunca pode responder 200 sem autenticação.
-          api=$(curl -s -o /dev/null -w '%{http_code}' "$url/api/rows" || true)
-          echo "GET /api/rows sem credencial -> HTTP $api"
-          if [ "$api" = 200 ] && [ "$DEMO_MODE" != "true" ]; then
-            echo "::error::API respondeu 200 sem autenticação."
-            exit 1
+          if [ "$DEMO_MODE" = "true" ]; then
+            # Demonstração: site público com dados sintéticos.
+            code=000
+            for i in 1 2 3 4 5 6; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$url/" || true)
+              [ "$code" = 200 ] && break
+              echo "tentativa $i: HTTP $code"; sleep 10
+            done
+            test "$code" = 200
+            headers=$(curl -sI "$url/")
+            echo "$headers" | grep -i '^x-frame-options: DENY'
+            echo "$headers" | grep -i '^content-security-policy:'
+          else
+            # Produção real: o domínio inteiro fica atrás do Cloudflare Access.
+            # Sem credencial, a raiz e a API devem redirecionar ao login (nunca devolver dados).
+            for path in "/" "/api/rows"; do
+              code=000
+              for i in 1 2 3 4 5 6; do
+                out=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$url$path" || true)
+                code=${out%% *}
+                [ "$code" = 302 ] && break
+                echo "$path tentativa $i: $out"; sleep 10
+              done
+              echo "GET $path sem credencial -> $out"
+              test "$code" = 302
+              case "$out" in *cloudflareaccess.com*) ;; *) echo "::error::$path não redireciona ao Cloudflare Access."; exit 1;; esac
+            done
           fi
