@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mapRows, parseDate, parseMoney } from './rows'
+import { mapRows, parseDate, parseMoney, slaDays } from './rows'
 
 const header = ['Status', 'Data Pregão', 'Instituição / Órgão', 'UF', 'Linha de Serviço', 'Torre', 'Pré-Vendas', 'Orçamento', 'Valor CTC', 'Motivo de NO GO', 'Ação IA']
 
@@ -46,4 +46,25 @@ describe('mapRows', () => {
     expect(() => mapRows([['Foo', 'Bar'], ['1', '2']])).toThrow(/Cabeçalho inesperado/)
   })
   it('planilha só com cabeçalho devolve lista vazia', () => expect(mapRows([header])).toEqual([]))
+})
+
+describe('SLA (dias entre distribuição do edital e Data Pregão)', () => {
+  const d = (y: number, m: number, day: number) => ({ y, m, d: day })
+  it('conta os dias, inclusive virada de mês e de ano', () => {
+    expect(slaDays(d(2025, 12, 20), d(2026, 1, 10))).toBe(21)
+    expect(slaDays(d(2026, 3, 1), d(2026, 3, 1))).toBe(0)
+  })
+  it('vazio quando falta uma data ou quando o pregão é anterior à distribuição', () => {
+    expect(slaDays(null, d(2026, 1, 1))).toBeNull()
+    expect(slaDays(d(2026, 1, 1), null)).toBeNull()
+    expect(slaDays(d(2026, 2, 1), d(2026, 1, 1))).toBeNull()
+  })
+  it('mapRows calcula o SLA a partir da coluna de distribuição (texto ISO, dd/mm/aaaa ou serial)', () => {
+    const h = ['Data de distribuição(envio edital)', 'Status', 'Data Pregão']
+    const rows = mapRows([h, ['2026-01-01', 'Win', '2026-02-05'], ['01/03/2026', 'Lost', 46088], ['2026-05-10', 'No Go', '2026-05-01'], [null, 'Go', '2026-05-01']])
+    expect(rows.map((r) => r.sla)).toEqual([35, 6, null, null])
+  })
+  it('sem a coluna de distribuição o SLA fica vazio', () => {
+    expect(mapRows([['Status', 'Data Pregão'], ['Win', '2026-02-05']])[0].sla).toBeNull()
+  })
 })
