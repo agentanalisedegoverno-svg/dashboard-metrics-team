@@ -123,10 +123,6 @@ export async function fetchSyncStatus(signal: AbortSignal): Promise<SyncStatus |
   }
 }
 
-export async function triggerSync(signal: AbortSignal): Promise<void> {
-  await requestJson('/sync', signal, { method: 'POST' })
-}
-
 export const useDataset = () =>
   useQuery({
     queryKey: ['dataset'],
