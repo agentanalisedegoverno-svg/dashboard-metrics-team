@@ -18,7 +18,7 @@ export function ExecTab({ m, rows, noYear }: TabProps) {
   const ongoing = statusOf(m, 'On going')
   const lost = statusOf(m, 'Lost')
   const nogo = statusOf(m, 'No Go')
-  const worked = win.count + go.count + ongoing.count + lost.count
+  const worked = win.count + go.count + ongoing.count + lost.count + nogo.count
   const F = m.financeiro
 
   return (
@@ -35,8 +35,8 @@ export function ExecTab({ m, rows, noYear }: TabProps) {
             value={worked}
             sub={`${fmtPct(m.total ? (worked / m.total) * 100 : 0)} do recorte`}
             tag="confirmado"
-            info="Soma de Win + Go + On going + Lost — tudo que a equipe efetivamente disputou (venceu, está disputando ou perdeu) no recorte selecionado."
-            onClick={drillStatus('Oportunidades trabalhadas', ['Win', 'Go', 'On going', 'Lost'])}
+            info="Soma de Win + Go + On going + Lost + No Go — tudo que a equipe analisou ou disputou no recorte selecionado (venceu, está disputando, perdeu ou foi descartado na triagem)."
+            onClick={drillStatus('Oportunidades trabalhadas', ['Win', 'Go', 'On going', 'Lost', 'No Go'])}
           />
         </KpiGrid>
         <Card className="mt-4">
