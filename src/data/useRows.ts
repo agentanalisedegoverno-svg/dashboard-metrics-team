@@ -64,7 +64,8 @@ function parseDataset(json: unknown, lastModified: string | null = null, isMockF
   const isMock = isRecord(json) && typeof json.isMock === 'boolean' ? json.isMock : isMockFallback
   const parsed = DatasetSchema.safeParse(rawRows)
   if (!parsed.success) throw new Error('Formato de dados inesperado (schema inválido).')
-  return { rows: parsed.data, updatedAt: updatedAt ?? formatHttpDate(lastModified), isMock }
+  // A API devolve ISO (UTC); o cabeçalho mostra o horário de Brasília legível.
+  return { rows: parsed.data, updatedAt: (updatedAt ? formatHttpDate(updatedAt) ?? updatedAt : null) ?? formatHttpDate(lastModified), isMock }
 }
 
 async function fetchDataset(signal: AbortSignal): Promise<Dataset> {
