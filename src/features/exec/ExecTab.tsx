@@ -29,6 +29,7 @@ export function ExecTab({ m, rows, noYear }: TabProps) {
           <KpiCard label="Go" value={go.count} sub={`${fmtPct(go.pct)} do recorte · sendo trabalhada agora`} tag="confirmado" onClick={drillStatus('Go', ['Go'])} />
           <KpiCard label="On going" value={ongoing.count} sub={`${fmtPct(ongoing.pct)} do recorte`} tag="confirmado" onClick={drillStatus('On going', ['On going'])} />
           <KpiCard label="Lost" value={lost.count} sub={`${fmtPct(lost.pct)} do recorte`} tag="confirmado" onClick={drillStatus('Lost', ['Lost'])} />
+          <KpiCard label="No Go" value={nogo.count} sub={`${fmtPct(nogo.pct)} do recorte · descartadas na triagem`} tag="confirmado" onClick={drillStatus('No Go', ['No Go'])} />
           <KpiCard
             label="Oportunidades trabalhadas"
             value={worked}
