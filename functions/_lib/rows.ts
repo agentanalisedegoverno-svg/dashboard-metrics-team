@@ -95,6 +95,22 @@ export function parseDate(v: Cell): { y: number; m: number; d: number } | null {
   return null
 }
 
+/** Cabeçalho (normalizado) da data de envio do edital, usada no cálculo do SLA. */
+const DIST_HEADER = 'data de distribuicao(envio edital)'
+
+/**
+ * SLA = dias entre a data de distribuição (envio do edital) e a Data Pregão.
+ * Sem uma das datas, ou com Data Pregão anterior à distribuição (dado inconsistente), fica vazio.
+ */
+export function slaDays(
+  dist: { y: number; m: number; d: number } | null,
+  pregao: { y: number; m: number; d: number } | null,
+): number | null {
+  if (!dist || !pregao) return null
+  const days = Math.round((Date.UTC(pregao.y, pregao.m - 1, pregao.d) - Date.UTC(dist.y, dist.m - 1, dist.d)) / 86_400_000)
+  return days >= 0 ? days : null
+}
+
 export function mapRows(values: readonly (readonly Cell[])[]): ApiRow[] {
   if (values.length < 2) return []
   const index = new Map<keyof ApiRow, number>()
@@ -109,11 +125,14 @@ export function mapRows(values: readonly (readonly Cell[])[]): ApiRow[] {
     const i = index.get(f)
     return i === undefined ? undefined : row[i]
   }
+  // Coluna só usada para calcular o SLA (não vira campo do painel).
+  const distIdx = values[0].findIndex((h) => norm(h) === DIST_HEADER)
 
   const out: ApiRow[] = []
   for (const row of values.slice(1)) {
     if (row.every((c) => text(c) === null)) continue
     const date = parseDate(get(row, 'dataPregao'))
+    const dist = distIdx >= 0 ? parseDate(row[distIdx]) : null
     out.push({
       ano: date ? String(date.y) : null,
       mes: date ? `${date.y}-${pad(date.m)}` : null,
@@ -129,7 +148,7 @@ export function mapRows(values: readonly (readonly Cell[])[]): ApiRow[] {
       orcamento: parseMoney(get(row, 'orcamento')),
       valorCtc: parseMoney(get(row, 'valorCtc')),
       valorVencedor: parseMoney(get(row, 'valorVencedor')),
-      sla: null,
+      sla: slaDays(dist, date),
       processo: text(get(row, 'processo')),
       orgao: text(get(row, 'orgao')),
       descritivo: text(get(row, 'descritivo')),
