@@ -1,7 +1,4 @@
-import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { triggerSync, useSyncStatus } from '@/data/useRows'
-import { Button } from '@/components/ui/button'
+import { useSyncStatus } from '@/data/useRows'
 
 function formatLastSync(value: string | null): string {
   if (!value) return 'Ainda não atualizado'
@@ -15,30 +12,7 @@ function formatLastSync(value: string | null): string {
 }
 
 export function SyncStatus() {
-  const queryClient = useQueryClient()
   const { data, error } = useSyncStatus()
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [refreshError, setRefreshError] = useState<string | null>(null)
-
-  async function handleRefresh() {
-    setIsRefreshing(true)
-    setRefreshError(null)
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), 10_000)
-
-    try {
-      await triggerSync(controller.signal)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['dataset'] }),
-        queryClient.invalidateQueries({ queryKey: ['syncStatus'] }),
-      ])
-    } catch (cause) {
-      setRefreshError(cause instanceof Error ? cause.message : 'Não foi possível atualizar os dados.')
-    } finally {
-      window.clearTimeout(timeoutId)
-      setIsRefreshing(false)
-    }
-  }
 
   if (!data && !error) return null
 
@@ -67,11 +41,7 @@ export function SyncStatus() {
             Não foi possível consultar o status da API: {error instanceof Error ? error.message : 'erro desconhecido'}
           </div>
         )}
-        {refreshError && <div role="alert" className="text-st-critical">{refreshError}</div>}
       </div>
-      <Button type="button" onClick={handleRefresh} disabled={isRefreshing}>
-        {isRefreshing ? 'Atualizando…' : data?.isMock ? 'Atualizar mock' : 'Sincronizar'}
-      </Button>
     </section>
   )
 }

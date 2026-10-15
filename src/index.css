@@ -74,3 +74,10 @@
     *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
   }
 }
+
+/* Telas grandes (4K/8K): amplia a interface inteira em degraus, mantendo ~1900 px de largura útil em CSS. */
+@media (min-width: 2560px) { html { zoom: 1.35; } }
+@media (min-width: 3200px) { html { zoom: 1.75; } }
+@media (min-width: 3840px) { html { zoom: 2; } }
+@media (min-width: 5120px) { html { zoom: 3; } }
+@media (min-width: 7680px) { html { zoom: 4; } }
