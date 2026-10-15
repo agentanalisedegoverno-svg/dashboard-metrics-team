@@ -3,7 +3,7 @@
  * Função pura: normaliza grafias, separa números de texto, gera a chave estável da linha
  * e produz um relatório de qualidade (nada é corrigido às escondidas: divergências viram avisos).
  */
-import { parseDate, parseMoney, type Cell } from './rows'
+import { parseDate, parseMoney, type Cell } from './rows.ts'
 
 export type SyncRow = {
   chave_planilha: string
