@@ -73,6 +73,24 @@ jobs:
           RCLONE_CONFIG_GD_ROOT_FOLDER_ID: ${{ env.GDRIVE_FOLDER_ID }}
           RCLONE_CONFIG_GD_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN }}
         run: |
+          # O rclone novo imprime o token codificado em base64 (e às vezes embrulhado em {"token": "..."}).
+          # Aceita as duas formas e normaliza para o JSON {"access_token":...} que o rclone espera.
+          RCLONE_CONFIG_GD_TOKEN=$(python3 - <<'PY'
+          import base64, json, os, sys
+          raw = os.environ["RCLONE_CONFIG_GD_TOKEN"].strip()
+          if not raw.startswith("{"):
+              raw = base64.b64decode(raw + "=" * (-len(raw) % 4)).decode()
+          obj = json.loads(raw)
+          if "access_token" not in obj and "token" in obj:
+              t = obj["token"]
+              obj = json.loads(t) if isinstance(t, str) else t
+          if "refresh_token" not in obj:
+              sys.exit("Token sem refresh_token: gere de novo com 'rclone authorize drive'")
+          print(json.dumps(obj))
+          PY
+          )
+          echo "::add-mask::$RCLONE_CONFIG_GD_TOKEN"
+          export RCLONE_CONFIG_GD_TOKEN
           rc() { docker run --rm -e RCLONE_CONFIG_GD_TYPE -e RCLONE_CONFIG_GD_SCOPE -e RCLONE_CONFIG_GD_ROOT_FOLDER_ID -e RCLONE_CONFIG_GD_TOKEN \
                    -v "$PWD/out:/out:ro" rclone/rclone:1.68.2 "$@"; }
           rc copy "/out/radar-$STAMP.dump.enc" gd:diario/
