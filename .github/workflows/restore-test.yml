@@ -1,0 +1,106 @@
+name: Teste de restauração do backup
+
+# Prova que o último backup do Drive abre e restaura: baixa, confere o hash, descriptografa e restaura
+# num Postgres temporário (descartado no fim), comparando com a produção. Mensal e sob demanda.
+on:
+  schedule:
+    - cron: '0 12 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GDRIVE_FOLDER_ID: 1DJrTNn_LcKxwHzf7gd22DvAD1KdD8Eq6
+
+jobs:
+  restaurar:
+    name: Baixar → descriptografar → restaurar → conferir
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: teste
+          POSTGRES_DB: restore
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - name: Baixa o backup mais recente do Drive
+        env:
+          RCLONE_CONFIG_GD_TYPE: drive
+          RCLONE_CONFIG_GD_SCOPE: drive
+          RCLONE_CONFIG_GD_ROOT_FOLDER_ID: ${{ env.GDRIVE_FOLDER_ID }}
+          RCLONE_CONFIG_GD_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN }}
+        run: |
+          RCLONE_CONFIG_GD_TOKEN=$(python3 - <<'PY'
+          import base64, json, os, sys
+          raw = os.environ["RCLONE_CONFIG_GD_TOKEN"].strip()
+          if not raw.startswith("{"):
+              raw = base64.b64decode(raw + "=" * (-len(raw) % 4)).decode()
+          obj = json.loads(raw)
+          if "access_token" not in obj and "token" in obj:
+              t = obj["token"]
+              obj = json.loads(t) if isinstance(t, str) else t
+          print(json.dumps(obj))
+          PY
+          )
+          echo "::add-mask::$RCLONE_CONFIG_GD_TOKEN"
+          export RCLONE_CONFIG_GD_TOKEN
+          mkdir -p bk
+          rc() { docker run --rm -e RCLONE_CONFIG_GD_TYPE -e RCLONE_CONFIG_GD_SCOPE -e RCLONE_CONFIG_GD_ROOT_FOLDER_ID -e RCLONE_CONFIG_GD_TOKEN \
+                   -v "$PWD/bk:/bk" rclone/rclone:1.68.2 "$@"; }
+          ultimo=$(rc lsf gd:diario --include '*.dump.enc' | sort | tail -1)
+          [ -n "$ultimo" ] || { echo "::error::Nenhum backup encontrado em diario/"; exit 1; }
+          echo "ARQUIVO=$ultimo" >> "$GITHUB_ENV"
+          rc copy "gd:diario/$ultimo" /bk
+          rc copy "gd:diario/$ultimo.sha256" /bk
+
+      - name: Confere o hash e descriptografa
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          cd bk
+          # O .sha256 foi gerado com o caminho out/…; compara só o hash.
+          esperado=$(cut -d' ' -f1 "$ARQUIVO.sha256")
+          real=$(sha256sum "$ARQUIVO" | cut -d' ' -f1)
+          [ "$esperado" = "$real" ] || { echo "::error::Hash do backup não confere"; exit 1; }
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:BACKUP_PASSPHRASE -in "$ARQUIVO" -out radar.dump
+          echo "Dump descriptografado: $(stat -c %s radar.dump) bytes"
+
+      - name: Restaura no Postgres temporário
+        run: |
+          docker run --rm --network host -v "$PWD/bk:/bk" postgres:17 \
+            pg_restore --no-owner --no-privileges --dbname "postgresql://postgres:teste@127.0.0.1:5432/restore" /bk/radar.dump 2> restore.err || true
+          echo "Mensagens do pg_restore: $(grep -c '' restore.err)"
+          grep -v "already exists" restore.err | head -10 || true
+
+      - name: Confere o conteúdo restaurado contra a produção
+        env:
+          DATABASE_URL_BACKUP: ${{ secrets.DATABASE_URL_BACKUP }}
+        run: |
+          q() { docker run --rm --network host postgres:17 psql "$1" -Atc "$2"; }
+          R="postgresql://postgres:teste@127.0.0.1:5432/restore"
+          restaurado=$(q "$R" "select count(*) from oportunidades")
+          producao=$(q "$DATABASE_URL_BACKUP" "select count(*) from oportunidades")
+          soma_r=$(q "$R" "select coalesce(round(sum(orcamento),2),0) from oportunidades")
+          hist=$(q "$R" "select count(*) from oportunidades_historico")
+          funcoes=$(q "$R" "select count(*) from pg_proc where proname in ('criar_oportunidade','atualizar_oportunidade','arquivar_oportunidade','sincronizar_planilha','validar_oportunidade')")
+          gatilhos=$(q "$R" "select count(*) from pg_trigger where tgname in ('oportunidades_auditar_tg') and not tgisinternal")
+          {
+            echo "### Restauração de \`$ARQUIVO\`"
+            echo "| Item | Restaurado | Produção agora |"
+            echo "|---|---|---|"
+            echo "| Oportunidades | $restaurado | $producao |"
+            echo "| Soma do orçamento | $soma_r | — |"
+            echo "| Linhas de histórico | $hist | — |"
+            echo "| Funções de cadastro (de 5) | $funcoes | — |"
+            echo "| Gatilho de auditoria | $gatilhos | — |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$restaurado" -ge 500 ] || { echo "::error::Poucas linhas restauradas ($restaurado)"; exit 1; }
+          [ "$funcoes" -eq 5 ] || { echo "::error::Funções de cadastro ausentes ($funcoes/5)"; exit 1; }
+          [ "$gatilhos" -eq 1 ] || { echo "::error::Gatilho de auditoria ausente"; exit 1; }
+          # O backup tem até 1 dia; a produção pode ter crescido, mas nunca menos que o restaurado menos a tolerância.
+          [ "$restaurado" -le "$((producao + 50))" ] || { echo "::error::Restaurado maior que a produção — verifique"; exit 1; }
