@@ -93,6 +93,8 @@ jobs:
           export RCLONE_CONFIG_GD_TOKEN
           rc() { docker run --rm -e RCLONE_CONFIG_GD_TYPE -e RCLONE_CONFIG_GD_SCOPE -e RCLONE_CONFIG_GD_ROOT_FOLDER_ID -e RCLONE_CONFIG_GD_TOKEN \
                    -v "$PWD/out:/out:ro" rclone/rclone:1.68.2 "$@"; }
+          rc mkdir gd:diario
+          rc mkdir gd:semanal
           rc copy "/out/radar-$STAMP.dump.enc" gd:diario/
           rc copy "/out/radar-$STAMP.dump.enc.sha256" gd:diario/
           if [ "$(date -u +%u)" = "7" ]; then
