@@ -27,8 +27,8 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
   ```
 - **Carga manual:** na pasta do projeto, com a planilha exportada em `aba.json`:
   ```
-  node scripts/load-db.mjs aba.json --raw --dry-run     # valida sem gravar
-  node scripts/load-db.mjs aba.json --raw --fonte "manual"
+  node scripts/sync-db.mjs aba.json --dry-run        # valida sem gravar (merge)
+  node scripts/sync-db.mjs aba.json --fonte "manual"
   ```
 
 ### 2.2 Dar ou tirar acesso ao painel
