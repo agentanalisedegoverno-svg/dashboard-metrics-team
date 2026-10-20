@@ -1,0 +1,90 @@
+name: Backup do banco
+
+# Dump completo (schema, dados, funções e gatilhos) do Neon, criptografado, enviado ao Google Drive.
+# Diário às 03:00 (Brasília); aos domingos também grava uma cópia semanal. Ver docs/BACKUP.md.
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-banco
+  cancel-in-progress: false
+
+env:
+  # Pasta do Drive que recebe os backups (não é segredo; o acesso vem do token).
+  GDRIVE_FOLDER_ID: 1DJrTNn_LcKxwHzf7gd22DvAD1KdD8Eq6
+  RETENCAO_DIARIOS: 14d
+  RETENCAO_SEMANAIS: 84d
+
+jobs:
+  backup:
+    name: pg_dump → criptografar → Drive
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Confere os segredos
+        env:
+          DATABASE_URL_BACKUP: ${{ secrets.DATABASE_URL_BACKUP }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          RCLONE_DRIVE_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN }}
+        run: |
+          for v in DATABASE_URL_BACKUP BACKUP_PASSPHRASE RCLONE_DRIVE_TOKEN; do
+            if [ -z "${!v}" ]; then echo "::error::Segredo $v não configurado (ver docs/BACKUP.md)"; exit 1; fi
+          done
+
+      - name: Dump do banco (formato custom, sem donos/privilégios)
+        env:
+          DATABASE_URL_BACKUP: ${{ secrets.DATABASE_URL_BACKUP }}
+        run: |
+          mkdir -p out
+          docker run --rm -e DATABASE_URL_BACKUP postgres:17 \
+            sh -c 'pg_dump "$DATABASE_URL_BACKUP" --format=custom --compress=9 --no-owner --no-privileges' > out/radar.dump
+          size=$(stat -c %s out/radar.dump)
+          echo "Dump: $size bytes"
+          # Um dump vazio ou minúsculo indica falha silenciosa (ex.: conexão sem permissão).
+          if [ "$size" -lt 20000 ]; then echo "::error::Dump suspeito (tamanho $size)"; exit 1; fi
+
+      - name: Verifica a integridade do dump
+        run: |
+          docker run --rm -v "$PWD/out:/out" postgres:17 pg_restore --list /out/radar.dump > out/conteudo.txt
+          for t in oportunidades oportunidades_historico opcoes usuarios; do
+            grep -q "TABLE public $t " out/conteudo.txt || { echo "::error::Tabela $t ausente no dump"; exit 1; }
+          done
+          echo "Itens no dump: $(grep -c '' out/conteudo.txt)"
+
+      - name: Criptografa (AES-256, PBKDF2)
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          stamp=$(date -u +%Y-%m-%dT%H%MZ)
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -pass env:BACKUP_PASSPHRASE \
+            -in out/radar.dump -out "out/radar-$stamp.dump.enc"
+          sha256sum "out/radar-$stamp.dump.enc" | tee "out/radar-$stamp.dump.enc.sha256"
+
+      - name: Envia ao Google Drive e aplica a retenção
+        env:
+          RCLONE_CONFIG_GD_TYPE: drive
+          RCLONE_CONFIG_GD_SCOPE: drive
+          RCLONE_CONFIG_GD_ROOT_FOLDER_ID: ${{ env.GDRIVE_FOLDER_ID }}
+          RCLONE_CONFIG_GD_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN }}
+        run: |
+          rc() { docker run --rm -e RCLONE_CONFIG_GD_TYPE -e RCLONE_CONFIG_GD_SCOPE -e RCLONE_CONFIG_GD_ROOT_FOLDER_ID -e RCLONE_CONFIG_GD_TOKEN \
+                   -v "$PWD/out:/out:ro" rclone/rclone:1.68.2 "$@"; }
+          rc copy "/out/radar-$STAMP.dump.enc" gd:diario/
+          rc copy "/out/radar-$STAMP.dump.enc.sha256" gd:diario/
+          if [ "$(date -u +%u)" = "7" ]; then
+            rc copy "/out/radar-$STAMP.dump.enc" gd:semanal/
+            rc copy "/out/radar-$STAMP.dump.enc.sha256" gd:semanal/
+          fi
+          # Retenção: apaga só dentro das pastas diario/ e semanal/ (nunca a raiz).
+          rc delete gd:diario --min-age "$RETENCAO_DIARIOS"
+          rc delete gd:semanal --min-age "$RETENCAO_SEMANAIS"
+          echo "Conteúdo atual do Drive:"; rc lsf gd:diario | tail -5
+
+      - name: Resumo
+        run: echo "### Backup $STAMP concluído" >> "$GITHUB_STEP_SUMMARY"
