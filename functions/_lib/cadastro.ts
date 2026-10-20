@@ -21,7 +21,7 @@ export async function listar(sql: Sql, email: string, incluirArquivadas: boolean
   const arquivadas = incluirArquivadas && admin
   const [{ rows }] = await sql`
     select coalesce(jsonb_agg(to_jsonb(o) order by o.id), '[]'::jsonb) as rows
-    from oportunidades o where ${arquivadas} or o.arquivado_em is null`
+    from oportunidades o where ${arquivadas} or (o.arquivado_em is null and not o.ausente_na_planilha)`
   return send(200, { rows })
 }
 

@@ -46,7 +46,7 @@ export const onRequest = async ({ request, env, params }: Ctx): Promise<Response
                motivo_no_go as "motivoNoGo", motivo_lost as "motivoLost", conta_vinculada as "contaVinculada",
                orcamento::float8 as orcamento, valor_ctc::float8 as "valorCtc", valor_vencedor::float8 as "valorVencedor",
                sla::float8 as sla, processo, orgao, descritivo, data_pregao as "dataPregao", acao_ia as "acaoIA"
-        from oportunidades where arquivado_em is null order by id`
+        from oportunidades where arquivado_em is null and not ausente_na_planilha order by id`
       return send(200, { rows, updatedAt: lastSyncAt, isMock: false })
     }
     return send(200, { lastSyncAt, rowCount: status?.total_linhas ?? 0, error: status?.erro ?? null, isMock: false })
