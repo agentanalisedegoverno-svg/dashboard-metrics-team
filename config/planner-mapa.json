@@ -1,0 +1,63 @@
+{
+  "_comentario": "Mapa Radar -> Planner. IDs e nomes extraídos dos exports do Planner de 21/10/2026. Se alguém renomear um bucket, atualize aqui (o planner-auto resolve por NOME; os IDs são só conferência).",
+  "planos": {
+    "its": {
+      "nome": "ITS Oportunidades",
+      "planId": "ZiZ73_n76Uu8gXXYbmIQ0mUAD-k0",
+      "torres": ["ITS"],
+      "rotulos": ["Licitação", "Público"],
+      "buckets": {
+        "Prospect": "Prospect",
+        "Go": "GO",
+        "On going": "Em andamento ( Proposta Entregue)",
+        "Win": "Ganhos!",
+        "Lost": "Perdidos",
+        "No Go": "NO GO",
+        "Suspended": "SUSPENSOS",
+        "Canceled": "Revogado",
+        "Validar": "Preparo",
+        "_sem_status": "Preparo"
+      }
+    },
+    "digital_health": {
+      "nome": "Digital e Health - Oportunidades",
+      "planId": "4lfDD-9yK0KEimdO-fLPMmUACMhU",
+      "torres": ["DIGITAL", "HEALTH"],
+      "rotulos": ["Licitação", "Público"],
+      "rotulosPorTorre": { "DIGITAL": ["DIGITAL"], "HEALTH": ["Health"] },
+      "buckets": {
+        "Prospect": "Prospect",
+        "Go": "GO",
+        "On going": "On Going (Proposta enviada)",
+        "Win": "WIN",
+        "Lost": "Lost",
+        "No Go": "NO GO",
+        "Suspended": "SUSPENSAS",
+        "Canceled": "Revogado",
+        "Validar": "Prospect",
+        "_sem_status": "Prospect"
+      }
+    }
+  },
+  "progresso": {
+    "Prospect": 0,
+    "Go": 50,
+    "On going": 50,
+    "Suspended": 50,
+    "Win": 100,
+    "Lost": 100,
+    "No Go": 100,
+    "Canceled": 100,
+    "Validar": 0,
+    "_sem_status": 0
+  },
+  "checklistPadrao": [
+    "Análise de edital",
+    "Qualificação técnica",
+    "Desenho da solução",
+    "Precificação",
+    "Apresentação e aprovação de margem",
+    "Esclarecimentos",
+    "Vistoria"
+  ]
+}
