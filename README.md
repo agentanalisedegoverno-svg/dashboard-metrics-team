@@ -6,13 +6,18 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 
 | Documento | Conteúdo |
 |---|---|
-| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Desenho completo (planilha → agente → banco → API → painel → usuário), diagramas, modelo de dados, decisões e riscos |
+| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Desenho completo (cadastro web, carga por merge, API, banco, Planner, backup, CI/CD), diagramas, modelo de dados, decisões e riscos |
 | [docs/OPERACAO.md](docs/OPERACAO.md) | Configurações e segredos, rotinas, solução de problemas, troca de senhas e tokens |
-| [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md) | Contrato de dados e uso do `scripts/load-db.mjs` |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Estado atual e melhorias futuras (curto, médio e longo prazo) |
+| [docs/CADASTRO-OPORTUNIDADES.md](docs/CADASTRO-OPORTUNIDADES.md) | Especificação do cadastro de oportunidades na web (34 colunas, validações, UX) |
+| [docs/INTEGRACAO-PLANNER.md](docs/INTEGRACAO-PLANNER.md) | Radar → Microsoft Planner: contrato do evento, regras, operação |
+| [docs/BACKUP.md](docs/BACKUP.md) | Backup diário criptografado no Drive, restauração e teste |
+| [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md) | Carga da planilha por merge (`scripts/sync-db.mjs`) |
 | [docs/AGENTE-DE-CARGA.md](docs/AGENTE-DE-CARGA.md) | Prompt do agente e agendamento a cada 2 dias |
-| [db/schema.sql](db/schema.sql) | Esquema, função de carga e privilégios do banco |
+| [planner-auto/](planner-auto/README.md) | Ferramenta que aplica os eventos do Radar no Planner |
+| [db/migrations/](db/migrations/) | Esquema, funções e privilégios do banco (migrações aditivas) |
 
-**Em uma frase:** um agente copia a aba *Base Governo* da planilha para o Postgres (Neon) a cada 2 dias; o painel lê desse banco por uma API protegida pelo Cloudflare Access (login por código no e-mail `@ctctech.com.br`).
+**Em uma frase:** o Postgres (Neon) é a fonte da verdade — o time cadastra oportunidades na aba **Oportunidades** e um agente sincroniza a planilha por merge a cada 2 dias; o painel de métricas, o backup diário e o Microsoft Planner leem desse banco, tudo atrás do Cloudflare Access (login por código no e-mail `@ctctech.com.br`).
 
 ## Rodar
 
@@ -80,23 +85,26 @@ scripts/
 - Cloudflare Access precisa ser habilitado no painel Cloudflare para proteger o site por e-mail. Se a API real usar outro host, ela também precisa exigir autenticação; proteger somente o frontend não protege os dados.
 - O backend real de leitura do SharePoint permanece pendente de configuração do tenant, app registration, permissões Graph e URL do workbook. Não configure esses valores em arquivos versionados; use variáveis/segredos no ambiente de execução.
 
-## Dados: Postgres (Neon) alimentado por agente
+## Dados: Postgres (Neon) como fonte da verdade
 
-**Fluxo:** um agente lê a planilha (`BaseLicitacao.xlsx`, aba "Base Governo") e substitui a base no Postgres a cada execução (ver [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md)). O painel lê do banco por `functions/api/[[path]].ts` (`GET /api/rows`, `GET /api/status`, `POST /api/sync` só relê), com o papel somente-leitura `radar_leitor`. Esquema em `db/schema.sql`.
+**Entradas:** (1) cadastro e edição na aba **Oportunidades** (API `functions/api/oportunidades/*`, regras no banco, histórico e bloqueio otimista); (2) carga da planilha `BaseLicitacao.xlsx` por **merge** (`scripts/sync-db.mjs` → `sincronizar_planilha`), que nunca sobrescreve o que foi editado na web. **Saídas:** painel de métricas (`GET /api/rows`), backup diário no Drive e integração com o Planner. Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md).
 
-**Proteção:** a API **falha fechada**: só responde com um JWT válido do **Cloudflare Access**. Sem Access configurado, devolve 503.
+**Proteção:** a API **falha fechada**: só responde com um JWT válido do **Cloudflare Access**. Sem Access configurado, devolve 503. Escritas exigem ainda o cabeçalho anti-CSRF.
 
 | Onde | Variável | Observação |
 |---|---|---|
-| Cloudflare Pages → Settings → Variables and Secrets | `DATABASE_URL` (**Secret**) | string do papel `radar_leitor` (somente leitura) |
-| `wrangler.toml` `[vars]` | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | time `ctctech-radar` e AUD da aplicação Access "Radar Pré-Vendas" (não são segredos) |
-| Ambiente do agente de carga | `DATABASE_URL_WRITER` | papel `radar_escritor` (só executa a função de carga) |
+| Cloudflare Pages → Variables and Secrets | `DATABASE_URL` (**Secret**) | papel `radar_leitor` (painel, somente leitura) |
+| Cloudflare Pages → Variables and Secrets | `DATABASE_URL_APP` (**Secret**) | papel `radar_app` (cadastro; só executa as funções de cadastro) |
+| `wrangler.toml` `[vars]` | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | time `ctctech-radar` e AUD da aplicação Access (não são segredos) |
+| Ambiente do agente de carga | `DATABASE_URL_WRITER` | papel `radar_escritor` (só `sincronizar_planilha`) |
+| Ambiente da integração com o Planner | `DATABASE_URL_PLANNER`, `PLANNER_EVENTOS_DIR` | papel `radar_planner` (somente leitura + controle) |
+| GitHub Actions (secrets) | `DATABASE_URL_BACKUP`, `BACKUP_PASSPHRASE`, `RCLONE_DRIVE_TOKEN` | backup diário e teste de restauração |
 
-**Acesso:** Cloudflare Access (Zero Trust, plano Free) com login por código (*One-time PIN*) enviado ao e-mail; política *Allow* para `@ctctech.com.br`. Para liberar outro e-mail ou domínio: Zero Trust → Access → Applications → Radar Pré-Vendas → Policies. A API valida o JWT em qualquer endereço do projeto, inclusive os `<hash>.radar-prevendas.pages.dev` de cada deploy. O flag `ACESSO_PUBLICO="true"` reabre a API sem login (uso temporário; não recomendado).
+**Acesso:** Cloudflare Access (Zero Trust, plano Free) com login por código (*One-time PIN*); política *Allow* para `@ctctech.com.br`. Todos veem, cadastram e editam; **só o administrador** arquiva/restaura e administra listas e usuários. Para liberar outro e-mail ou domínio: Zero Trust → Access → Applications → Radar Pré-Vendas → Policies. A API valida o JWT em qualquer endereço do projeto. O flag `ACESSO_PUBLICO="true"` reabre a API sem login (uso temporário; não recomendado).
 
-Com `DEMO_MODE=true` (variável do GitHub), o site publica o build com dados sintéticos e banner; sem a variável, publica o build de produção. `functions/_lib/rows.ts` converte a matriz bruta da planilha (cabeçalho real conferido, 33 colunas) e é usado por `scripts/load-db.mjs --raw`.
+`functions/_lib/planilha.ts` converte a matriz bruta da planilha (34 colunas de dados) e é usado por `scripts/sync-db.mjs`; `functions/_lib/rows.ts` mantém o mapeamento do painel.
 
-> O código de login Microsoft (MSAL + repasse de token, `src/auth/`) segue no repositório, **desligado**: só ativa com `VITE_MS_CLIENT_ID`/`VITE_MS_TENANT_ID`, que não são definidos. A fonte de dados oficial é o banco.
+> O código de login Microsoft (MSAL, `src/auth/`) segue no repositório, **desligado**: só ativa com `VITE_MS_CLIENT_ID`/`VITE_MS_TENANT_ID`, que não são definidos.
 
 ## Esteira CI/CD (`.github/workflows`)
 
@@ -113,7 +121,7 @@ Com `DEMO_MODE=true` (variável do GitHub), o site publica o build com dados sin
 | production | `main` → Cloudflare Pages (environment `production`), smoke test (200, headers, API não pública) |
 | codeql / dependabot | análise estática semanal e atualizações agrupadas (actions fixadas por SHA) |
 
-**Configuração única:** secrets `CLOUDFLARE_API_TOKEN` (permissão *Pages: Edit*) e `CLOUDFLARE_ACCOUNT_ID`; variável `DEMO_MODE=true` enquanto a integração SharePoint não existe (publica com banner de dados sintéticos; remova para o modo real, em que API fora do ar vira erro visível). Opcional: `SITE_URL` (domínio próprio), revisores obrigatórios no environment `production` e proteção da `main` exigindo o check *CI ok*. **Rollback:** Actions → Pipeline → *Run workflow* com `ref` = commit/tag anterior.
+**Configuração única:** secrets `CLOUDFLARE_API_TOKEN` (permissão *Pages: Edit*, sem filtro de IP) e `CLOUDFLARE_ACCOUNT_ID`; `DEMO_MODE` ausente = build de produção real (API fora do ar vira erro visível). Além do pipeline há os workflows **Backup do banco** (diário) e **Teste de restauração do backup** (mensal). Opcional: `SITE_URL` (domínio próprio), revisores obrigatórios no environment `production` e proteção da `main` exigindo o check *CI ok*. **Rollback:** Actions → Pipeline → *Run workflow* com `ref` = commit/tag anterior.
 
 ## Verificação
 
@@ -123,7 +131,4 @@ Com `DEMO_MODE=true` (variável do GitHub), o site publica o build com dados sin
 
 ## Lacunas / próximos passos
 
-1. Configurar o Cloudflare Access e o secret `DATABASE_URL`, rodar a primeira carga real e remover `DEMO_MODE`.
-2. A aba Metodologia ainda descreve a atualização como "disparo manual".
-3. Opcional: colapsar os chips de filtro quando todos os meses estão marcados.
-4. Adotar ESLint quando `typescript-eslint` suportar TS 7.
+O estado atual e as melhorias planejadas estão em [docs/ROADMAP.md](docs/ROADMAP.md). Destaques: trava final da carga antiga (migração 002), correção das pendências migradas, chave estável na planilha, encerramento da convivência com a planilha e alertas de falha.

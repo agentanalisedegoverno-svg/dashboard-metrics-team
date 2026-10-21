@@ -1,0 +1,73 @@
+# Roadmap de melhorias
+
+Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **tamanho** aproximado (P = horas, M = dias, G = semanas). A prioridade é uma sugestão para validação do time.
+
+## 1. Onde estamos
+
+| Entrega | Estado |
+|---|---|
+| Painel de métricas (7 abas) lendo do banco, atrás do Cloudflare Access | ✅ em produção |
+| Banco com cadastro: histórico, bloqueio otimista, listas fechadas, usuários | ✅ |
+| API de cadastro (CRUD, histórico, arquivar/restaurar, listas, usuários) | ✅ |
+| Aba **Oportunidades** (grade virtualizada, formulário, histórico, administração) | ✅ |
+| Carga da planilha por **merge** (`sync-db.mjs`) com relatório de qualidade | ✅ |
+| Backup diário criptografado no Google Drive + teste de restauração | ✅ |
+| Integração Radar → Planner (exportador, `planner-auto`, agendamento) | ✅ |
+| Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ⏳ após a 1ª rodada do agente no novo fluxo |
+
+## 2. Próximos passos (curto prazo)
+
+| # | Item | Por quê | Tam. |
+|---|---|---|---|
+| 1 | **Aplicar a migração 002** (revogar `carregar_oportunidades` do escritor) | Impede que um agente desatualizado apague o que foi cadastrado na web | P |
+| 2 | **Corrigir as pendências da migração** pela aba (63 registros: Lost sem motivo, "Validar", pregão antes da distribuição, sem Pré-vendas) | Qualidade das métricas; hoje elas entram como "pendência" | M |
+| 3 | **Acompanhar os primeiros cartões reais do Planner** (cadastrar, conferir bucket/responsável/prazo, mudar status) e apagar o cartão `RAD-999001` | É a primeira escrita real; o 50%/100% pode sobrescrever progresso manual | P |
+| 4 | **Alerta de falha** do agente de carga e da integração (e-mail/Teams quando o log trouxer `[ERRO]` ou a última carga passar de N dias) | Hoje só se descobre olhando o log ou o "Última atualização" | M |
+| 5 | **Rotacionar credenciais** pendentes e passar a trimestral (papéis do banco, token Cloudflare, tokens antigos do GitHub) | Higiene; vários valores já passaram por conversas | P |
+| 6 | **Primeiro teste de restauração** com a rodada mensal e conferência do resumo | Provar de novo que o backup abre | P |
+| 7 | **Dependabot:** revisar os PRs semanais e planejar a migração do `@tanstack/react-table` v9 (hoje fixado na v8) | Evita a main quebrada que já ocorreu uma vez | M |
+
+## 3. Médio prazo
+
+| # | Item | Por quê | Tam. |
+|---|---|---|---|
+| 8 | **Chave estável na planilha** (coluna de ID, ou o `id` do Radar escrito de volta) | Hoje corrigir processo/data/torre gera linha nova + "ausente"; perde-se o vínculo e a proteção de edição web | M |
+| 9 | **Encerrar a convivência com a planilha** (data de corte; planilha somente leitura; depois desligar o agente) | Elimina duplo lançamento e a dependência da máquina local | M |
+| 10 | **Planner: propagar arquivamento e mudança de torre** (arquivar → mover para Revogado/concluir; trocar de plano) | Hoje o cartão fica órfão nesses casos | M |
+| 11 | **Planner: conta de serviço** do time (login do `planner-auto` fora de pessoa) ou permissão de aplicativo | Não depender do João logado e do computador ligado | M |
+| 12 | **Rodar a integração fora da máquina local** (runner agendado) | Mesma razão; exige o item 11 | G |
+| 13 | **Planner: alertas e relatório semanal** (atrasadas, vencendo, sem responsável) — Fase 1 do plano do `planner-auto` | Valor imediato para o time, sem tela nova | M |
+| 14 | **Visões salvas e exportação CSV/Excel** na aba Oportunidades | Substitui o uso do Excel para consulta e envio | M |
+| 15 | **Duplicatas:** tela de revisão (hoje só aviso no cadastro) e mesclagem | 6 grupos duplicados vindos da planilha | M |
+| 16 | **Notificação de edição simultânea** em tempo real (ou aviso ao abrir) | Hoje só detecta ao salvar (409) | M |
+| 17 | **Auditoria navegável:** tela de histórico global (quem mexeu em quê) com filtros | A trilha existe por registro; falta visão geral | M |
+| 18 | **E2E contra a API real** (ambiente de teste com branch do Neon) | Hoje o e2e usa API simulada | M |
+
+## 4. Longo prazo
+
+| # | Item | Por quê | Tam. |
+|---|---|---|---|
+| 19 | **Eventos dos Fluxos 1 a 3** (parecer GO/NO GO, aderência) e **agenda** (sessão do pregão, limite de impugnação) no Planner | Une o processo de análise ao acompanhamento; precisa compatibilizar a chave (UASG + ano + pregão) com `RAD-<id>` | G |
+| 20 | **Sincronização com a lista "Pipeline Oportunidades"** (SharePoint) | Uma só visão no M365; direção única Radar → lista | M |
+| 21 | **Painel web do Planner** (funil, prazos, carga por responsável) integrado ao Radar | Visões que o Planner não tem | G |
+| 22 | **Login e permissões mais finos:** lista nominal ou grupos no Access, papéis (consulta / editor / admin) | Hoje todo o domínio edita; só o admin arquiva | M |
+| 23 | **Domínio próprio** e política de retenção/LGPD (histórico, e-mails dos usuários) | Profissionalização | M |
+| 24 | **Neon pago** (histórico maior, sem limites de computação) ou segundo backup em outra região | Folga operacional se o volume crescer | P |
+| 25 | **SLA real de triagem** (campo de data da decisão Go/No Go) | Hoje o indicador é um proxy distribuição → pregão | M |
+| 26 | **ESLint** quando o `typescript-eslint` suportar TypeScript 7 | Hoje o gate é só o `tsc` | P |
+| 27 | **Observabilidade:** métricas de uso, erros da API e tempo de resposta (Cloudflare Analytics / logs) | Hoje não há visão de uso | M |
+
+## 5. Riscos que o roadmap endereça
+
+| Risco | Itens |
+|---|---|
+| Dependência do computador do João (carga, Planner) | 4, 9, 11, 12 |
+| Perda de vínculo ao corrigir a planilha | 8, 9 |
+| Cartões órfãos no Planner | 10 |
+| Credenciais antigas circulando | 5 |
+| Quebra por atualização de dependência | 7, 18 |
+| Qualidade dos dados migrados | 2, 15 |
+
+## 6. Como usar este roadmap
+- Revisar a cada mês junto com o teste de restauração e o calendário de segurança ([OPERACAO.md](OPERACAO.md) §4.4).
+- Antes de começar um item médio/longo, abrir uma issue com o critério de aceite e o plano de teste.
