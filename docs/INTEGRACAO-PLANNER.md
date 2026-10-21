@@ -34,6 +34,7 @@ flowchart LR
   "tipo": "oportunidade_nova",            // ou "oportunidade_atualizada"
   "chave": "RAD-77",
   "origem": "Radar",
+  "versaoOrigem": 3,                      // versão da oportunidade no Radar
   "geradoEm": "2026-10-21T14:30:00.000Z",
   "plano": "ZiZ73_n76Uu8gXXYbmIQ0mUAD-k0",
   "planoNome": "ITS Oportunidades",
@@ -55,6 +56,13 @@ O que o `processar-eventos` deve fazer, por `chave`:
 - **`oportunidade_nova`:** procurar cartão com `[RAD-<id>]` no título; se **não existir**, criar (bucket, rótulos, responsável, prazo, nota em *Anotações*, checklist). Se já existir, tratar como atualização.
 - **`oportunidade_atualizada`:** achar o cartão pela chave e atualizar título, bucket, progresso, prazo, responsável e acrescentar a nota (não apagar anotações do time). **Nunca desmarcar** itens de checklist já concluídos.
 - Usar `If-Match` (ETag) nas atualizações e mover o arquivo para `processados\` (ou `erros\` com o motivo).
+
+### Regras do consumidor (decididas na revisão do PR #33)
+
+1. **Versão:** guardar a última `versaoOrigem` aplicada por `chave` (por exemplo na nota do cartão ou em um arquivo de estado) e **ignorar** eventos com `versaoOrigem` menor. Assim, reprocessar um evento antigo da pasta `erros\` nunca sobrescreve um mais novo.
+2. **Responsável nulo não mexe no responsável.** Em atualização, `responsavel: null` significa "não alterar": se alguém atribuiu o cartão à mão no Planner, a próxima atualização do Radar não apaga a atribuição. (Vale em especial para quem não tem e-mail cadastrado no Radar.)
+3. **Nomes de bucket e rótulo:** tentar o nome **exato**; se não achar, comparar sem diferenciar maiúsculas/minúsculas e espaços (ex.: `Em andamento ( Proposta Entregue)` tem espaço estranho). Se ainda assim não achar, o evento vai para `erros\` com o motivo. **Nunca** cair num bucket qualquer. O mesmo vale para rótulos que não existirem no plano.
+4. **Progresso:** o 50%/100% vindo do Radar pode sobrescrever o que o time marcou à mão; por isso, nos primeiros cartões reais, acompanhar a execução.
 - Os **nomes** de bucket e rótulo vêm de [`config/planner-mapa.json`](../config/planner-mapa.json), extraídos dos exports de 21/10/2026. Se alguém renomear um bucket no Planner, atualize esse arquivo.
 
 ## Mapeamento status → bucket
