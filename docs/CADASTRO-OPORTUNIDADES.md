@@ -1,6 +1,6 @@
 # Especificação: cadastro de oportunidades na aplicação web
 
-> Status: **proposta para revisão** (decisões de produto já tomadas; implementação por fases).
+> Status: **implementado e em produção** (F0–F4 concluídas em 20–21/10/2026; F5, encerramento da planilha, pendente). Este documento mantém a especificação original; o desenho atual está em [ARQUITETURA.md](ARQUITETURA.md) e o que falta em [ROADMAP.md](ROADMAP.md).
 > Objetivo: tirar a planilha `BaseLicitacao.xlsx` do centro do processo. Os usuários da organização cadastram e atualizam oportunidades numa nova aba do Radar; cada gravação alimenta o banco que já serve as métricas do time.
 
 ## 1. Decisões de produto
@@ -115,21 +115,24 @@ Mantemos a base atual (React 19, TypeScript, Tailwind v4, componentes no padrão
 | Datas | **date-fns** (pt-BR) | Leve e sem estado global. |
 | Notificações | **sonner** | Toasts acessíveis. |
 
-## 8. Plano em fases
+## 8. Plano em fases (estado)
 
 | Fase | Entrega | Critério de aceite |
 |---|---|---|
-| F0 | Esta especificação revisada | Aprovada pelo dono do produto. |
-| F1 | **Banco:** migração aditiva, listas normalizadas, histórico, papel `radar_app`, `sincronizar_planilha`; backfill dos 600 registros com relatório de qualidade | Painel atual segue idêntico; 600 linhas migradas; relatório de pendências gerado. |
-| F2 | **API** com validação, auditoria, bloqueio otimista, CSRF e papéis | Testes unitários e de contrato; conflito de edição detectado. |
-| F3 | **Front:** aba Oportunidades (formulário, grade, edição, histórico) | E2E (criar, editar, conflito, arquivar), axe sem violações, visual 390–7680 px. |
-| F4 | **Convivência:** agente passa ao merge; runbook e data de encerramento | Carga do agente não sobrescreve edição web (teste automatizado). |
-| F5 | Encerramento: planilha somente leitura; limpeza | Checklist de virada. |
+| F0 ✅ | Esta especificação revisada | Aprovada pelo dono do produto. |
+| F1 ✅ | **Banco:** migração aditiva, listas normalizadas, histórico, papel `radar_app`, `sincronizar_planilha`; backfill dos 600 registros com relatório de qualidade | Painel atual segue idêntico; 600 linhas migradas; relatório de pendências gerado. |
+| F2 ✅ | **API** com validação, auditoria, bloqueio otimista, CSRF e papéis | Testes unitários e de contrato; conflito de edição detectado. |
+| F3 ✅ | **Front:** aba Oportunidades (formulário, grade, edição, histórico) | E2E (criar, editar, conflito, arquivar), axe sem violações, visual 390–7680 px. |
+| F4 ✅ | **Convivência:** agente passa ao merge; runbook e data de encerramento | Carga do agente não sobrescreve edição web (teste automatizado). |
+| F5 ⏳ | Encerramento: planilha somente leitura; limpeza | Checklist de virada. |
 
-## 9. Riscos e pontos em aberto
+## 9. Riscos e pontos em aberto (resolvidos e pendentes)
 
 - **Quem são os administradores** (e-mails): preciso da lista para o papel de arquivar e editar listas.
 - **Lista de Pré-vendas:** são pessoas do time, não necessariamente usuários do Access; manter lista própria ou mapear para e-mail?
 - **Dados com problema** (41 pregões antes da distribuição, 30 Lost sem motivo, 6 grupos duplicados): corrigir na migração (com revisão do time) ou migrar como pendência?
 - **Duplo lançamento** durante a convivência: mitigado pelo alerta de duplicata, mas depende de disciplina; por isso a data de encerramento.
 - **Custo Total CTC e Ação IA:** campos novos/reservados; confirmar se `Ação IA` continuará sob outro agente.
+
+**Resolvido:** administradores (`joao.henrique@ctctech.com.br`; os demais são promovidos na própria aba); Pré-vendas viram usuários com e-mail (também usado para atribuir cartões no Planner); dados com problema migraram como **pendência**; permissões mantidas (todos cadastram e editam, só o admin arquiva).
+**Pendente:** data de encerramento da convivência com a planilha (F5) e destino de `Ação IA`.

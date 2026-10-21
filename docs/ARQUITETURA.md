@@ -1,94 +1,115 @@
 # Arquitetura do Radar Pré-Vendas
 
-Painel interno de pré-vendas (licitações). Os dados nascem na planilha **BaseLicitacao.xlsx** (aba *Base Governo*), são copiados por um agente para um **Postgres (Neon)** e exibidos em um painel React protegido por **Cloudflare Access** (login por código enviado ao e-mail `@ctctech.com.br`).
+Painel interno de pré-vendas (licitações) **e** cadastro de oportunidades. O banco **Postgres (Neon)** é a fonte da verdade: ele é alimentado de duas formas (a planilha *BaseLicitacao.xlsx*, por merge, e o cadastro direto na aba **Oportunidades**) e alimenta o painel de métricas, o backup e o Microsoft Planner. Tudo atrás do **Cloudflare Access** (código por e-mail `@ctctech.com.br`).
 
-Este documento cobre o caminho completo: planilha → agente → banco → API → painel → usuário. A operação do dia a dia está em [OPERACAO.md](OPERACAO.md).
+A operação do dia a dia está em [OPERACAO.md](OPERACAO.md); o que vem a seguir está em [ROADMAP.md](ROADMAP.md).
 
 ## 1. Visão geral
 
 ```mermaid
 flowchart LR
-  subgraph origem["Origem dos dados (Microsoft 365)"]
-    XLS["BaseLicitacao.xlsx<br/>aba Base Governo<br/>SharePoint GOVERNO2"]
-    OD["OneDrive sincronizado<br/>na máquina do João"]
+  subgraph origem["Origem dos dados"]
+    XLS["BaseLicitacao.xlsx<br/>(aba Base Governo)<br/>SharePoint / OneDrive"]
+    U(["Usuário do time<br/>@ctctech.com.br"])
   end
 
   subgraph local["Máquina local (Windows)"]
-    TS["Agendador de Tarefas<br/>a cada 2 dias"]
-    AG["Agente Claude Code<br/>claude-sonnet-5-5"]
-    LD["scripts/load-db.mjs<br/>papel radar_escritor"]
-  end
-
-  subgraph neon["Neon Postgres - sa-east-1"]
-    FN["função carregar_oportunidades<br/>(transação atômica)"]
-    T1[("oportunidades")]
-    T2[("carga_status")]
+    AG["Agente de carga<br/>sync-db.mjs (merge)<br/>papel radar_escritor"]
+    EXP["Exportador<br/>planner-eventos.mjs<br/>papel radar_planner"]
+    PA["planner-auto<br/>processar-eventos"]
+    EV[("eventos/<br/>entrada · processados · erros")]
   end
 
   subgraph cf["Cloudflare"]
-    ACC["Cloudflare Access<br/>One-time PIN<br/>@ctctech.com.br"]
+    ACC["Access (One-time PIN)"]
     subgraph pages["Pages: radar-prevendas"]
-      SPA["Painel React (SPA)"]
-      API["Pages Function /api/*<br/>papel radar_leitor"]
+      SPA["SPA React<br/>painel + aba Oportunidades"]
+      API["Pages Functions /api/*"]
     end
   end
 
-  U(["Usuário"])
+  subgraph neon["Neon Postgres (sa-east-1)"]
+    DB[("oportunidades · historico<br/>opcoes · usuarios<br/>carga_status · planner_*")]
+    FN["funções SECURITY DEFINER<br/>criar / atualizar / arquivar<br/>sincronizar_planilha"]
+  end
 
-  XLS -->|sincroniza| OD
-  TS --> AG
-  OD -->|"cópia somente leitura"| AG
-  AG --> LD
-  LD -->|"SELECT carregar_oportunidades(jsonb)"| FN
-  FN --> T1
-  FN --> T2
+  subgraph gh["GitHub"]
+    CI["Pipeline CI/CD"]
+    BK["Backup diário<br/>+ teste de restauração"]
+  end
 
-  U -->|HTTPS| ACC
-  ACC -->|"JWT válido"| SPA
-  SPA -->|"/api/rows, /api/status"| API
-  API -->|"SELECT somente leitura"| T1
-  API --> T2
+  DRV[("Google Drive<br/>dumps criptografados")]
+  PL["Microsoft Planner<br/>ITS · Digital e Health"]
+
+  XLS -->|"cópia somente leitura"| AG
+  AG -->|"sincronizar_planilha"| FN
+  U --> ACC --> SPA
+  SPA -->|"/api/rows · /api/oportunidades · /api/opcoes"| API
+  API -->|"radar_leitor (painel)<br/>radar_app (cadastro)"| FN
+  FN --> DB
+  DB -->|"SELECT"| EXP
+  EXP -->|"JSON v2"| EV
+  EV --> PA -->|"Microsoft Graph"| PL
+  DB -->|"pg_dump (radar_backup)"| BK --> DRV
+  CI -->|"deploy"| pages
 ```
 
-**Ideia central:** dois caminhos totalmente separados e com privilégios mínimos. O agente só **escreve** (por uma única função) e o painel só **lê**. Nenhum dos dois consegue fazer o que o outro faz.
+**Ideia central:** cada componente tem um papel de banco com o **mínimo de privilégio** e só consegue o que precisa. Quem lê não escreve; quem exporta para o Planner só lê; quem faz backup só lê; quem cadastra só chama funções que validam e auditam.
 
-## 2. Carga de dados (planilha → banco)
+## 2. Duas portas de entrada de dados (convivência planilha ↔ web)
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant TS as Agendador (Windows)
-  participant AG as Agente Claude Code
-  participant OD as OneDrive (cópia local)
-  participant LD as load-db.mjs
-  participant PG as Neon Postgres
+  participant XLS as Planilha (cópia)
+  participant AG as Agente (sync-db.mjs)
+  participant DB as Neon (sincronizar_planilha)
+  actor U as Usuário
+  participant WEB as Aba Oportunidades + API
 
-  TS->>AG: a cada 2 dias, claude -p "executar roteiro"
-  AG->>OD: copia BaseLicitacao.xlsx para pasta temporária
-  AG->>AG: lê a aba Base Governo e gera aba.json
-  AG->>AG: valida (cabeçalho, mais de 400 linhas, 90% com Status e Data)
-  alt validação falhou
-    AG-->>TS: relata o motivo e NÃO carrega
-  else validação ok
-    AG->>LD: node scripts/load-db.mjs aba.json --raw
-    LD->>LD: mapRows converte cabeçalho em campos do painel
-    LD->>PG: select carregar_oportunidades(jsonb, fonte)
-    PG->>PG: DELETE + INSERT + UPDATE carga_status (1 transação)
-    PG-->>LD: N linhas
-    LD-->>AG: ✓ N linhas carregadas
-    AG->>AG: apaga cópia e aba.json
-  end
+  AG->>XLS: lê a aba Base Governo (somente leitura)
+  AG->>AG: mapeia 34 colunas, normaliza, gera chave_planilha
+  AG->>DB: sincronizar_planilha(linhas)
+  DB->>DB: insere novas · atualiza as que mudaram
+  DB->>DB: NÃO toca em linhas editadas na web
+  DB->>DB: sumiu da planilha → marca "ausente" (não apaga)
+  U->>WEB: cadastra / edita (Zod + regras)
+  WEB->>DB: criar_/atualizar_oportunidade (versão otimista)
+  DB->>DB: valida, grava, registra histórico (quem, quando, campo, de→para)
 ```
 
-Pontos de projeto:
-- **Atomicidade:** a função troca a base inteira em uma transação. Se algo falhar, a base anterior permanece. Array vazio é recusado.
-- **Somente leitura na origem:** o agente lê uma **cópia** da planilha e nunca grava nela.
-- **Contrato único:** o cabeçalho da planilha é convertido nos campos do painel em `functions/_lib/rows.ts` (testado), reaproveitado por `load-db.mjs --raw`.
-- **Rastreabilidade:** `carga_status` guarda a hora, o total de linhas, a fonte e o último erro de cada carga.
+Regras de projeto:
+- **A edição na web vence a planilha.** Linhas com `editado_na_web` ou `fonte = 'web'` nunca são sobrescritas pela carga.
+- **Nada é apagado:** linha que sumiu da planilha vira `ausente_na_planilha` (o painel e a grade a ignoram); "excluir" na web é **arquivar** (só administrador, reversível).
+- **Chave de sincronização** (`chave_planilha`) = processo + órgão + data do pregão + torre. Se alguém corrigir um desses campos na planilha, o banco enxerga uma linha nova e marca a antiga como ausente (limitação conhecida; ver [ROADMAP.md](ROADMAP.md)).
+- **Trava de segurança:** o agente recusa a carga se vierem menos de 400 linhas (leitura parcial marcaria o resto como ausente).
+- A carga total antiga (`carregar_oportunidades`) é **bloqueada pelo banco** se existir qualquer linha criada pela web.
 
-Roteiro completo do agente: [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md). Contrato e esquema: [CARGA-DE-DADOS.md](CARGA-DE-DADOS.md) e [../db/schema.sql](../db/schema.sql).
+Detalhes: [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md), [CARGA-DE-DADOS.md](CARGA-DE-DADOS.md), [CADASTRO-OPORTUNIDADES.md](CADASTRO-OPORTUNIDADES.md).
 
-## 3. Acesso do usuário (login → dados)
+## 3. Cadastro pela web (API)
+
+| Rota | Método | Quem | O que faz |
+|---|---|---|---|
+| `/api/rows`, `/api/status` | GET | qualquer usuário autenticado | dados do painel (papel `radar_leitor`) |
+| `/api/me` | GET | autenticado | e-mail, nome, se é admin |
+| `/api/opcoes` | GET / PUT | todos leem; **admin** altera | listas fechadas e pré-vendas |
+| `/api/usuarios` | PUT | **admin** | usuários, papéis e e-mails |
+| `/api/oportunidades` | GET / POST | todos | grade e cadastro (aviso de duplicata) |
+| `/api/oportunidades/:id` | GET / PUT | todos | leitura e edição com versão otimista (409 em conflito) |
+| `/api/oportunidades/:id/historico` | GET | todos | trilha de alterações |
+| `/api/oportunidades/:id/arquivar` · `/restaurar` | POST | **admin** | exclusão lógica reversível |
+
+Camadas de proteção:
+1. **Borda:** Cloudflare Access (domínio `@ctctech.com.br`).
+2. **API:** valida o JWT do Access por conta própria (assinatura RS256, `exp`, `iss`, `aud`) em qualquer endereço do projeto; o **autor** vem do e-mail do JWT, nunca do corpo da requisição.
+3. **CSRF:** escritas exigem o cabeçalho `x-radar-csrf` e `Origin` igual ao host.
+4. **Formato:** esquema Zod compartilhado entre navegador e API (`src/domain/oportunidade.ts`), descartando campos desconhecidos.
+5. **Regras de negócio no banco:** `validar_oportunidade` (obrigatórios, listas fechadas, Lost/No Go com motivo, Win com Valor CTC, datas, valores) — a **fonte da verdade** da validação; erros voltam campo a campo (HTTP 422).
+6. **Banco:** a API usa `radar_app`, que só executa as funções de cadastro (não faz `INSERT` direto).
+7. **Cabeçalhos:** CSP restritiva, `X-Frame-Options: DENY`, HSTS e `noindex`.
+
+## 4. Acesso do usuário (login → dados)
 
 ```mermaid
 sequenceDiagram
@@ -99,82 +120,137 @@ sequenceDiagram
   participant DB as Neon Postgres
 
   U->>AC: abre radar-prevendas.pages.dev
-  AC-->>U: 302 para ctctech-radar.cloudflareaccess.com
-  U->>AC: informa o e-mail @ctctech.com.br
-  AC-->>U: envia código de 6 dígitos por e-mail
-  U->>AC: digita o código
+  AC-->>U: 302 para o login (e-mail @ctctech.com.br)
+  U->>AC: informa o e-mail e o código de 6 dígitos
   AC-->>U: cookie de sessão (24 h) + JWT
-  U->>PG: GET / (painel)
-  PG-->>U: SPA React
-  U->>PG: GET /api/rows (com Cf-Access-Jwt-Assertion)
-  PG->>PG: valida JWT: assinatura RS256, exp, iss, aud
-  alt JWT inválido ou ausente
+  U->>PG: GET / e depois /api/* (Cf-Access-Jwt-Assertion)
+  PG->>PG: valida o JWT (RS256, exp, iss, aud)
+  alt inválido ou ausente
     PG-->>U: 401
-  else JWT válido
-    PG->>DB: SELECT (papel radar_leitor)
-    DB-->>PG: linhas + carga_status
+  else válido
+    PG->>DB: leitura (radar_leitor) ou cadastro (radar_app)
+    DB-->>PG: dados
     PG-->>U: JSON (private, no-store)
   end
 ```
 
-Camadas de proteção (defesa em profundidade):
-1. **Borda:** a aplicação do Access barra quem não tem e-mail `@ctctech.com.br` antes de qualquer código rodar.
-2. **API:** a Pages Function valida o JWT por conta própria, em **qualquer** endereço do projeto (inclusive `<hash>.radar-prevendas.pages.dev`, que a aplicação do Access não cobre). Sem `CF_ACCESS_*` configurado, devolve 503 (falha fechada).
-3. **Banco:** a API usa `radar_leitor`, que só consegue `SELECT` em duas tabelas.
-4. **Cabeçalhos:** CSP restritiva, `X-Frame-Options: DENY`, HSTS e `noindex` (`public/_headers`).
-
-## 4. Entrega (código → produção)
+## 5. Integração com o Microsoft Planner
 
 ```mermaid
 flowchart LR
-  DEV["Desenvolvedor"] -->|push / PR| GH["GitHub<br/>agentanalisedegoverno-svg/<br/>dashboard-metrics-team"]
-  GH --> PIPE["Pipeline (GitHub Actions)"]
-
-  subgraph ci["CI reutilizável"]
-    Q["Typecheck, testes e cobertura"]
-    B["Build, orçamento de bundle,<br/>guarda contra dados reais"]
-    E["E2E Playwright + axe<br/>(WCAG AA, claro e escuro)"]
-    A["npm audit + dependency review"]
-  end
-
-  PIPE --> ci
-  ci -->|"PR"| PRV["Preview pr-N.pages.dev<br/>(build de demonstração)"]
-  ci -->|"push na main"| PROD["Deploy produção<br/>wrangler pages deploy"]
-  PROD --> SMOKE["Smoke test:<br/>302 ao Access na raiz e em /api/rows"]
-  PROD --> CFP["Cloudflare Pages<br/>radar-prevendas"]
+  W["Oportunidade criada ou<br/>alterada na web<br/>(depois do marco)"] --> DB[("Neon")]
+  DB -->|"radar_planner<br/>somente leitura"| EXP["planner-eventos.mjs"]
+  EXP -->|"evento v2 (JSON)"| EV[("eventos/entrada")]
+  AGD["Agendador do Windows<br/>seg–sex, 07h–19h, a cada 30 min"] --> RUN["rodar-integracao.cmd"]
+  RUN --> EXP
+  RUN --> PA["planner_auto.py<br/>processar-eventos --sim"]
+  EV --> PA
+  PA -->|"Graph (delegado)"| P1["Plano ITS Oportunidades"]
+  PA -->|"Graph (delegado)"| P2["Plano Digital e Health"]
+  PA --> EV2[("processados / erros")]
 ```
 
-- O build de **produção** não tem fallback para dados sintéticos: API fora do ar vira erro visível.
-- `DEMO_MODE=true` (variável do GitHub) publica o build de demonstração com banner; está **desligado**.
-- **Rollback:** *Actions → Pipeline → Run workflow* com `ref` = commit anterior.
+- **Sentido único** (Radar → Planner). Só oportunidades **criadas na web depois da ativação**; as vindas da planilha nunca são enviadas.
+- **Torre → plano:** ITS vai para *ITS Oportunidades*; DIGITAL e HEALTH vão para *Digital e Health*.
+- **Status → bucket e progresso**; **Pré-vendas → responsável** (e-mail cadastrado em *Listas e usuários*); título `[RAD-<id>] Órgão | Objeto | PE | UASG | DATA`.
+- **Idempotente e conservador:** a chave `RAD-<id>` evita duplicar; versão antiga é ignorada; responsável vazio não mexe; nunca apaga cartão nem arquivo; erro vai para `erros\` com o motivo.
 
-## 5. Modelo de dados e privilégios
+Contrato completo e mapeamentos: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md).
+
+## 6. Backup e restauração
+
+```mermaid
+flowchart LR
+  CRON["GitHub Actions<br/>diário 03:00 BRT"] --> DUMP["pg_dump completo<br/>(radar_backup, somente leitura)"]
+  DUMP --> CHK["verifica integridade"]
+  CHK --> ENC["AES-256 + PBKDF2"]
+  ENC --> DRV[("Google Drive<br/>diario/ (14 dias)<br/>semanal/ (12 semanas)")]
+  MES["Teste mensal"] --> DL["baixa o último"] --> DEC["descriptografa"] --> RST["restaura num Postgres temporário"] --> CMP["compara com a produção"]
+  DRV --> DL
+```
+
+Runbook e restauração: [BACKUP.md](BACKUP.md).
+
+## 7. Entrega (código → produção)
+
+```mermaid
+flowchart LR
+  DEV["Desenvolvedor"] -->|"PR"| GH["GitHub"]
+  GH --> PIPE["Pipeline"]
+  subgraph ci["CI reutilizável"]
+    Q["Typecheck + testes + cobertura"]
+    B["Build + orçamento de bundle + guarda de dados"]
+    E["E2E Playwright + axe (WCAG AA)"]
+    A["npm audit + dependency review"]
+  end
+  PIPE --> ci
+  ci -->|"PR"| PRV["Preview pr-N.pages.dev"]
+  ci -->|"push na main"| PROD["Deploy produção (wrangler)"]
+  PROD --> SMOKE["Smoke test: Access na raiz e em /api"]
+  GH --> CQL["CodeQL + Dependabot"]
+```
+
+- Build de **produção** sem fallback sintético: API fora do ar vira erro visível.
+- **Rollback:** *Actions → Pipeline → Run workflow* com `ref` = commit anterior.
+- Dependabot não propõe *major* do `@tanstack/react-table` (a grade usa a v8).
+
+## 8. Modelo de dados e privilégios
 
 ```mermaid
 erDiagram
+  oportunidades ||--o{ oportunidades_historico : "audita"
+  oportunidades ||--o| planner_exportacao : "exportada"
   oportunidades {
     bigint id PK
-    text ano
-    text mes
     text status
-    text uf
     text torre
-    text linha_servico
-    text vistoria
-    text analista
-    text motivo_no_go
-    text motivo_lost
-    text conta_vinculada
-    numeric orcamento
-    numeric valor_ctc
-    numeric valor_vencedor
-    numeric sla
-    text processo
     text orgao
     text descritivo
-    text data_pregao
-    jsonb acao_ia
-    timestamptz carregado_em
+    text processo
+    text uasg
+    date data_pregao_dt
+    text analista
+    numeric orcamento
+    bool orcamento_sigiloso
+    numeric valor_ctc
+    text fonte "planilha ou web"
+    text chave_planilha
+    bool editado_na_web
+    bool ausente_na_planilha
+    int versao "bloqueio otimista"
+    text[] pendencias
+    timestamptz arquivado_em
+  }
+  oportunidades_historico {
+    bigint id PK
+    bigint oportunidade_id FK
+    int versao
+    text acao "criou editou arquivou sincronizou"
+    text por
+    jsonb alteracoes "campo: antes, depois"
+  }
+  opcoes {
+    text lista PK
+    text valor PK
+    bool ativo
+    int ordem
+  }
+  usuarios {
+    int id PK
+    text nome
+    text email
+    bool admin
+    bool pre_vendas
+    bool ativo
+  }
+  planner_marco {
+    int id PK "sempre 1"
+    timestamptz marco "NULL = desligado"
+  }
+  planner_exportacao {
+    bigint oportunidade_id PK
+    int versao_exportada
+    text chave
   }
   carga_status {
     int id PK "sempre 1"
@@ -185,42 +261,55 @@ erDiagram
   }
 ```
 
+(A tabela `oportunidades` tem ~55 colunas: as 34 da planilha, as derivadas `ano`, `mes`, `sla`, e os metadados de auditoria. Esquema completo em [`db/migrations/`](../db/migrations/).)
+
 | Papel | Quem usa | Pode | Não pode |
 |---|---|---|---|
-| `radar_leitor` | API do painel (Pages Function) | `SELECT` em `oportunidades` e `carga_status` | escrever, apagar, executar a carga, criar objetos |
-| `radar_escritor` | Agente de carga (`load-db.mjs`) | `EXECUTE carregar_oportunidades(jsonb, text)` | ler tabelas, apagar, alterar esquema |
-| `neondb_owner` | Administração (console Neon / conector) | tudo | — (uso excepcional) |
+| `radar_leitor` | API do painel | `SELECT` nas tabelas de leitura | escrever, apagar, executar carga |
+| `radar_app` | API de cadastro | `SELECT` + `EXECUTE` das funções de cadastro | `INSERT` direto, sincronizar planilha |
+| `radar_escritor` | Agente de carga | `EXECUTE sincronizar_planilha` | ler tabelas, apagar, alterar esquema |
+| `radar_planner` | Exportador do Planner | `SELECT` em oportunidades e usuários; grava só nas tabelas `planner_*` | alterar oportunidades |
+| `radar_backup` | Backup diário | leitura de tudo (`pg_read_all_data`) | gravar |
+| `neondb_owner` | Administração (console/CLI) | tudo | — (uso excepcional) |
 
-A função `carregar_oportunidades` é `SECURITY DEFINER`: roda com os privilégios do dono, por isso o escritor não precisa de nenhum privilégio direto nas tabelas.
+As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do dono, então os papéis acima não precisam de acesso direto às tabelas para escrever.
 
-## 6. Inventário de componentes
+## 9. Inventário de componentes
 
 | Componente | Onde | Identificação |
 |---|---|---|
-| Planilha | SharePoint GOVERNO2 (`connectcomcloud.sharepoint.com`) | `BaseLicitacao.xlsx`, aba *Base Governo* (~590 linhas, 33 colunas) |
-| Agente de carga | máquina local do João | tarefa `RadarPreVendas-Carga`, modelo `claude-sonnet-5-5` |
-| Banco | Neon, região `aws-sa-east-1` | projeto `radar-prevendas` (`young-breeze-09937213`), branch `main`, banco `neondb` |
-| Hospedagem | Cloudflare Pages | projeto `radar-prevendas`, `https://radar-prevendas.pages.dev` |
-| Autenticação | Cloudflare Zero Trust (plano Free) | time `ctctech-radar`, aplicação *Radar Pré-Vendas*, *One-time PIN*, política `@ctctech.com.br` |
+| Planilha | SharePoint GOVERNO2 | `BaseLicitacao.xlsx`, aba *Base Governo* (~610 linhas, 39 colunas; as 6 "(Pivot)" são auxiliares e ignoradas) |
+| Agente de carga | máquina local do João | tarefa `RadarPreVendas-Carga` (a cada 2 dias) |
+| Integração Planner | máquina local do João | tarefa `Radar-Planner integracao` (seg–sex, 07h–19h, a cada 30 min); código em [`planner-auto/`](../planner-auto/) |
+| Banco | Neon, `aws-sa-east-1` | projeto `radar-prevendas`, branch `main`, banco `neondb` |
+| Hospedagem | Cloudflare Pages | `https://radar-prevendas.pages.dev` |
+| Autenticação | Cloudflare Zero Trust (Free) | time `ctctech-radar`, *One-time PIN*, política `@ctctech.com.br` |
 | Código e CI/CD | GitHub | `agentanalisedegoverno-svg/dashboard-metrics-team` |
+| Backup | GitHub Actions → Google Drive | `Backup do banco` (diário) e `Teste de restauração do backup` (mensal) |
+| Planner | Microsoft 365 | planos *ITS Oportunidades* e *Digital e Health - Oportunidades* |
 
-## 7. Decisões de arquitetura
+## 10. Decisões de arquitetura
 
 | Decisão | Motivo | Alternativa descartada |
 |---|---|---|
-| Painel lê de um **banco**, não direto da planilha | Independe de permissões do Microsoft 365 (o TI demorava a responder) e deixa o painel rápido e estável | Leitura direta pelo Microsoft Graph (código no histórico; exigia app registration e consentimento de administrador) |
-| **Agente** copia a planilha para o banco | Reaproveita o acesso que o João já tem ao OneDrive/M365; sem segredo de aplicativo | Função serverless com segredo do Graph |
-| **Neon Postgres** | Gratuito, Postgres de verdade, driver HTTP que roda em Workers, região em São Paulo | Cloudflare D1 (exigiria permissões de token adicionais) |
-| **Troca atômica** da base inteira | Simples, sem estados parciais, idempotente | Upsert por chave (a planilha não tem chave estável) |
-| **Cloudflare Access** com código por e-mail | Sem TI e sem app registration; controle por domínio; plano gratuito | Login Microsoft (MSAL): código mantido no repositório, **desligado** |
-| API valida o JWT **ela mesma** | A aplicação do Access cobre um hostname; a API também responde nos `<hash>.pages.dev` | Confiar só na borda |
-| Papéis separados (leitor/escritor) e função `SECURITY DEFINER` | Privilégio mínimo: quem lê não escreve e vice-versa | Uma única conexão com poder total |
+| Painel e cadastro leem/gravam num **banco** | Independe das permissões do Microsoft 365; rápido e estável; uma fonte da verdade | Leitura direta da planilha pelo Graph |
+| **Merge** na carga da planilha (não troca total) | Permite cadastro web em paralelo sem perder edições | Substituir a base inteira a cada carga (apagaria o que foi cadastrado na web) |
+| **Neon Postgres** | Gratuito, Postgres de verdade, driver HTTP em Workers, região em São Paulo | Cloudflare D1 |
+| **Regras de negócio no banco**, formato no Zod | Uma única fonte da verdade; vale para qualquer cliente (API, agente) | Validar só no navegador ou só na API |
+| **Bloqueio otimista** (`versao`) + histórico por gatilho | Detecta edição simultânea; auditoria que não depende da aplicação | Última gravação vence |
+| **Arquivar** em vez de excluir | Reversível e auditável | `DELETE` |
+| **Cloudflare Access** com código por e-mail | Sem TI e sem app registration; plano gratuito | Login Microsoft (MSAL): código no repositório, **desligado** |
+| API valida o JWT **ela mesma** | A borda cobre um hostname; a API responde também nos `<hash>.pages.dev` | Confiar só na borda |
+| Papéis separados por função | Privilégio mínimo | Uma conexão com poder total |
+| **Planner por eventos em arquivo** (não chamada direta do Radar) | Nenhum segredo da Microsoft no Radar/Cloudflare; roda com o login delegado já aprovado pelo TI; auditável (arquivos em `processados\`) | Função serverless com permissão de aplicativo (pedido maior ao TI) |
+| Backup por `pg_dump` criptografado | Restaura tudo (esquema, funções, gatilhos); cobre o histórico de 6 h do Neon free | JSON só dos dados |
 
-## 8. Limites e riscos conhecidos
+## 11. Limites e riscos conhecidos
 
-- **Disponibilidade do agente:** depende da máquina do João ligada, com o OneDrive sincronizado. Se falhar, o painel continua com os dados da última carga (a data aparece em "Última atualização").
-- **Troca total da base:** se o agente ler a planilha incompleta, apaga o resto. Mitigado pelas validações do roteiro (mínimo de linhas, cabeçalho, % de preenchimento).
-- **Plano gratuito do Neon:** retenção de histórico de 6 horas para restauração; limites de computação. Suficiente para o volume atual (~590 linhas).
-- **Dados sem Data Pregão** (2 linhas) ficam sem ano e mês e não entram nas métricas por ano.
-- **SLA negativo** é descartado na carga (datas inconsistentes na planilha de origem).
-- **Domínio completo no Access:** quem tem e-mail `@ctctech.com.br` entra, sem lista nominal. Para restringir, trocar a regra por e-mails específicos.
+- **Máquina local:** carga da planilha e integração com o Planner dependem do computador ligado e logado. Se falhar, o painel e o cadastro seguem normais; só a carga/os cartões atrasam. Há log em `planner-auto\logs\integracao.log`.
+- **Chave da planilha instável:** corrigir processo/órgão/data/torre na planilha gera uma linha nova e uma "ausente".
+- **Planner:** sentido único; arquivar no Radar não atualiza o cartão; mudar a torre não move o cartão entre planos; o 50%/100% do Radar pode sobrescrever progresso marcado à mão.
+- **Plano gratuito do Neon:** histórico de 6 h (coberto pelo backup diário); limites de computação, folgados para ~600 linhas.
+- **Backup no Google Drive:** o token do rclone tem acesso à conta Google que o gerou; ver [BACKUP.md](BACKUP.md).
+- **Domínio completo no Access:** quem tem e-mail `@ctctech.com.br` entra. Para restringir, trocar a regra por e-mails específicos.
+- **Permissões da aba:** todos cadastram e editam; só o admin arquiva e administra listas/usuários (decisão mantida).
