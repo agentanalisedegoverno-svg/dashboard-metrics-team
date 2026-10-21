@@ -40,6 +40,8 @@ export type EventoPlanner = {
   tipo: 'oportunidade_nova' | 'oportunidade_atualizada'
   chave: string
   origem: 'Radar'
+  /** Versão da oportunidade no Radar: o consumidor ignora eventos com versão menor que a última aplicada. */
+  versaoOrigem: number
   geradoEm: string
   plano: string
   planoNome: string
@@ -105,6 +107,7 @@ export function montarEvento(
     tipo,
     chave: chaveRadar(o.id),
     origem: 'Radar',
+    versaoOrigem: o.versao,
     geradoEm: agora.toISOString(),
     plano: plano.planId,
     planoNome: plano.nome,
