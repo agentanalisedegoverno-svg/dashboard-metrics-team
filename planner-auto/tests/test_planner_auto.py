@@ -81,6 +81,11 @@ class Planejamento(unittest.TestCase):
         self.assertEqual(len(p["responsaveis_ids"]), 2)
         self.assertIn("a@x.com, b@x.com", pa.descricao_acao(p))
 
+    def test_responsaveis_extras_da_config(self):
+        c = ctx(); c["responsaveis_extras"] = ["x@x.com", "julio.silva@ctctech.com.br"]
+        p = pa.planeja(evento(), c)  # evento já traz julio.silva; o extra duplicado não repete
+        self.assertEqual(p["responsaveis_emails"], ["julio.silva@ctctech.com.br", "x@x.com"])
+
     def test_erros_vao_para_erros(self):
         with self.assertRaises(pa.EventoInvalido):
             pa.planeja(evento(bucket="Bucket Fantasma"), ctx())

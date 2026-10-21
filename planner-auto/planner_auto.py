@@ -103,6 +103,10 @@ def planeja(ev: dict, contexto: dict) -> dict:
 
     # `responsaveis` (lista) ou `responsavel` (um e-mail). Vazio/nulo = não altera a atribuição.
     emails = list(c.get("responsaveis") or ([c["responsavel"]] if c.get("responsavel") else []))
+    # `responsaveis_extras` (config.json do planner-auto): pessoas acrescentadas a TODO cartão, além do pré-vendas do Radar.
+    for extra in contexto.get("responsaveis_extras", []):
+        if extra not in emails:
+            emails.append(extra)
     responsaveis_ids = []
     for email in emails:
         uid = contexto["resolve_usuario"](email)
@@ -366,7 +370,8 @@ def cmd_processar(args):
                 "categorias": {nome: cat for cat, nome in (det.get("categoryDescriptions") or {}).items() if nome},
                 "tarefas_por_chave": tarefas,
             }
-        return {**cache_plano[plan_id], "ultima_versao": {k: v["versaoOrigem"] for k, v in estado.items()}, "resolve_usuario": resolve_usuario}
+        return {**cache_plano[plan_id], "ultima_versao": {k: v["versaoOrigem"] for k, v in estado.items()}, "resolve_usuario": resolve_usuario,
+                "responsaveis_extras": cfg.get("responsaveis_extras", [])}
 
     planos = []
     for arq in arquivos:

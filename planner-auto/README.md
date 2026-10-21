@@ -12,6 +12,8 @@ python planner_auto.py login            # código em https://login.microsoft.com
 python planner_auto.py inspecionar      # confere buckets/rótulos com config\planner-mapa.json do Radar
 ```
 
+Opcional: `"responsaveis_extras": ["a@x.com", ...]` acrescenta essas pessoas como responsáveis de **todo** cartão (além do pré-vendas do Radar); lista vazia ou ausente desliga.
+
 `config.json` fica **só na máquina** (tem os IDs do app e do tenant). O token fica em `%USERPROFILE%\.planner_auto\`, junto do log `acoes.jsonl` e do estado `estado_radar.json`.
 
 ## Comandos
