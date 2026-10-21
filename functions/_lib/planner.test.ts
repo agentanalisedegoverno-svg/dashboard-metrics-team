@@ -35,6 +35,8 @@ describe('integração Planner', () => {
     expect(nova.cartao.responsavel).toBe('julio.silva@ctctech.com.br')
     expect(nova.cartao.checklist).toHaveLength(7)
     expect(nova.cartao.prazo).toBe('2026-11-05T12:00:00Z')
+    expect(nova.versaoOrigem).toBe(1)
+    expect(montarEvento({ ...base, versao: 4 }, 'oportunidade_atualizada', M, email)!.versaoOrigem).toBe(4)
     const upd = montarEvento({ ...base, analista: 'Fulano' }, 'oportunidade_atualizada', M, email)!
     expect(upd.cartao.responsavel).toBeNull()
     expect(upd.cartao.checklist).toEqual([])
