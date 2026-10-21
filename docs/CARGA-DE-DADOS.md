@@ -11,7 +11,7 @@ Cada linha segue o formato do painel (`functions/_lib/rows.ts`):
 1. **Matriz bruta da aba** (mais simples para o agente): salvar `usedRange.values` em JSON e rodar
    ```
    DATABASE_URL_WRITER='postgresql://radar_escritor:<senha>@ep-sparkling-hat-b61akqwy.c-2.sa-east-1.aws.neon.tech/neondb?sslmode=require' \
-     node scripts/load-db.mjs aba.json --raw --fonte "agente-claude"
+     node scripts/sync-db.mjs aba.json --fonte "agente-claude"  # merge (F4); load-db.mjs é a carga total antiga
    ```
    O script converte o cabeçalho real da planilha (33 colunas) nos campos acima.
 2. **JSON já no contrato:** `node scripts/load-db.mjs linhas.json` (sem `--raw`).

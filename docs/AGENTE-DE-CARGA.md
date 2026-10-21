@@ -1,6 +1,8 @@
-# Roteiro do agente de carga (planilha → Postgres)
+# Roteiro do agente de carga (planilha → Postgres, por merge)
 
 Cole o bloco "Prompt do agente" abaixo no agente do Claude Code que alimenta o banco. Ele é autocontido e não contém credenciais.
+
+> **Mudou na F4:** a carga deixou de **substituir** a base. Agora é um **merge** (`scripts/sync-db.mjs` → `sincronizar_planilha`): atualiza o que mudou, insere o que é novo, **nunca sobrescreve** linhas editadas pela web e marca como "ausentes" (sem apagar) as que sumiram da planilha. Isso permite que o time cadastre e edite pela aba Oportunidades enquanto a planilha ainda existe.
 
 ## Pré-requisitos (uma vez) — execução na máquina local (Windows)
 - Node 22.18+ e este repositório clonado, com `npm ci` já executado.
@@ -46,12 +48,14 @@ PASSOS
       linha totalmente vazia no meio de dados.
    c) Pelo menos 90% das linhas têm "Status" preenchido e pelo menos 90% têm "Data Pregão" válida.
    Se algo falhar: não carregue; relate qual validação falhou e os números encontrados.
-2.5. Teste a conversão sem gravar: node scripts/load-db.mjs aba.json --raw --dry-run  (deve imprimir "✓ dry-run: N linhas").
-3. Carregue (substitui a base inteira, em uma transação):
-      node scripts/load-db.mjs aba.json --raw --fonte "agente-claude"
-   A saída esperada é "✓ N linhas carregadas". N deve ser igual ao número de linhas de dados lidas.
+2.5. Teste a conversão sem gravar: node scripts/sync-db.mjs aba.json --dry-run  (imprime "Linhas: N | avisos de qualidade: M" e "✓ dry-run").
+3. Sincronize (merge, em uma transação):
+      node scripts/sync-db.mjs aba.json --fonte "agente-claude"
+   A saída esperada é "✓ sincronizado" com recebidas = número de linhas de dados lidas. Os avisos de qualidade
+   (ex.: Lost sem motivo) NÃO impedem a carga: viram pendências para corrigir pela web.
+   O script recusa a carga se vierem menos de 400 linhas (proteção contra leitura parcial).
 4. Apague a cópia temporária da planilha e o aba.json (contêm dados de licitações) (contém dados de licitações).
-5. Relate em 5 linhas: horário, linhas lidas, linhas carregadas, validações, e qualquer anomalia.
+5. Relate em 5 linhas: horário, linhas lidas, inseridas/atualizadas/ausentes/protegidas (da saída do script), validações, e qualquer anomalia.
 
 EM CASO DE ERRO
 - Erro de conexão/autenticação: relate e pare (não tente outras credenciais).
@@ -60,11 +64,12 @@ EM CASO DE ERRO
 ```
 
 ## Como confirmar que funcionou
-- A saída do script mostra `✓ N linhas carregadas`.
+- A saída do script mostra `✓ sincronizado` com `recebidas` = linhas da planilha.
 - No painel, "Última atualização" muda e a contagem de oportunidades bate com a planilha (após o Cloudflare Access estar ativo e `DEMO_MODE` removido).
 - Em caso de dúvida, no console do Neon: `select ultima_carga_em, total_linhas, fonte from carga_status;`.
 
 ## Observações
-- Cada carga **substitui tudo**; o agente deve sempre enviar a planilha completa.
+- O agente deve sempre enviar a planilha **completa** (linhas que não vierem ficam "ausentes").
+- A chave de cada linha é processo + órgão + data do pregão + torre. Se alguém corrigir um desses campos na planilha, o banco enxerga uma linha nova e marca a antiga como ausente (o painel ignora as ausentes). Edições feitas na web ficam sempre protegidas.
 - Em caso de incidente, a carga anterior pode ser recuperada pelo histórico do Neon (restauração de ponto no tempo, retenção de 6 horas no plano gratuito); para garantir, rode o agente e confira logo após alterações grandes na planilha.
 - Trocar a senha do `radar_escritor`: peça para gerar uma nova e atualize só o ambiente do agente.
