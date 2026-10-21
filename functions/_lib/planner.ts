@@ -20,6 +20,7 @@ export type MapaPlanner = {
 
 export type OportunidadePlanner = {
   id: number
+  codigo?: string | null
   versao: number
   status: string | null
   torre: string | null
@@ -58,8 +59,10 @@ export type EventoPlanner = {
   }
 }
 
-/** Chave estável do cartão: aparece entre colchetes no início do título. */
+/** Chave estável do cartão (aparece entre colchetes no início do título): o código AAAA-NNNN da oportunidade;
+ * `RAD-<id>` só como reserva para registros sem código (legado). */
 export const chaveRadar = (id: number) => `RAD-${id}`
+export const chaveDe = (o: Pick<OportunidadePlanner, 'id' | 'codigo'>) => o.codigo || chaveRadar(o.id)
 
 const limpa = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim()
 const dataBr = (iso: string) => iso.split('-').reverse().join('/')
@@ -72,7 +75,7 @@ export function tituloCartao(o: OportunidadePlanner): string {
     [o.processo ? `PE: ${limpa(o.processo)}` : '', o.uasg ? `UASG: ${limpa(o.uasg)}` : ''].filter(Boolean).join(' '),
     o.data_pregao_dt ? `DATA: ${dataBr(o.data_pregao_dt)}` : '',
   ].filter(Boolean)
-  return `[${chaveRadar(o.id)}] ${partes.join(' | ')}`.slice(0, 255)
+  return `[${chaveDe(o)}] ${partes.join(' | ')}`.slice(0, 255)
 }
 
 export function planoDaTorre(mapa: MapaPlanner, torre: string | null) {
@@ -95,7 +98,7 @@ export function montarEvento(
   const bucket = plano.buckets[status] ?? plano.buckets._sem_status
   const rotulos = [...plano.rotulos, ...(plano.rotulosPorTorre?.[o.torre!.trim().toUpperCase()] ?? [])]
   const nota = [
-    `Radar #${o.id} (v${o.versao}) — status: ${o.status ?? 'sem status'}.`,
+    `Radar ${chaveDe(o)} (v${o.versao}) — status: ${o.status ?? 'sem status'}.`,
     o.linha_servico ? `Linha de serviço: ${limpa(o.linha_servico)}.` : '',
     o.orcamento_sigiloso ? 'Orçamento sigiloso.' : o.orcamento ? `Orçamento: R$ ${o.orcamento.toLocaleString('pt-BR')}.` : '',
     o.observacoes ? `Obs.: ${limpa(o.observacoes).slice(0, 600)}` : '',
@@ -105,7 +108,7 @@ export function montarEvento(
   return {
     versao: '2',
     tipo,
-    chave: chaveRadar(o.id),
+    chave: chaveDe(o),
     origem: 'Radar',
     versaoOrigem: o.versao,
     geradoEm: agora.toISOString(),

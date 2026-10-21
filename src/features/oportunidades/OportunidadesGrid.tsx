@@ -17,6 +17,7 @@ export const Selo = ({ status }: { status: string | null }) => (
 )
 
 const colunas: ColumnDef<Oportunidade>[] = [
+  { accessorKey: 'codigo', header: 'Código', size: 100, cell: (c) => <span className="font-mono text-xs">{c.getValue<string | null>() ?? '—'}</span> },
   { accessorKey: 'status', header: 'Status', size: 110, cell: (c) => <Selo status={c.getValue<string | null>()} /> },
   { accessorKey: 'orgao', header: 'Órgão', size: 260, cell: (c) => <span className="line-clamp-1" title={c.getValue<string>() ?? ''}>{c.getValue<string>() ?? '—'}</span> },
   { accessorKey: 'processo', header: 'Processo', size: 130 },
@@ -70,6 +71,7 @@ export function OportunidadesGrid({ dados, onAbrir, compacto }: Props) {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <Selo status={o.status} />
+                    <span className="font-mono text-xs text-muted">{o.codigo ?? ''}</span>
                     <span className="text-xs text-muted">{dataBr(o.data_pregao_dt)}</span>
                   </div>
                   <p className="mt-1 line-clamp-1 text-[13px] font-semibold text-ink">{o.orgao ?? '—'}</p>

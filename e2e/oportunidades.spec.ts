@@ -16,6 +16,7 @@ const opcoes = {
 const semente = (n: number): Reg[] =>
   Array.from({ length: n }, (_, i) => ({
     id: i + 1,
+    codigo: `2026-${String(i + 1).padStart(4, '0')}`,
     versao: 1,
     status: i % 3 === 0 ? 'Win' : 'Go',
     orgao: `Órgão ${i + 1}`,
@@ -75,6 +76,9 @@ test('lista virtualizada, busca e filtro', async ({ page }) => {
   expect(await page.locator('tbody tr[tabindex="0"], [role=listitem]').count()).toBeLessThan(80)
   await page.getByLabel('Buscar oportunidades').fill('Órgão 42')
   await expect(page.getByText(/oportunidades · logado/)).toContainText('de 500')
+  await page.getByLabel('Buscar oportunidades').fill('2026-0042')
+  await expect(page.getByText(/^1 de 500 oportunidades/)).toBeVisible()
+  await expect(page.getByText('2026-0042').first()).toBeVisible()
   await page.getByLabel('Buscar oportunidades').fill('')
   await page.getByRole('checkbox', { name: /Só com pendências/ }).check()
   await expect(page.getByText(/1 de 500 oportunidades/)).toBeVisible()

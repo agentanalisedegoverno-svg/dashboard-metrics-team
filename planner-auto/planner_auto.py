@@ -9,7 +9,7 @@ Comandos desta entrega:
       --sim                  grava sem pedir confirmação (só para rotinas já aprovadas)
       --arquivo NOME         processa só esse arquivo de entrada\\
 
-Regras (docs/INTEGRACAO-PLANNER.md do Radar): idempotência pela chave [RAD-<id>] no título; ignora
+Regras (docs/INTEGRACAO-PLANNER.md do Radar): idempotência pela chave [AAAA-NNNN] (código da oportunidade) no título; ignora
 eventos com versaoOrigem menor/igual à última aplicada; responsavel null não altera a atribuição;
 bucket/rótulo por nome exato e depois sem caixa/espaços, senão o evento vai para erros\\; nunca apaga nada.
 """
@@ -29,7 +29,8 @@ GRAPH = "https://graph.microsoft.com/v1.0"
 ESCOPOS = ["Tasks.ReadWrite", "Group.Read.All", "User.ReadBasic.All"]
 BASE = Path(__file__).resolve().parent
 HOME_DIR = Path.home() / ".planner_auto"
-CHAVE_RE = re.compile(r"\[(RAD-\d+)\]")
+CHAVE_PADRAO = r"(?:\d{4}-\d{4,}|RAD-\d+)"  # código AAAA-NNNN do Radar; RAD-<id> é o formato antigo
+CHAVE_RE = re.compile(r"\[(" + CHAVE_PADRAO + r")\]")
 ASSIGN = {"@odata.type": "#microsoft.graph.plannerAssignment", "orderHint": " !"}
 
 
@@ -62,7 +63,7 @@ def valida_evento(ev: dict, planos_conhecidos: set[str]) -> None:
         raise EventoInvalido(f"versão de contrato não suportada: {ev.get('versao')!r}")
     if ev.get("tipo") not in ("oportunidade_nova", "oportunidade_atualizada"):
         raise EventoInvalido(f"tipo desconhecido: {ev.get('tipo')!r}")
-    if not re.fullmatch(r"RAD-\d+", str(ev.get("chave", ""))):
+    if not re.fullmatch(CHAVE_PADRAO, str(ev.get("chave", ""))):
         raise EventoInvalido(f"chave inválida: {ev.get('chave')!r}")
     if not isinstance(ev.get("versaoOrigem"), int):
         raise EventoInvalido("versaoOrigem ausente")

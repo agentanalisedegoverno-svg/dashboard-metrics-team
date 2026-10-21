@@ -4,16 +4,19 @@ import { chaveRadar, montarEvento, nomeArquivo, planoDaTorre, tituloCartao, type
 
 const M = mapa as unknown as MapaPlanner
 const base: OportunidadePlanner = {
-  id: 77, versao: 1, status: 'Go', torre: 'ITS', orgao: 'SEDES', descritivo: 'Link  dedicado', processo: '24/2026', uasg: '158443',
+  id: 77, codigo: '2026-0077', versao: 1, status: 'Go', torre: 'ITS', orgao: 'SEDES', descritivo: 'Link  dedicado', processo: '24/2026', uasg: '158443',
   data_pregao_dt: '2026-11-05', analista: 'Júlio César', linha_servico: 'Conectividade', observacoes: null, orcamento: 1500000, orcamento_sigiloso: false,
 }
 const email = (n: string) => (n === 'Júlio César' ? 'julio.silva@ctctech.com.br' : null)
 
 describe('integração Planner', () => {
   it('título no padrão dos cartões existentes, com a chave entre colchetes', () => {
-    expect(tituloCartao(base)).toBe('[RAD-77] SEDES | Link dedicado | PE: 24/2026 UASG: 158443 | DATA: 05/11/2026')
-    expect(tituloCartao({ ...base, processo: null, uasg: null, data_pregao_dt: null, orgao: null })).toBe('[RAD-77] Órgão não informado | Link dedicado')
+    expect(tituloCartao(base)).toBe('[2026-0077] SEDES | Link dedicado | PE: 24/2026 UASG: 158443 | DATA: 05/11/2026')
+    expect(tituloCartao({ ...base, processo: null, uasg: null, data_pregao_dt: null, orgao: null })).toBe('[2026-0077] Órgão não informado | Link dedicado')
+    // sem código (legado): reserva RAD-<id>
+    expect(tituloCartao({ ...base, codigo: null }).startsWith('[RAD-77] ')).toBe(true)
     expect(chaveRadar(5)).toBe('RAD-5')
+    expect(montarEvento(base, 'oportunidade_nova', M, email)!.chave).toBe('2026-0077')
   })
   it('a torre decide o plano: ITS num, DIGITAL e HEALTH no outro; torre desconhecida não gera evento', () => {
     expect(planoDaTorre(M, 'ITS')?.planId).toBe('ZiZ73_n76Uu8gXXYbmIQ0mUAD-k0')
@@ -43,7 +46,7 @@ describe('integração Planner', () => {
   })
   it('nome de arquivo ordenável e orçamento sigiloso não vaza valor', () => {
     const e = montarEvento({ ...base, orcamento_sigiloso: true }, 'oportunidade_nova', M, email, new Date('2026-10-21T14:30:00Z'))!
-    expect(nomeArquivo(e)).toBe('20261021-1430_RAD-77_oportunidade_nova.json')
+    expect(nomeArquivo(e)).toBe('20261021-1430_2026-0077_oportunidade_nova.json')
     expect(e.cartao.nota).toContain('Orçamento sigiloso.')
     expect(e.cartao.nota).not.toMatch(/1\.500\.000/)
   })

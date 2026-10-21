@@ -10,7 +10,7 @@ Sentido único: **Radar → Planner**. O Radar é a fonte da verdade; o Planner 
 - **Qualquer status** gera cartão. O status define o bucket.
 - **A torre define o plano:** `ITS` → *ITS Oportunidades*; `DIGITAL` e `HEALTH` → *Digital e Health - Oportunidades*. Torre vazia ou desconhecida não gera cartão (o exportador avisa).
 - **O responsável vem do Radar:** é o **Pré-vendas** escolhido na oportunidade, convertido no e-mail cadastrado em *Listas e usuários*. Hoje: Júlio César, Flávio Santanna, João Henrique e Jefferson Oliveira. O contrato aceita também uma **lista** de responsáveis (`responsaveis`), mas o Radar hoje envia um.
-- **Chave do cartão:** `RAD-<id>`, entre colchetes no início do título. É o que torna o processamento idempotente.
+- **Chave do cartão = código da oportunidade** (`AAAA-NNNN`, ex.: `2026-0512`), entre colchetes no início do título. É o mesmo código que aparece na aba Oportunidades do Radar, então a oportunidade é encontrada nos dois lados pelo mesmo identificador. É também o que torna o processamento idempotente. O formato antigo `RAD-<id>` só existe no cartão de teste e como reserva para registros sem código.
 
 ## Componentes
 
@@ -40,27 +40,27 @@ flowchart LR
 
 ## Contrato do evento (v2)
 
-Arquivo `AAAAMMDD-HHMM_RAD-<id>_<tipo>.json` em `eventos\entrada\`:
+Arquivo `AAAAMMDD-HHMM_<código>_<tipo>.json` em `eventos\entrada\`:
 
 ```json
 {
   "versao": "2",
   "tipo": "oportunidade_nova",            // ou "oportunidade_atualizada"
-  "chave": "RAD-77",
+  "chave": "2026-0077",                   // código da oportunidade (AAAA-NNNN)
   "versaoOrigem": 3,                      // versão da oportunidade no Radar
   "origem": "Radar",
   "geradoEm": "2026-10-21T14:30:00.000Z",
   "plano": "<planId>",
   "planoNome": "ITS Oportunidades",
   "cartao": {
-    "titulo": "[RAD-77] SEDES | Link dedicado | PE: 24/2026 UASG: 158443 | DATA: 05/11/2026",
+    "titulo": "[2026-0077] SEDES | Link dedicado | PE: 24/2026 UASG: 158443 | DATA: 05/11/2026",
     "status": "Go",
     "bucket": "GO",                        // nome EXATO do bucket no plano
     "progresso": 50,                       // 0, 50 ou 100
     "prazo": "2026-11-05T12:00:00Z",
     "responsavel": "pessoa@ctctech.com.br",   // ou "responsaveis": [ ... ]; vazio = não alterar
     "rotulos": ["Licitação", "Público"],
-    "nota": "Radar #77 (v3) — status: Go. ...",
+    "nota": "Radar 2026-0077 (v3) — status: Go. ...",
     "checklist": ["Análise de edital", "..."]       // só na criação
   }
 }
@@ -69,7 +69,7 @@ Arquivo `AAAAMMDD-HHMM_RAD-<id>_<tipo>.json` em `eventos\entrada\`:
 ## O que o `processar-eventos` faz
 
 Para cada arquivo de `entrada\`, em ordem de nome, pela `chave`:
-- **`oportunidade_nova`:** procura cartão com `[RAD-<id>]` no título, no plano indicado. Se não existir, cria (bucket, rótulos, responsáveis, prazo, progresso, nota em *Anotações*, checklist). Se já existir, trata como atualização.
+- **`oportunidade_nova`:** procura cartão com `[<código>]` no título, no plano indicado. Se não existir, cria (bucket, rótulos, responsáveis, prazo, progresso, nota em *Anotações*, checklist). Se já existir, trata como atualização.
 - **`oportunidade_atualizada`:** acha o cartão pela chave e atualiza título, bucket, progresso e prazo; **acrescenta** a nota (não apaga o que o time escreveu) e **acrescenta** responsáveis (nunca remove). Nunca desmarca item de checklist concluído.
 - Depois move o arquivo para `processados\` (ou `erros\` com o motivo).
 
@@ -118,7 +118,7 @@ Não têm status equivalente no Radar: *Cotação Concluída* (ITS) e *Cotaçõe
   Disable-ScheduledTask -TaskName "Radar-Planner integracao"   # pausar
   ```
 - **Log:** `C:\Users\CTC\planner-auto\logs\integracao.log`. Se mudar o repositório de pasta, ajustar o `rodar-integracao.cmd`.
-- **Cartão de teste:** `RAD-999001` (plano ITS) foi criado na validação; apagar à mão no Planner.
+- **Cartão de teste:** `RAD-999001` (plano ITS, formato antigo de chave) foi criado na validação; apagar à mão no Planner.
 - Problemas comuns: [OPERACAO.md](OPERACAO.md) §3.
 
 ## Limitações da versão atual

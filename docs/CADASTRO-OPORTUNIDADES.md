@@ -56,6 +56,8 @@ Perfil feito sobre as 600 linhas de 14/10/2026. "Preench." é o percentual de li
 | 33 | Mês | *(derivado)* | — | 100% | Calculado de `data_pregao`. Não é digitado. |
 | 34 | Ação IA | `acao_ia` | reservado | 0% | Pertence a outro agente. Aparece somente leitura; nunca editável no formulário. |
 
+**Código da oportunidade** (`codigo`, `AAAA-NNNN`): identificador de negócio, atribuído automaticamente (ano da data do pregão + número sequencial do ano, de `0001` em diante), **único e imutável**. Aparece na grade, no formulário e no título do cartão do Planner. Numeração inicial feita em 21/10/2026 (da data do pregão mais antiga para a mais nova, por ano); depois disso, cada nova oportunidade recebe o próximo número do ano.
+
 Campos derivados (nunca digitados): `ano`, `mes` (de `data_pregao`) e `sla` = dias entre `data_distribuicao` e `data_pregao`.
 
 ## 3. Convivência planilha ↔ web (sincronização por merge)

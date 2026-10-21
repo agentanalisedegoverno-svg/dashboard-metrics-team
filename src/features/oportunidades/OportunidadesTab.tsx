@@ -46,7 +46,7 @@ export default function OportunidadesTab() {
         (!torre || o.torre === torre) &&
         (!analista || o.analista === analista) &&
         (!soPendencias || (o.pendencias?.length ?? 0) > 0) &&
-        (!q || fold([o.orgao, o.processo, o.descritivo, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),
+        (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),
     )
   }, [lista.data, buscaAdiada, status, torre, analista, soPendencias])
 
@@ -70,7 +70,7 @@ export default function OportunidadesTab() {
           type="search"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar órgão, processo, descritivo…"
+          placeholder="Buscar código, órgão, processo, descritivo…"
           aria-label="Buscar oportunidades"
           className={`${selectCls} min-w-60 flex-1`}
         />
