@@ -81,6 +81,7 @@ sequenceDiagram
 Regras de projeto:
 - **A edição na web vence a planilha.** Linhas com `editado_na_web` ou `fonte = 'web'` nunca são sobrescritas pela carga.
 - **Nada é apagado:** linha que sumiu da planilha vira `ausente_na_planilha` (o painel e a grade a ignoram); "excluir" na web é **arquivar** (só administrador, reversível).
+- **Código da oportunidade** (`codigo`, `AAAA-NNNN`): identificador de negócio, único e imutável, numerado por ano da data do pregão. É o mesmo código mostrado no Radar e no título do cartão do Planner. A planilha **não** recebe o código (ela será desativada).
 - **Chave de sincronização** (`chave_planilha`) = processo + órgão + data do pregão + torre. Se alguém corrigir um desses campos na planilha, o banco enxerga uma linha nova e marca a antiga como ausente (limitação conhecida; ver [ROADMAP.md](ROADMAP.md)).
 - **Trava de segurança:** o agente recusa a carga se vierem menos de 400 linhas (leitura parcial marcaria o resto como ausente).
 - A carga total antiga (`carregar_oportunidades`) é **bloqueada pelo banco** se existir qualquer linha criada pela web.

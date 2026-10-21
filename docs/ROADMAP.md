@@ -31,7 +31,7 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 
 | # | Item | Por quê | Tam. |
 |---|---|---|---|
-| 8 | **Chave estável na planilha:** gravar o `codigo` (`AAAA-NNNN`) de volta numa coluna "Código" da planilha e usá-lo na sincronização | Hoje corrigir processo/data/torre gera linha nova + "ausente"; com o código como chave perde-se esse problema e o time acha a oportunidade também no Excel | M |
+| 8 | ~~Gravar o código na planilha~~ **Descartado:** o Excel não será alterado; a planilha será desativada (item 9). Até lá, a chave instável (processo + órgão + data + torre) segue como limitação conhecida da carga | O código `AAAA-NNNN` já identifica a oportunidade no Radar e no Planner, sem depender do Excel | — |
 | 9 | **Encerrar a convivência com a planilha** (data de corte; planilha somente leitura; depois desligar o agente) | Elimina duplo lançamento e a dependência da máquina local | M |
 | 10 | **Planner: propagar arquivamento e mudança de torre** (arquivar → mover para Revogado/concluir; trocar de plano) | Hoje o cartão fica órfão nesses casos | M |
 | 11 | **Planner: conta de serviço** do time (login do `planner-auto` fora de pessoa) ou permissão de aplicativo | Não depender do João logado e do computador ligado | M |
