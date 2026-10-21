@@ -121,6 +121,8 @@ export const CAMPO_LISTA = {
 /** Registro como devolvido pela API (entrada + metadados). */
 export type Oportunidade = OportunidadeInput & {
   id: number
+  /** Código de negócio AAAA-NNNN (imutável); aparece no Radar e no título do cartão do Planner. */
+  codigo: string | null
   versao: number
   fonte: 'planilha' | 'web'
   ano: string | null

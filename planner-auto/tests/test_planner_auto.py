@@ -32,13 +32,18 @@ class Funcoes(unittest.TestCase):
 
     def test_chave_do_titulo(self):
         self.assertEqual(pa.chave_do_titulo("[RAD-12] X | Y"), "RAD-12")
+        self.assertEqual(pa.chave_do_titulo("[2026-0512] Órgão | Objeto"), "2026-0512")
         self.assertIsNone(pa.chave_do_titulo("Nova oportunidade"))
 
     def test_valida_evento(self):
         pa.valida_evento(evento(), PLANOS)
+        novo = evento(titulo="[2026-0512] SEDES | Link")
+        novo["chave"] = "2026-0512"
+        pa.valida_evento(novo, PLANOS)
         for mut, msg in [
             (lambda e: e.update(versao="1"), "versão"),
             (lambda e: e.update(chave="X-1"), "chave"),
+            (lambda e: e.update(chave="26-1"), "chave curta"),
             (lambda e: e.update(plano="OUTRO"), "plano"),
             (lambda e: e["cartao"].update(progresso=30), "progresso"),
             (lambda e: e["cartao"].update(titulo="sem chave"), "título"),

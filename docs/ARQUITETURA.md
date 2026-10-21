@@ -152,8 +152,8 @@ flowchart LR
 
 - **Sentido único** (Radar → Planner). Só oportunidades **criadas na web depois da ativação**; as vindas da planilha nunca são enviadas.
 - **Torre → plano:** ITS vai para *ITS Oportunidades*; DIGITAL e HEALTH vão para *Digital e Health*.
-- **Status → bucket e progresso**; **Pré-vendas → responsável** (e-mail cadastrado em *Listas e usuários*); título `[RAD-<id>] Órgão | Objeto | PE | UASG | DATA`.
-- **Idempotente e conservador:** a chave `RAD-<id>` evita duplicar; versão antiga é ignorada; responsável vazio não mexe; nunca apaga cartão nem arquivo; erro vai para `erros\` com o motivo.
+- **Status → bucket e progresso**; **Pré-vendas → responsável** (e-mail cadastrado em *Listas e usuários*); título `[AAAA-NNNN] Órgão | Objeto | PE | UASG | DATA` (o **código da oportunidade**).
+- **Idempotente e conservador:** a chave (o código `AAAA-NNNN`) evita duplicar; versão antiga é ignorada; responsável vazio não mexe; nunca apaga cartão nem arquivo; erro vai para `erros\` com o motivo.
 
 Contrato completo e mapeamentos: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md).
 
@@ -206,6 +206,7 @@ erDiagram
     text torre
     text orgao
     text descritivo
+    text codigo "AAAA-NNNN, único e imutável"
     text processo
     text uasg
     date data_pregao_dt

@@ -199,7 +199,7 @@ export function OportunidadeDrawer({ aberto, onFechar, registro: registroProp, o
           <header className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
             <div>
               <DialogPrimitive.Title className="font-serif text-lg font-semibold text-ink">
-                {nova ? 'Nova oportunidade' : `Oportunidade #${registro.id}`}
+                {nova ? 'Nova oportunidade' : `Oportunidade ${registro.codigo ?? `#${registro.id}`}`}
               </DialogPrimitive.Title>
               {!nova && (
                 <p className="mt-0.5 text-xs text-muted">
