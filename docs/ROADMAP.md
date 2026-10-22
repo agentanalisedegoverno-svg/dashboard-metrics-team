@@ -54,7 +54,7 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | 19 | **Eventos dos Fluxos 1 a 3** (parecer GO/NO GO, aderência) e **agenda** (sessão do pregão, limite de impugnação) no Planner | Une o processo de análise ao acompanhamento; precisa compatibilizar a chave (UASG + ano + pregão) com `RAD-<id>` | G |
 | 20 | **Sincronização com a lista "Pipeline Oportunidades"** (SharePoint) | Uma só visão no M365; direção única Radar → lista | M |
 | 21 | **Painel web do Planner** (funil, prazos, carga por responsável) integrado ao Radar | Visões que o Planner não tem | G |
-| 22 | **Login e permissões mais finos:** lista nominal ou grupos no Access, papéis (consulta / editor / admin) | Hoje todo o domínio edita; só o admin arquiva | M |
+| 22 | **Permissões ainda mais finas:** lista nominal no Access (hoje todo o domínio entra e quem não está em `usuarios` é editor), perfis por torre/plano | Os perfis administrador/editor/visualizador já existem (22/10/2026) | M |
 | 23 | **Domínio próprio** e política de retenção/LGPD (histórico, e-mails dos usuários) | Profissionalização | M |
 | 24 | **Neon pago** (histórico maior, sem limites de computação) ou segundo backup em outra região | Folga operacional se o volume crescer | P |
 | 25 | **SLA real de triagem** (campo de data da decisão Go/No Go) | Hoje o indicador é um proxy distribuição → pregão | M |

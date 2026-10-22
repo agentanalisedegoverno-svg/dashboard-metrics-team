@@ -40,9 +40,10 @@ async function chamar<T>(path: string, init: { method?: string; body?: unknown; 
   return corpo as T
 }
 
-export type Me = { email: string; nome: string | null; admin: boolean; preVendas: boolean }
+export type Perfil = 'administrador' | 'editor' | 'visualizador'
+export type Me = { email: string; nome: string | null; admin: boolean; preVendas: boolean; somenteLeitura: boolean; perfil: Perfil }
 export type Opcao = { valor: string; ativo: boolean; ordem: number }
-export type UsuarioAdmin = { nome: string; email: string | null; admin: boolean; pre_vendas: boolean; ativo: boolean }
+export type UsuarioAdmin = { nome: string; email: string | null; admin: boolean; pre_vendas: boolean; ativo: boolean; somente_leitura: boolean }
 export type Opcoes = { listas: Record<string, Opcao[]>; preVendas: string[]; linhasTorre: Record<string, string>; usuarios?: UsuarioAdmin[] }
 export type EmpresaReceita = { cnpj: string; razao_social: string; tipo: 'Matriz' | 'Filial'; situacao: string | null }
 export type Historico = { id: number; versao: number; acao: string; por: string; em: string; alteracoes: Record<string, [unknown, unknown]> }

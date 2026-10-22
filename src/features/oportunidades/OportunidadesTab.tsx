@@ -102,17 +102,19 @@ export default function OportunidadesTab() {
               <Settings2 className="size-4" /> Listas e usuários
             </Button>
           )}
-          <button
-            onClick={() => setEditando(null)}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand px-3.5 py-[7px] text-[13px] font-semibold text-page hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-          >
-            <Plus className="size-4" /> Nova oportunidade
-          </button>
+          {!me.data.somenteLeitura && (
+            <button
+              onClick={() => setEditando(null)}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand px-3.5 py-[7px] text-[13px] font-semibold text-page hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+            >
+              <Plus className="size-4" /> Nova oportunidade
+            </button>
+          )}
         </div>
       </div>
       <p className="mb-2 mt-3 text-xs text-muted" aria-live="polite">
-        {dados.length} de {lista.data.length} oportunidades · logado como {me.data.nome ?? me.data.email}
-        {me.data.admin ? ' (administrador)' : ''}
+        {dados.length} de {lista.data.length} oportunidades · logado como {me.data.nome ?? me.data.email} ({me.data.perfil})
+        {me.data.somenteLeitura ? ' — somente consulta' : ''}
       </p>
       <OportunidadesGrid dados={dados} onAbrir={setEditando} compacto={compacto} />
       <OportunidadeDrawer aberto={editando !== undefined} onFechar={() => setEditando(undefined)} registro={editando ?? null} opcoes={opcoes.data} me={me.data} />

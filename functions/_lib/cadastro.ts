@@ -13,8 +13,12 @@ const idValido = (id: string) => /^\d{1,15}$/.test(id)
 const invalido = (error: Parameters<typeof errosZod>[0]) => send(422, { error: 'Dados inválidos.', erros: errosZod(error) })
 
 export async function me(sql: Sql, email: string) {
-  const [u] = await sql`select nome, admin, pre_vendas from usuarios where email = ${email} and ativo`
-  return send(200, { email, nome: u?.nome ?? null, admin: u?.admin ?? false, preVendas: u?.pre_vendas ?? false })
+  const [u] = await sql`select nome, admin, ativo, pre_vendas, somente_leitura from usuarios where email = ${email}`
+  const admin = Boolean(u?.admin && u?.ativo)
+  // Visualizador vale mesmo com a linha inativa; quem não está na lista é editor (comportamento padrão).
+  const somenteLeitura = !admin && Boolean(u?.somente_leitura)
+  const perfil = admin ? 'administrador' : somenteLeitura ? 'visualizador' : 'editor'
+  return send(200, { email, nome: u?.nome ?? null, admin, preVendas: u?.pre_vendas ?? false, somenteLeitura, perfil })
 }
 
 export async function listar(sql: Sql, email: string, incluirArquivadas: boolean) {
@@ -132,12 +136,13 @@ export async function opcoes(sql: Sql, email: string) {
   for (const o of lista) (listas[o.lista] ??= []).push({ valor: o.valor, ativo: o.ativo, ordem: o.ordem })
   const linhasTorre: Record<string, string> = {}
   for (const l of (await sql`select linha, torre from linhas_torre order by linha`) as { linha: string; torre: string }[]) linhasTorre[l.linha] = l.torre
-  const usuarios = (await sql`select nome, email, admin, pre_vendas, ativo from usuarios order by nome`) as {
+  const usuarios = (await sql`select nome, email, admin, pre_vendas, ativo, somente_leitura from usuarios order by nome`) as {
     nome: string
     email: string | null
     admin: boolean
     pre_vendas: boolean
     ativo: boolean
+    somente_leitura: boolean
   }[]
   return send(200, {
     listas,
@@ -166,7 +171,7 @@ export async function salvarUsuario(sql: Sql, email: string, corpo: unknown) {
   if (!parsed.success) return invalido(parsed.error)
   const u = parsed.data
   try {
-    await sql`select salvar_usuario(${u.nome}, ${u.email}, ${u.admin}, ${u.pre_vendas}, ${u.ativo}, ${email})`
+    await sql`select salvar_usuario(${u.nome}, ${u.email}, ${u.admin}, ${u.pre_vendas}, ${u.ativo}, ${email}, ${u.somente_leitura})`
     return send(200, { ok: true })
   } catch (e) {
     return erroBanco(e)

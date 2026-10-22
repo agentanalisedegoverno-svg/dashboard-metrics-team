@@ -104,6 +104,7 @@ export const usuarioInput = z.object({
   admin: z.boolean().default(false),
   pre_vendas: z.boolean().default(false),
   ativo: z.boolean().default(true),
+  somente_leitura: z.boolean().default(false),
 })
 
 export type ErroCampo = { campo: string; mensagem: string }

@@ -116,6 +116,16 @@ flowchart LR
 | **Unidade de fornecimento** | Lista fechada (combo): Serviço, Posto de Trabalho, Ponto de Função, Hora. Os valores antigos foram normalizados (HORA/Horas → Hora; PONTO DE FUNÇÃO → Ponto de Função). |
 | **Empresa vencedora (CNPJ)** | Digita-se **só o CNPJ** (com máscara e validação dos dígitos). O Radar consulta a **Receita Federal** (dados abertos, via BrasilAPI, pelo servidor) e mostra a **razão social** e se é **Matriz** ou **Filial**. A consulta é refeita no salvamento e o navegador nunca é a fonte desses dados. Receita fora do ar: salva só o CNPJ e avisa (mantém a razão já gravada se o CNPJ não mudou). O texto antigo de "Empresas vencedoras" (238 registros) fica visível como *registro anterior* e não é apagado. |
 
+### Perfis de acesso (alçada)
+
+| Perfil | Quem é | Pode |
+|---|---|---|
+| **Administrador** | marcado como *Administrador* em *Listas e usuários* (hoje: João Henrique, Flávio Santanna e Jefferson Oliveira) | tudo: ver, cadastrar, editar, **arquivar/restaurar**, administrar listas e **perfis de usuários** |
+| **Editor** | **padrão** de todo `@ctctech.com.br` que não esteja marcado como visualizador (comportamento que já existia) | ver, cadastrar e editar; **não** arquiva nem administra |
+| **Visualizador** | marcado como *Visualizador* (precisa do e-mail) | **só consulta**: grade, filtros, tela de leitura e histórico; não vê botões de cadastrar, editar ou arquivar |
+
+Regras: **só o administrador** cria ou remove alguém dos grupos (a tela *Listas e usuários* e a função do banco `salvar_usuario` são exclusivas de administrador). Administrador e visualizador são **excludentes**. O sistema **nunca fica sem administrador** (o banco recusa rebaixar ou desativar o último). Remover alguém do grupo visualizador = desmarcar a caixa, e a pessoa volta a ser editor. A restrição é aplicada **no banco** (cadastro e edição recusam o visualizador com 403), não só escondida na tela.
+
 ## 7. Bibliotecas
 
 Mantemos a base atual (React 19, TypeScript, Tailwind v4, componentes no padrão shadcn/ui sobre Radix) e adicionamos só o necessário:

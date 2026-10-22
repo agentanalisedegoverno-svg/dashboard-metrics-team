@@ -43,7 +43,9 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 - **Pendente (trava final):** depois que o agente rodar uma vez no novo fluxo, aplicar `db/migrations/002_revogar_carga_total.sql`. Ela tira do `radar_escritor` a carga total antiga, para um agente desatualizado nunca apagar o que foi cadastrado na web.
 
 ### 2.2 Cadastro e administração (aba Oportunidades)
-- Todo `@ctctech.com.br` vê, cadastra e edita. **Só o administrador** arquiva/restaura e administra listas e usuários.
+- **Perfis:** *Administrador* (tudo), *Editor* (cadastra e edita; é o padrão de todo `@ctctech.com.br`) e *Visualizador* (só consulta). **Só o administrador** arquiva/restaura e administra listas e usuários.
+- **Colocar alguém como visualizador (ou administrador):** aba Oportunidades → *Listas e usuários* → Usuários → informe nome, **e-mail** e o **perfil** → Adicionar. Para uma pessoa que já está na lista, marque/desmarque *Visualizador* ou *Administrador* na linha dela. **Remover do grupo** = desmarcar (a pessoa volta a ser editor).
+- O sistema não deixa remover o **último administrador**. Administradores hoje: João Henrique, Flávio Santanna e Jefferson Oliveira.
 - **Novo pré-vendas:** aba Oportunidades → *Listas e usuários* → Usuários → informar nome e **e-mail** (o e-mail é o que atribui o cartão no Planner).
 - **Nova opção de lista** (modalidade, site, motivos…): *Listas e usuários* → Listas. Itens desativados somem do cadastro, mas continuam válidos em registros que já os usam.
 - **Nova linha de serviço que não seja ITS:** incluir em `linhas_torre` (Neon → SQL Editor): `insert into linhas_torre (linha, torre) values ('Nome exato da linha', 'DIGITAL');` (ou `'HEALTH'`). Linha sem mapeamento resulta em **ITS**, como na planilha.
@@ -92,6 +94,8 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | Cadastro: **409** "Outra pessoa alterou este registro" | Edição simultânea | Usar "Descartar e recarregar" e refazer a alteração |
 | Cadastro: **422** com campos destacados | Regra de negócio violada | Corrigir os campos indicados |
 | Cadastro: **403** ao arquivar | Usuário não é administrador | Marcar como admin em *Listas e usuários* (por um admin) |
+| Cadastro/edição: **403** "Seu perfil é somente leitura" | A pessoa está marcada como *Visualizador* | Um administrador desmarca *Visualizador* em *Listas e usuários* |
+| "Deve existir ao menos um administrador ativo" | Tentativa de rebaixar/desativar o último admin | Promover outro administrador antes |
 | Painel com número de oportunidades acima do esperado | Linhas "ausentes" sendo contadas | Não deve ocorrer (a API as ignora); se ocorrer, verificar a versão publicada |
 | "Última atualização" parada há dias | Agente não rodou | Ver o histórico da tarefa; rodar a carga manual |
 | Carga recusada: "só N linhas (mínimo 400)" | Leitura parcial da planilha | Reler a planilha; conferir o OneDrive |

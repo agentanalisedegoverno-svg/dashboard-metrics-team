@@ -18,6 +18,7 @@ export function AdminListas({ aberto, onFechar, opcoes }: { aberto: boolean; onF
   const [novo, setNovo] = useState('')
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
+  const [perfil, setPerfil] = useState<'editor' | 'visualizador' | 'administrador'>('editor')
   const salvarOpcao = useSalvarOpcao()
   const salvarUsuario = useSalvarUsuario()
   const itens = opcoes.listas[lista] ?? []
@@ -80,24 +81,43 @@ export function AdminListas({ aberto, onFechar, opcoes }: { aberto: boolean; onF
                       <span className="ml-2 text-xs text-muted">{u.email ?? 'sem e-mail (só consta como pré-vendas)'}</span>
                     </span>
                     <span className="flex gap-3 text-xs text-ink-soft">
-                      {(['pre_vendas', 'admin', 'ativo'] as const).map((k) => (
+                      {(['pre_vendas', 'admin', 'somente_leitura', 'ativo'] as const).map((k) => (
                         <label key={k} className="flex cursor-pointer items-center gap-1">
                           <input type="checkbox" className="size-4 accent-[var(--gold)]" checked={u[k]} disabled={salvarUsuario.isPending}
-                            onChange={(e) => salvarUsuario.mutate({ ...u, [k]: e.target.checked }, { onError: erro })} />
-                          {k === 'pre_vendas' ? 'Pré-vendas' : k === 'admin' ? 'Admin' : 'Ativo'}
+                            onChange={(e) =>
+                              salvarUsuario.mutate(
+                                {
+                                  ...u,
+                                  [k]: e.target.checked,
+                                  // Administrador e visualizador são excludentes.
+                                  ...(k === 'admin' && e.target.checked ? { somente_leitura: false } : {}),
+                                  ...(k === 'somente_leitura' && e.target.checked ? { admin: false } : {}),
+                                },
+                                { onError: erro },
+                              )
+                            } />
+                          {k === 'pre_vendas' ? 'Pré-vendas' : k === 'admin' ? 'Administrador' : k === 'somente_leitura' ? 'Visualizador' : 'Ativo'}
                         </label>
                       ))}
                     </span>
                   </li>
                 ))}
               </ul>
-              <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(e) => {
+              <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]" onSubmit={(e) => {
                 e.preventDefault()
                 if (!nome.trim()) return
-                salvarUsuario.mutate({ nome: nome.trim(), email: email.trim() || null, admin: false, pre_vendas: true, ativo: true }, { onSuccess: () => { setNome(''); setEmail(''); toast.success('Usuário salvo.') }, onError: erro })
+                salvarUsuario.mutate(
+                  { nome: nome.trim(), email: email.trim() || null, admin: perfil === 'administrador', somente_leitura: perfil === 'visualizador', pre_vendas: perfil !== 'visualizador', ativo: true },
+                  { onSuccess: () => { setNome(''); setEmail(''); setPerfil('editor'); toast.success('Usuário salvo.') }, onError: erro },
+                )
               }}>
                 <input className={inputCls} aria-label="Nome" placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
-                <input className={inputCls} aria-label="E-mail (opcional)" placeholder="E-mail (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <input className={inputCls} aria-label="E-mail" placeholder="E-mail (obrigatório para visualizador)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <select className={inputCls} aria-label="Perfil" value={perfil} onChange={(e) => setPerfil(e.target.value as typeof perfil)}>
+                  <option value="editor">Editor</option>
+                  <option value="visualizador">Visualizador (só consulta)</option>
+                  <option value="administrador">Administrador</option>
+                </select>
                 <Button type="submit" disabled={salvarUsuario.isPending}>Adicionar</Button>
               </form>
             </>
