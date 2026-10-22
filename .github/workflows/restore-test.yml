@@ -23,13 +23,29 @@ env:
   GDRIVE_FOLDER_ID: 1DJrTNn_LcKxwHzf7gd22DvAD1KdD8Eq6
 
 jobs:
+  preparar:
+    name: Escolher destinos
+    runs-on: ubuntu-latest
+    outputs:
+      alvos: ${{ steps.escolher.outputs.alvos }}
+    steps:
+      - id: escolher
+        env:
+          ALVO: ${{ inputs.alvo }}
+        run: |
+          if [ -z "$ALVO" ] || [ "$ALVO" = "ambos" ]; then
+            echo 'alvos=["temporario","neon"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "alvos=[\"$ALVO\"]" >> "$GITHUB_OUTPUT"
+          fi
+
   restaurar:
     name: Restaurar em ${{ matrix.alvo }}
-    if: github.event_name != 'workflow_dispatch' || inputs.alvo == 'ambos' || inputs.alvo == matrix.alvo
+    needs: preparar
     strategy:
       fail-fast: false
       matrix:
-        alvo: [temporario, neon]
+        alvo: ${{ fromJSON(needs.preparar.outputs.alvos) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
