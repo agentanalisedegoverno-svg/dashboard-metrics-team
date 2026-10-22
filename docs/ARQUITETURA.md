@@ -162,12 +162,14 @@ Contrato completo e mapeamentos: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md).
 
 ```mermaid
 flowchart LR
-  CRON["GitHub Actions<br/>diário 03:00 BRT"] --> DUMP["pg_dump completo<br/>(radar_backup, somente leitura)"]
+  CRON["GitHub Actions<br/>diário (agendado 03:00 BRT)"] --> DUMP["pg_dump completo<br/>(radar_backup, somente leitura)"]
   DUMP --> CHK["verifica integridade"]
   CHK --> ENC["AES-256 + PBKDF2"]
   ENC --> DRV[("Google Drive<br/>diario/ (14 dias)<br/>semanal/ (12 semanas)")]
-  MES["Teste mensal"] --> DL["baixa o último"] --> DEC["descriptografa"] --> RST["restaura num Postgres temporário"] --> CMP["compara com a produção"]
+  MES["Teste mensal"] --> DL["baixa o último"] --> DEC["descriptografa"] --> RST["restaura em 2 destinos<br/>Postgres temporário + branch Neon"] --> CMP["compara com a produção<br/>+ cadastro de teste"]
   DRV --> DL
+  VIG["Vigia diário<br/>alerta se atrasar"] -.-> CRON
+  VIG -.-> MES
 ```
 
 Runbook e restauração: [BACKUP.md](BACKUP.md).
@@ -287,7 +289,7 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 | Hospedagem | Cloudflare Pages | `https://radar-prevendas.pages.dev` |
 | Autenticação | Cloudflare Zero Trust (Free) | time `ctctech-radar`, *One-time PIN*, política `@ctctech.com.br` |
 | Código e CI/CD | GitHub | `agentanalisedegoverno-svg/dashboard-metrics-team` |
-| Backup | GitHub Actions → Google Drive | `Backup do banco` (diário) e `Teste de restauração do backup` (mensal) |
+| Backup | GitHub Actions → Google Drive | `Backup do banco` (diário), `Teste de restauração do backup` (mensal, 2 destinos, inclui o branch Neon `teste-restauracao`) e `Vigia do backup` (alerta diário) |
 | Planner | Microsoft 365 | planos *ITS Oportunidades* e *Digital e Health - Oportunidades* |
 
 ## 10. Decisões de arquitetura
