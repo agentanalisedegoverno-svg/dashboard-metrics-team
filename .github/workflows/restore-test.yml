@@ -1,11 +1,20 @@
 name: Teste de restauração do backup
 
-# Prova que o último backup do Drive abre e restaura: baixa, confere o hash, descriptografa e restaura
-# num Postgres temporário (descartado no fim), comparando com a produção. Mensal e sob demanda.
+# Prova que o último backup do Drive abre e restaura, em DOIS destinos:
+#  - "temporario": Postgres 17 descartável no próprio runner;
+#  - "neon": um branch real do Neon (teste-restauracao, banco restore_drill, papel radar_restore isolado da produção).
+# Baixa, confere o hash, descriptografa, restaura, compara com a produção e executa um cadastro de verdade
+# (desfeito) para provar que funções e gatilhos funcionam. Mensal e sob demanda.
 on:
   schedule:
     - cron: '0 12 1 * *'
   workflow_dispatch:
+    inputs:
+      alvo:
+        description: 'Onde restaurar'
+        type: choice
+        options: [ambos, temporario, neon]
+        default: ambos
 
 permissions:
   contents: read
@@ -14,8 +23,29 @@ env:
   GDRIVE_FOLDER_ID: 1DJrTNn_LcKxwHzf7gd22DvAD1KdD8Eq6
 
 jobs:
+  preparar:
+    name: Escolher destinos
+    runs-on: ubuntu-latest
+    outputs:
+      alvos: ${{ steps.escolher.outputs.alvos }}
+    steps:
+      - id: escolher
+        env:
+          ALVO: ${{ inputs.alvo }}
+        run: |
+          if [ -z "$ALVO" ] || [ "$ALVO" = "ambos" ]; then
+            echo 'alvos=["temporario","neon"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "alvos=[\"$ALVO\"]" >> "$GITHUB_OUTPUT"
+          fi
+
   restaurar:
-    name: Baixar → descriptografar → restaurar → conferir
+    name: Restaurar em ${{ matrix.alvo }}
+    needs: preparar
+    strategy:
+      fail-fast: false
+      matrix:
+        alvo: ${{ fromJSON(needs.preparar.outputs.alvos) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -36,7 +66,7 @@ jobs:
           RCLONE_CONFIG_GD_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN }}
         run: |
           RCLONE_CONFIG_GD_TOKEN=$(python3 - <<'PY'
-          import base64, json, os, sys
+          import base64, json, os
           raw = os.environ["RCLONE_CONFIG_GD_TOKEN"].strip()
           if not raw.startswith("{"):
               raw = base64.b64decode(raw + "=" * (-len(raw) % 4)).decode()
@@ -55,6 +85,7 @@ jobs:
           ultimo=$(rc lsf gd:diario --include '*.dump.enc' | sort | tail -1)
           [ -n "$ultimo" ] || { echo "::error::Nenhum backup encontrado em diario/"; exit 1; }
           echo "ARQUIVO=$ultimo" >> "$GITHUB_ENV"
+          echo "Drive: $(rc lsf gd:diario --include '*.dump.enc' | wc -l) backup(s) em diario/, $(rc lsf gd:semanal --include '*.dump.enc' | wc -l) em semanal/" | tee -a "$GITHUB_STEP_SUMMARY"
           rc copy "gd:diario/$ultimo" /bk
           rc copy "gd:diario/$ultimo.sha256" /bk
 
@@ -63,44 +94,65 @@ jobs:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           cd bk
-          # O .sha256 foi gerado com o caminho out/…; compara só o hash.
           esperado=$(cut -d' ' -f1 "$ARQUIVO.sha256")
           real=$(sha256sum "$ARQUIVO" | cut -d' ' -f1)
           [ "$esperado" = "$real" ] || { echo "::error::Hash do backup não confere"; exit 1; }
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:BACKUP_PASSPHRASE -in "$ARQUIVO" -out radar.dump
           echo "Dump descriptografado: $(stat -c %s radar.dump) bytes"
 
-      - name: Restaura no Postgres temporário
+      - name: Prepara o destino (${{ matrix.alvo }})
+        env:
+          DATABASE_URL_RESTORE: ${{ secrets.DATABASE_URL_RESTORE }}
+        run: |
+          if [ "${{ matrix.alvo }}" = "neon" ]; then
+            [ -n "$DATABASE_URL_RESTORE" ] || { echo "::error::Segredo DATABASE_URL_RESTORE não configurado"; exit 1; }
+            # O segredo aponta para o banco administrativo (neondb) do branch de teste; o drill usa o banco restore_drill.
+            ALVO=$(python3 -c "import os,urllib.parse as u; p=u.urlsplit(os.environ['DATABASE_URL_RESTORE']); print(p._replace(path='/restore_drill').geturl())")
+            echo "::add-mask::$ALVO"
+            echo "ALVO_URL=$ALVO" >> "$GITHUB_ENV"
+            docker run --rm --network host postgres:17 psql "$DATABASE_URL_RESTORE" -v ON_ERROR_STOP=1 \
+              -c "DROP DATABASE IF EXISTS restore_drill WITH (FORCE)" -c "CREATE DATABASE restore_drill"
+          else
+            echo "ALVO_URL=postgresql://postgres:teste@127.0.0.1:5432/restore" >> "$GITHUB_ENV"
+          fi
+
+      - name: Restaura
         run: |
           docker run --rm --network host -v "$PWD/bk:/bk" postgres:17 \
-            pg_restore --no-owner --no-privileges --dbname "postgresql://postgres:teste@127.0.0.1:5432/restore" /bk/radar.dump 2> restore.err || true
+            pg_restore --no-owner --no-privileges --dbname "$ALVO_URL" /bk/radar.dump 2> restore.err || true
           echo "Mensagens do pg_restore: $(grep -c '' restore.err)"
           grep -v "already exists" restore.err | head -10 || true
 
-      - name: Confere o conteúdo restaurado contra a produção
+      - name: Confere o conteúdo, a produção e o funcionamento
         env:
           DATABASE_URL_BACKUP: ${{ secrets.DATABASE_URL_BACKUP }}
         run: |
           q() { docker run --rm --network host postgres:17 psql "$1" -Atc "$2"; }
-          R="postgresql://postgres:teste@127.0.0.1:5432/restore"
+          R="$ALVO_URL"
           restaurado=$(q "$R" "select count(*) from oportunidades")
           producao=$(q "$DATABASE_URL_BACKUP" "select count(*) from oportunidades")
           soma_r=$(q "$R" "select coalesce(round(sum(orcamento),2),0) from oportunidades")
+          com_codigo=$(q "$R" "select count(*) from oportunidades where codigo is not null")
           hist=$(q "$R" "select count(*) from oportunidades_historico")
-          funcoes=$(q "$R" "select count(*) from pg_proc where proname in ('criar_oportunidade','atualizar_oportunidade','arquivar_oportunidade','sincronizar_planilha','validar_oportunidade')")
-          gatilhos=$(q "$R" "select count(*) from pg_trigger where tgname in ('oportunidades_auditar_tg') and not tgisinternal")
+          funcoes=$(q "$R" "select count(*) from pg_proc where proname in ('criar_oportunidade','atualizar_oportunidade','arquivar_oportunidade','sincronizar_planilha','validar_oportunidade','proximo_codigo')")
+          gatilhos=$(q "$R" "select count(*) from pg_trigger where tgname in ('oportunidades_auditar_tg','oportunidades_codigo_tg','oportunidades_derivar_tg') and not tgisinternal")
+          # Cadastro de verdade (desfeito): prova que função, validação, código e gatilhos funcionam no restaurado.
+          teste=$(q "$R" "DO \$\$ DECLARE o jsonb; BEGIN o := criar_oportunidade('{\"status\":\"Go\",\"orgao\":\"DRILL\",\"descritivo\":\"drill\",\"torre\":\"ITS\",\"data_pregao_dt\":\"2026-03-10\"}'::jsonb, 'drill@ctctech.com.br'); RAISE EXCEPTION 'DRILL_OK %', o->>'codigo'; END \$\$" 2>&1 || true)
           {
-            echo "### Restauração de \`$ARQUIVO\`"
+            echo "### Restauração em **${{ matrix.alvo }}** de \`$ARQUIVO\`"
             echo "| Item | Restaurado | Produção agora |"
             echo "|---|---|---|"
             echo "| Oportunidades | $restaurado | $producao |"
+            echo "| Com código AAAA-NNNN | $com_codigo | — |"
             echo "| Soma do orçamento | $soma_r | — |"
             echo "| Linhas de histórico | $hist | — |"
-            echo "| Funções de cadastro (de 5) | $funcoes | — |"
-            echo "| Gatilho de auditoria | $gatilhos | — |"
+            echo "| Funções (de 6) | $funcoes | — |"
+            echo "| Gatilhos (de 3) | $gatilhos | — |"
+            echo "| Cadastro de teste (desfeito) | $(echo "$teste" | grep -o 'DRILL_OK [0-9-]*' || echo FALHOU) | — |"
           } | tee -a "$GITHUB_STEP_SUMMARY"
           [ "$restaurado" -ge 500 ] || { echo "::error::Poucas linhas restauradas ($restaurado)"; exit 1; }
-          [ "$funcoes" -eq 5 ] || { echo "::error::Funções de cadastro ausentes ($funcoes/5)"; exit 1; }
-          [ "$gatilhos" -eq 1 ] || { echo "::error::Gatilho de auditoria ausente"; exit 1; }
-          # O backup tem até 1 dia; a produção pode ter crescido, mas nunca menos que o restaurado menos a tolerância.
+          [ "$com_codigo" -ge 500 ] || { echo "::error::Códigos ausentes no restaurado"; exit 1; }
+          [ "$funcoes" -eq 6 ] || { echo "::error::Funções ausentes ($funcoes/6)"; exit 1; }
+          [ "$gatilhos" -eq 3 ] || { echo "::error::Gatilhos ausentes ($gatilhos/3)"; exit 1; }
+          echo "$teste" | grep -q 'DRILL_OK' || { echo "::error::O cadastro de teste falhou no banco restaurado: $teste"; exit 1; }
           [ "$restaurado" -le "$((producao + 50))" ] || { echo "::error::Restaurado maior que a produção — verifique"; exit 1; }

@@ -24,7 +24,7 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | 3 | **Acompanhar os primeiros cartões reais do Planner** (cadastrar, conferir bucket/responsável/prazo, mudar status) e apagar o cartão `RAD-999001` | É a primeira escrita real; o 50%/100% pode sobrescrever progresso manual | P |
 | 4 | **Alerta de falha** do agente de carga e da integração (e-mail/Teams quando o log trouxer `[ERRO]` ou a última carga passar de N dias) | Hoje só se descobre olhando o log ou o "Última atualização" | M |
 | 5 | **Rotacionar credenciais** pendentes e passar a trimestral (papéis do banco, token Cloudflare, tokens antigos do GitHub) | Higiene; vários valores já passaram por conversas | P |
-| 6 | **Primeiro teste de restauração** com a rodada mensal e conferência do resumo | Provar de novo que o backup abre | P |
+| 6 | ~~Teste de restauração em branch real do Neon~~ **Feito (22/10):** restaura em Postgres temporário e no branch `teste-restauracao`, com cadastro de teste; vigia diário ativo | — | — |
 | 7 | **Dependabot:** revisar os PRs semanais e planejar a migração do `@tanstack/react-table` v9 (hoje fixado na v8) | Evita a main quebrada que já ocorreu uma vez | M |
 
 ## 3. Médio prazo

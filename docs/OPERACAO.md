@@ -16,6 +16,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `DATABASE_URL_PLANNER` (papel `radar_planner`) | variável de ambiente do usuário Windows da máquina da integração | **Segredo** | Administrador |
 | `PLANNER_EVENTOS_DIR` | variável de ambiente do usuário Windows (`...\planner-auto\eventos\entrada`) | caminho | Administrador |
 | `DATABASE_URL_BACKUP` (papel `radar_backup`) | GitHub → Settings → Secrets and variables → Actions | **Secret** | Administrador |
+| `DATABASE_URL_RESTORE` (papel `radar_restore`, só no branch `teste-restauracao`) | GitHub (Actions) | **Secret** | Administrador |
 | `BACKUP_PASSPHRASE` | GitHub (Actions) **e** cofre de senhas da empresa | **Secret** | Administrador |
 | `RCLONE_DRIVE_TOKEN` | GitHub (Actions) | **Secret** | Administrador |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub (Actions) | **Secret** | Administrador |
@@ -57,8 +58,9 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 - Regras, contrato e limitações: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md).
 
 ### 2.4 Backup e restauração
-- **Diário às 03:00 (Brasília)**, pelo GitHub Actions ("Backup do banco"): `pg_dump` criptografado enviado ao Google Drive (`diario/` por 14 dias; `semanal/` por 12 semanas). Falha → e-mail do GitHub.
-- **Teste de restauração:** mensal (dia 1) e sob demanda em *Actions → Teste de restauração do backup → Run workflow*. O resumo mostra linhas, soma do orçamento, histórico, funções e gatilho restaurados.
+- **Diário (agendado 03:00 Brasília; na prática ~08:30, por atraso do GitHub)**, pelo GitHub Actions ("Backup do banco"): `pg_dump` criptografado enviado ao Google Drive (`diario/` por 14 dias; `semanal/` aos domingos, por 12 semanas). Falha → e-mail do GitHub.
+- **Vigia do backup** (diário, 12:00): falha e avisa por e-mail se o último backup bem-sucedido tiver mais de 30 horas ou o último teste de restauração mais de 40 dias.
+- **Teste de restauração:** mensal (dia 1) e sob demanda em *Actions → Teste de restauração do backup → Run workflow* (campo *alvo*: ambos, temporário ou neon). Restaura num Postgres temporário **e** no branch real `teste-restauracao` do Neon e confere linhas, códigos, soma, histórico, funções, gatilhos e um cadastro de teste.
 - **Restaurar de verdade:** ver [BACKUP.md](BACKUP.md).
 
 ### 2.5 Dar ou tirar acesso ao painel
@@ -96,6 +98,8 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | Pipeline falha no `npm ci` ("Missing ... from lock file") | `package-lock.json` fora de sincronia | Regenerar o lockfile a partir do `package.json` limpo e validar com `npm ci` |
 | Pipeline falha no "Deploy produção" | Token da Cloudflare sem permissão/expirado | Novo token *Pages: Edit* **sem filtro de IP**; atualizar `CLOUDFLARE_API_TOKEN` |
 | Backup falha ao enviar | `RCLONE_DRIVE_TOKEN` inválido/expirado | Refazer `rclone authorize "drive"` e atualizar o secret |
+| E-mail "Vigia do backup" falhou | Backup sem sucesso há mais de 30 h, ou teste de restauração com mais de 40 dias | Abrir *Actions → Backup do banco*, ver o erro e rodar de novo; rodar o teste de restauração |
+| Teste de restauração falha no destino `neon` | Branch/papel `radar_restore` apagado ou secret `DATABASE_URL_RESTORE` antigo | Ver [BACKUP.md](BACKUP.md) (Manutenção do branch de teste) |
 
 **Erro 9109 da Cloudflare** ("Cannot use the access token from location"): o token tem filtro de IP. Para o GitHub Actions o token não pode ter filtro de IP.
 
@@ -126,7 +130,7 @@ Trocar `BACKUP_PASSPHRASE` vale **só para backups novos**: guarde as senhas ant
 ### 4.4 Calendário sugerido
 | Frequência | Ação |
 |---|---|
-| Mensal | Rodar o teste de restauração e conferir o resultado; revisar PRs do Dependabot |
+| Mensal | O teste de restauração roda sozinho (dia 1): conferir o resumo; revisar PRs do Dependabot |
 | Trimestral | Trocar as senhas dos papéis do banco |
 | Antes do vencimento | Renovar o token do pipeline |
 | ~90 dias | Refazer o login do `planner-auto` se ficar sem uso |
