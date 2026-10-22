@@ -9,7 +9,7 @@ export const onRequest = rota(
       const r = await consultaCnpj(String(params.cnpj))
       if (r.ok) return send(200, r.empresa)
       const status = r.motivo === 'invalido' ? 422 : r.motivo === 'nao_encontrado' ? 404 : 503
-      return send(status, { error: r.mensagem, motivo: r.motivo })
+      return send(status, { error: r.mensagem, motivo: r.motivo, detalhe: r.detalhe })
     },
   },
   { semBanco: true },
