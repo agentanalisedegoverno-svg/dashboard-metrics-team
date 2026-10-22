@@ -69,6 +69,7 @@ jobs:
           ultimo=$(rc lsf gd:diario --include '*.dump.enc' | sort | tail -1)
           [ -n "$ultimo" ] || { echo "::error::Nenhum backup encontrado em diario/"; exit 1; }
           echo "ARQUIVO=$ultimo" >> "$GITHUB_ENV"
+          echo "Drive: $(rc lsf gd:diario --include '*.dump.enc' | wc -l) backup(s) em diario/, $(rc lsf gd:semanal --include '*.dump.enc' | wc -l) em semanal/" | tee -a "$GITHUB_STEP_SUMMARY"
           rc copy "gd:diario/$ultimo" /bk
           rc copy "gd:diario/$ultimo.sha256" /bk
 
