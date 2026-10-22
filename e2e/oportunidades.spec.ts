@@ -44,10 +44,18 @@ async function api(page: Page, admin = false, forcarConflito = false, visualizad
     r.fulfill({ json: { email: 'joao.henrique@ctctech.com.br', nome: 'João Henrique', admin, preVendas: false, somenteLeitura: visualizador, perfil: admin ? 'administrador' : visualizador ? 'visualizador' : 'editor' } }),
   )
   const usuarios = [
+    { nome: 'João Henrique', email: 'joao.henrique@ctctech.com.br', admin: true, pre_vendas: false, ativo: true, somente_leitura: false },
     { nome: 'Ana Admin', email: 'ana@ctctech.com.br', admin: true, pre_vendas: false, ativo: true, somente_leitura: false },
+    { nome: 'Rodrigo A', email: null, admin: false, pre_vendas: true, ativo: true, somente_leitura: false },
     { nome: 'Vera Viewer', email: 'vera@ctctech.com.br', admin: false, pre_vendas: false, ativo: true, somente_leitura: true },
   ]
-  await page.route('**/api/opcoes', (r) => r.fulfill({ json: admin ? { ...opcoes, usuarios } : opcoes }))
+  await page.route('**/api/opcoes', (r) => {
+    if (r.request().method() === 'PUT') {
+      enviados.push(r.request().postDataJSON() as Reg)
+      return r.fulfill({ json: { ok: true } })
+    }
+    return r.fulfill({ json: admin ? { ...opcoes, usuarios } : opcoes })
+  })
   await page.route('**/api/usuarios', (r) => {
     enviados.push(r.request().postDataJSON() as Reg)
     return r.fulfill({ json: { ok: true } })
@@ -157,7 +165,7 @@ test('histórico mostra quem alterou o quê', async ({ page }) => {
 test('somente administrador vê arquivar e a administração de listas', async ({ page }) => {
   await api(page, false)
   await abrirAba(page)
-  await expect(page.getByRole('button', { name: /Listas e usuários/ })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Administração' })).toHaveCount(0)
   await page.getByText('Órgão 1', { exact: true }).first().click()
   await expect(page.getByRole('button', { name: 'Arquivar' })).toHaveCount(0)
 })
@@ -323,27 +331,79 @@ test('editor mantém o que tem hoje: cadastra e edita, mas não arquiva nem admi
   await abrirAba(page)
   await expect(page.getByText(/\(editor\)/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Nova oportunidade' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Listas e usuários/ })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Administração' })).toHaveCount(0)
   await page.getByText('Órgão 2', { exact: true }).first().click()
   await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Arquivar' })).toHaveCount(0)
 })
 
-test('administrador gerencia perfis: visualizador e administrador são excludentes', async ({ page }) => {
-  const { enviados } = await api(page, true)
+test('Administração é uma aba própria (não uma janela) e só aparece para administrador', async ({ page }) => {
+  await api(page, true)
   await abrirAba(page)
-  await page.getByRole('button', { name: /Listas e usuários/ }).click()
-  await page.getByRole('tab', { name: 'Usuários' }).click()
-  const vera = page.getByRole('listitem').filter({ hasText: 'Vera Viewer' })
-  await expect(vera.getByLabel('Visualizador')).toBeChecked()
-  // marcar Administrador desmarca Visualizador (e envia os dois juntos)
-  await vera.getByLabel('Administrador').click()
-  await expect.poll(() => enviados.find((e) => e.nome === 'Vera Viewer')).toMatchObject({ admin: true, somente_leitura: false })
-  // adicionar novo visualizador
-  await page.getByLabel('Nome', { exact: true }).fill('Caio Consulta')
-  await page.getByLabel('E-mail').fill('caio@ctctech.com.br')
-  await page.getByLabel('Perfil').selectOption('visualizador')
-  await page.getByRole('button', { name: 'Adicionar' }).last().click()
-  await expect.poll(() => enviados.find((e) => e.nome === 'Caio Consulta')).toMatchObject({ somente_leitura: true, admin: false, pre_vendas: false })
+  // não existe mais o botão/janela "Listas e usuários" dentro de Oportunidades
+  await expect(page.getByRole('button', { name: /Listas e usuários/ })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await expect(page.getByRole('navigation', { name: 'Seções da administração' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(new URL(page.url()).hash).toBe('#admin/usuarios') // endereço compartilhável
+  await page.getByRole('button', { name: 'Listas de opções' }).click()
+  expect(new URL(page.url()).hash).toBe('#admin/listas')
 })
 
+test('usuários e perfis: tabela com perfil único, sem autobloqueio e menor privilégio por padrão', async ({ page }) => {
+  const { enviados } = await api(page, true)
+  await abrirAba(page)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await expect(page.getByRole('table', { name: /Usuários, e-mails e perfis/ })).toBeVisible()
+
+  // a própria pessoa não altera o próprio perfil nem se desativa
+  const meu = page.getByRole('row').filter({ hasText: 'João Henrique' })
+  await expect(meu.getByLabel('Perfil de João Henrique')).toBeDisabled()
+  await expect(meu.getByLabel('João Henrique está ativo')).toBeDisabled()
+  await expect(meu.getByText('você', { exact: true })).toBeVisible()
+
+  // muda o perfil de outra pessoa com um único seletor (administrador e visualizador são excludentes)
+  await page.getByLabel('Perfil de Vera Viewer').selectOption('administrador')
+  await expect.poll(() => enviados.find((e) => e.nome === 'Vera Viewer')).toMatchObject({ admin: true, somente_leitura: false })
+
+  // quem não tem e-mail não pode ser visualizador (o perfil depende do e-mail)
+  await expect(page.getByLabel('Perfil de Rodrigo A').locator('option', { hasText: 'Visualizador' })).toBeDisabled()
+
+  // novo usuário nasce como Visualizador (menor privilégio)
+  await page.getByRole('button', { name: 'Adicionar usuário' }).click()
+  await expect(page.getByLabel('Perfil do novo usuário')).toHaveValue('visualizador')
+  await page.getByLabel('Nome', { exact: true }).fill('Caio Consulta')
+  await page.getByLabel('E-mail', { exact: true }).fill('caio@ctctech.com.br')
+  await page.getByRole('button', { name: 'Salvar' }).click()
+  await expect.poll(() => enviados.find((e) => e.nome === 'Caio Consulta')).toMatchObject({ somente_leitura: true, admin: false, pre_vendas: false })
+
+  // busca e filtro por perfil
+  await page.getByLabel('Buscar usuário').fill('vera')
+  await expect(page.getByRole('row').filter({ hasText: 'Vera Viewer' })).toHaveCount(1)
+  await expect(page.getByRole('row').filter({ hasText: 'Rodrigo A' })).toHaveCount(0)
+})
+
+test('listas de opções e consulta linha → torre na Administração', async ({ page }) => {
+  const { enviados } = await api(page, true)
+  await abrirAba(page)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await page.getByRole('button', { name: 'Listas de opções' }).click()
+  await page.getByRole('button', { name: /^Unidade de fornecimento/ }).click()
+  await expect(page.getByText('Posto de Trabalho')).toBeVisible()
+  await page.getByLabel('Novo item da lista').fill('Licença')
+  await page.getByRole('button', { name: 'Adicionar' }).click()
+  await expect.poll(() => enviados.find((e) => e.valor === 'Licença')).toMatchObject({ lista: 'unidade_fornecimento', ativo: true })
+  await page.getByRole('button', { name: 'Linha → Torre' }).click()
+  const tabela = page.getByRole('table', { name: /Linha de serviço e a torre resultante/ })
+  await expect(tabela.getByRole('row').filter({ hasText: 'Software Development' })).toContainText('DIGITAL')
+  await expect(tabela.getByRole('row').filter({ hasText: 'Service Desk' })).toContainText('ITS')
+})
+
+test('acessibilidade da área de administração', async ({ page }) => {
+  await api(page, true)
+  await abrirAba(page)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await expect(page.getByRole('table')).toBeVisible()
+  const r = await new AxeBuilder({ page }).include('section[aria-label="Administração"]').analyze()
+  expect(r.violations, JSON.stringify(r.violations.map((v) => v.id))).toEqual([])
+})

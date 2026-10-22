@@ -22,7 +22,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub (Actions) | **Secret** | Administrador |
 | `DEMO_MODE` | GitHub → Actions → Variables (ausente = produção real) | variável | Administrador |
 | Política de acesso (quem entra) | Cloudflare Zero Trust → Access → Applications → Radar Pré-Vendas → Policies | configuração | Administrador |
-| Administradores do Radar e listas | Aba Oportunidades → **Listas e usuários** (só admin) | dados | Administrador do Radar |
+| Perfis, usuários e listas de opções | Aba **Administração** (só administradores) | dados | Administrador do Radar |
 | Mapa de planos/buckets do Planner | `config/planner-mapa.json` | público | Pull request |
 
 ## 2. Rotinas
@@ -44,10 +44,11 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 
 ### 2.2 Cadastro e administração (aba Oportunidades)
 - **Perfis:** *Administrador* (tudo), *Editor* (cadastra e edita; é o padrão de todo `@ctctech.com.br`) e *Visualizador* (só consulta). **Só o administrador** arquiva/restaura e administra listas e usuários.
-- **Colocar alguém como visualizador (ou administrador):** aba Oportunidades → *Listas e usuários* → Usuários → informe nome, **e-mail** e o **perfil** → Adicionar. Para uma pessoa que já está na lista, marque/desmarque *Visualizador* ou *Administrador* na linha dela. **Remover do grupo** = desmarcar (a pessoa volta a ser editor).
-- O sistema não deixa remover o **último administrador**. Administradores hoje: João Henrique, Flávio Santanna e Jefferson Oliveira.
-- **Novo pré-vendas:** aba Oportunidades → *Listas e usuários* → Usuários → informar nome e **e-mail** (o e-mail é o que atribui o cartão no Planner).
-- **Nova opção de lista** (modalidade, site, motivos…): *Listas e usuários* → Listas. Itens desativados somem do cadastro, mas continuam válidos em registros que já os usam.
+- **Colocar alguém como visualizador (ou administrador):** aba **Administração** → *Usuários e perfis* → *Adicionar usuário* → nome, **e-mail** e **perfil** (o padrão é *Visualizador*: dar mais acesso é um passo explícito). Para quem já está na lista, troque o **perfil** na linha da pessoa. **Remover do grupo** = mudar o perfil (quem não está listado é editor).
+- O sistema não deixa remover o **último administrador**, e **ninguém altera o próprio perfil nem se desativa** (a linha dela fica travada com a marca "você"): outro administrador faz isso. Administradores hoje: João Henrique, Flávio Santanna e Jefferson Oliveira.
+- **Novo pré-vendas:** aba **Administração** → *Usuários e perfis* → informar nome e **e-mail** (o e-mail é o que atribui o cartão no Planner).
+- **Ver a regra linha → torre:** *Administração → Linha → Torre* (consulta; incluir uma linha DIGITAL/HEALTH ainda é por SQL).
+- **Nova opção de lista** (modalidade, site, motivos…): aba **Administração** → *Listas de opções*. Itens desativados somem do cadastro, mas continuam válidos em registros que já os usam.
 - **Nova linha de serviço que não seja ITS:** incluir em `linhas_torre` (Neon → SQL Editor): `insert into linhas_torre (linha, torre) values ('Nome exato da linha', 'DIGITAL');` (ou `'HEALTH'`). Linha sem mapeamento resulta em **ITS**, como na planilha.
 - **Consulta de CNPJ fora do ar:** o cadastro segue; a tela avisa e a razão social é consultada de novo ao salvar.
 - **Pendências da migração:** a grade tem o filtro "Só com pendências"; corrigir o registro e salvar remove a pendência.
@@ -93,15 +94,15 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `/api/*` responde **502** | Senha/URL errada ou Neon indisponível | Conferir a string (sem espaço/quebra de linha); testar no console do Neon |
 | Cadastro: **409** "Outra pessoa alterou este registro" | Edição simultânea | Usar "Descartar e recarregar" e refazer a alteração |
 | Cadastro: **422** com campos destacados | Regra de negócio violada | Corrigir os campos indicados |
-| Cadastro: **403** ao arquivar | Usuário não é administrador | Marcar como admin em *Listas e usuários* (por um admin) |
-| Cadastro/edição: **403** "Seu perfil é somente leitura" | A pessoa está marcada como *Visualizador* | Um administrador desmarca *Visualizador* em *Listas e usuários* |
+| Cadastro: **403** ao arquivar | Usuário não é administrador | Mudar o perfil para Administrador em *Administração → Usuários e perfis* (por outro admin) |
+| Cadastro/edição: **403** "Seu perfil é somente leitura" | A pessoa está marcada como *Visualizador* | Um administrador muda o perfil dela em *Administração → Usuários e perfis* |
 | "Deve existir ao menos um administrador ativo" | Tentativa de rebaixar/desativar o último admin | Promover outro administrador antes |
 | Painel com número de oportunidades acima do esperado | Linhas "ausentes" sendo contadas | Não deve ocorrer (a API as ignora); se ocorrer, verificar a versão publicada |
 | "Última atualização" parada há dias | Agente não rodou | Ver o histórico da tarefa; rodar a carga manual |
 | Carga recusada: "só N linhas (mínimo 400)" | Leitura parcial da planilha | Reler a planilha; conferir o OneDrive |
 | Cartão não aparece no Planner | Tarefa parada, login expirado ou evento em `erros\` | Ver `logs\integracao.log` e a pasta `erros\`; `python planner_auto.py login` se preciso |
 | Evento em `erros\`: "bucket/rótulo não encontrado" | Nome mudou no Planner | Atualizar `config/planner-mapa.json` (e rodar `inspecionar`) |
-| Evento em `erros\`: "responsável não encontrado" | E-mail do pré-vendas errado | Corrigir o e-mail em *Listas e usuários* |
+| Evento em `erros\`: "responsável não encontrado" | E-mail do pré-vendas errado | Corrigir o e-mail em *Administração → Usuários e perfis* |
 | Pipeline falha no `npm ci` ("Missing ... from lock file") | `package-lock.json` fora de sincronia | Regenerar o lockfile a partir do `package.json` limpo e validar com `npm ci` |
 | Pipeline falha no "Deploy produção" | Token da Cloudflare sem permissão/expirado | Novo token *Pages: Edit* **sem filtro de IP**; atualizar `CLOUDFLARE_API_TOKEN` |
 | Backup falha ao enviar | `RCLONE_DRIVE_TOKEN` inválido/expirado | Refazer `rclone authorize "drive"` e atualizar o secret |

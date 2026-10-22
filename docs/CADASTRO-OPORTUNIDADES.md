@@ -120,11 +120,11 @@ flowchart LR
 
 | Perfil | Quem é | Pode |
 |---|---|---|
-| **Administrador** | marcado como *Administrador* em *Listas e usuários* (hoje: João Henrique, Flávio Santanna e Jefferson Oliveira) | tudo: ver, cadastrar, editar, **arquivar/restaurar**, administrar listas e **perfis de usuários** |
+| **Administrador** | marcado como *Administrador* na aba *Administração* (hoje: João Henrique, Flávio Santanna e Jefferson Oliveira) | tudo: ver, cadastrar, editar, **arquivar/restaurar**, administrar listas e **perfis de usuários** |
 | **Editor** | **padrão** de todo `@ctctech.com.br` que não esteja marcado como visualizador (comportamento que já existia) | ver, cadastrar e editar; **não** arquiva nem administra |
 | **Visualizador** | marcado como *Visualizador* (precisa do e-mail) | **só consulta**: grade, filtros, tela de leitura e histórico; não vê botões de cadastrar, editar ou arquivar |
 
-Regras: **só o administrador** cria ou remove alguém dos grupos (a tela *Listas e usuários* e a função do banco `salvar_usuario` são exclusivas de administrador). Administrador e visualizador são **excludentes**. O sistema **nunca fica sem administrador** (o banco recusa rebaixar ou desativar o último). Remover alguém do grupo visualizador = desmarcar a caixa, e a pessoa volta a ser editor. A restrição é aplicada **no banco** (cadastro e edição recusam o visualizador com 403), não só escondida na tela.
+Regras: **só o administrador** cria ou remove alguém dos grupos (a aba *Administração* e a função do banco `salvar_usuario` são exclusivas de administrador). Administrador e visualizador são **excludentes**. O sistema **nunca fica sem administrador** (o banco recusa rebaixar ou desativar o último). Remover alguém do grupo visualizador = desmarcar a caixa, e a pessoa volta a ser editor. A restrição é aplicada **no banco** (cadastro e edição recusam o visualizador com 403), não só escondida na tela.
 
 ## 7. Bibliotecas
 
