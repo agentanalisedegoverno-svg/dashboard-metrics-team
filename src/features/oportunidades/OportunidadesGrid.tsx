@@ -6,12 +6,19 @@ import type { Oportunidade } from '@/domain/oportunidade'
 import { cn } from '@/lib/utils'
 import { brl, dataBr } from './formato'
 
-const STATUS_PONTO: Record<string, string> = { Win: 'bg-st-good', Lost: 'bg-st-critical', 'No Go': 'bg-st-warn' }
+// Win verde · Go azul · No Go laranja · On going amarela · Lost vermelha · demais cinza
+const STATUS_PONTO: Record<string, string> = {
+  Win: 'bg-dot-win',
+  Go: 'bg-dot-go',
+  'No Go': 'bg-dot-nogo',
+  'On going': 'bg-dot-ongoing',
+  Lost: 'bg-dot-lost',
+}
 
 /** Texto sempre em tinta padrão (contraste AA); a cor do status vai no ponto. */
 export const Selo = ({ status }: { status: string | null }) => (
   <span className="inline-flex items-center gap-1.5 rounded-full bg-line-soft px-2 py-0.5 text-xs font-semibold text-ink">
-    <span aria-hidden className={cn('size-2 rounded-full', STATUS_PONTO[status ?? ''] ?? 'bg-muted')} />
+    <span aria-hidden className={cn('size-2 rounded-full', STATUS_PONTO[status ?? ''] ?? 'bg-dot-other')} />
     {status ?? '—'}
   </span>
 )

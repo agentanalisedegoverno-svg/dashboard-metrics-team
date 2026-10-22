@@ -9,8 +9,11 @@ const opcoes = {
     torre: ['ITS', 'DIGITAL', 'HEALTH'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
     uf: ['DF', 'GO', 'SP'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
     motivo_no_go: [{ valor: 'Risco Jurídico', ativo: true, ordem: 1 }],
+    linha_servico: ['Service Desk', 'Software Development', 'Lya Gov'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
+    unidade_fornecimento: ['Serviço', 'Posto de Trabalho', 'Ponto de Função', 'Hora'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
   },
   preVendas: ['Flávio Santanna', 'Marcia'],
+  linhasTorre: { 'Software Development': 'DIGITAL', 'Lya Gov': 'HEALTH' },
 }
 
 const semente = (n: number): Reg[] =>
@@ -39,6 +42,13 @@ async function api(page: Page, admin = false, forcarConflito = false) {
   const enviados: Reg[] = []
   await page.route('**/api/me', (r) => r.fulfill({ json: { email: 'joao.henrique@ctctech.com.br', nome: 'João Henrique', admin, preVendas: false } }))
   await page.route('**/api/opcoes', (r) => r.fulfill({ json: opcoes }))
+  // Receita (via API do Radar): 00000000000191 = matriz; qualquer outro CNPJ válido = não encontrado.
+  await page.route('**/api/cnpj/*', (r) => {
+    const cnpj = new URL(r.request().url()).pathname.split('/').pop()
+    return cnpj === '00000000000191'
+      ? r.fulfill({ json: { cnpj, razao_social: 'BANCO DO BRASIL SA', tipo: 'Matriz', situacao: 'ATIVA' } })
+      : r.fulfill({ status: 404, json: { error: 'CNPJ não encontrado na Receita Federal.', motivo: 'nao_encontrado' } })
+  })
   await page.route('**/api/oportunidades**', async (r) => {
     const req = r.request()
     const url = new URL(req.url())
@@ -117,6 +127,7 @@ test('edição: conflito de versão oferece recarregar sem perder o outro trabal
   await api(page, false, true)
   await abrirAba(page)
   await page.getByText('Órgão 2', { exact: true }).first().click()
+  await page.getByRole('button', { name: 'Editar' }).click()
   await page.getByLabel(/^Instituição/).fill('Meu ajuste')
   await page.getByRole('button', { name: 'Salvar alterações' }).click()
   await expect(page.getByText('Outra pessoa alterou este registro enquanto você editava.')).toBeVisible()
@@ -150,3 +161,136 @@ test('acessibilidade da aba, do formulário e em tela de celular', async ({ page
   r = await new AxeBuilder({ page }).include('[role=dialog]').analyze()
   expect(r.violations, JSON.stringify(r.violations.map((v) => v.id))).toEqual([])
 })
+
+test('logo da CTC no cabeçalho e bolinhas de status por cor', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  const logo = page.getByRole('img', { name: 'CTC' })
+  await expect(logo).toBeVisible()
+  expect(await logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0)
+  // semente: i % 3 === 0 é Win (verde), os demais são Go (azul)
+  await expect(page.locator('.bg-dot-win').first()).toBeVisible()
+  await expect(page.locator('.bg-dot-go').first()).toBeVisible()
+})
+
+test('torre acompanha a linha de serviço (campo calculado) e unidade é lista', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  const torre = page.getByLabel(/^Torre/)
+  await expect(torre).toBeEnabled() // sem linha, a torre é escolhida à mão
+  // a linha vem antes da torre no formulário
+  const rotulos = await page.locator('dialog, [role=dialog]').getByText(/^(Linha de serviço|Torre)/).allTextContents()
+  expect(rotulos[0]).toMatch(/Linha de serviço/)
+  await page.getByLabel(/^Linha de serviço/).selectOption('Software Development')
+  await expect(torre).toHaveValue('DIGITAL')
+  await expect(torre).toBeDisabled()
+  await page.getByLabel(/^Linha de serviço/).selectOption('Lya Gov')
+  await expect(torre).toHaveValue('HEALTH')
+  await page.getByLabel(/^Linha de serviço/).selectOption('Service Desk')
+  await expect(torre).toHaveValue('ITS') // qualquer outra linha = ITS
+  const unidade = page.getByLabel(/^Unidade de fornecimento/)
+  expect(await unidade.evaluate((e) => e.tagName)).toBe('SELECT')
+  await expect(unidade.locator('option')).toHaveText(['— selecione —', 'Serviço', 'Posto de Trabalho', 'Ponto de Função', 'Hora'])
+})
+
+test('empresa vencedora: só o CNPJ; razão social e matriz/filial vêm da Receita', async ({ page }) => {
+  const { enviados } = await api(page)
+  await abrirAba(page)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  const cnpj = page.getByLabel(/^Empresa vencedora \(CNPJ\)/)
+  await cnpj.fill('00000000000191')
+  await expect(cnpj).toHaveValue('00.000.000/0001-91') // máscara
+  await expect(page.getByText('BANCO DO BRASIL SA')).toBeVisible()
+  await expect(page.getByText('Matriz', { exact: true })).toBeVisible()
+  await cnpj.fill('00.000.000/0001-92')
+  await expect(page.getByText('CNPJ inválido (confira os dígitos).')).toBeVisible()
+  await cnpj.fill('33000167000101')
+  await expect(page.getByText('CNPJ não encontrado na Receita Federal.')).toBeVisible()
+  // salva com a empresa preenchida
+  await cnpj.fill('00000000000191')
+  await expect(page.getByText('BANCO DO BRASIL SA')).toBeVisible()
+  await page.getByLabel(/^Status/).selectOption('Go')
+  await page.getByLabel(/^Instituição/).fill('Prefeitura X')
+  await page.getByLabel(/^Descritivo/).fill('Link')
+  await page.getByLabel(/^Torre/).selectOption('ITS')
+  await page.getByLabel(/^Data do pregão/).fill('2026-05-20')
+  await page.getByRole('button', { name: 'Cadastrar' }).click()
+  await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
+  expect(enviados[0]).toMatchObject({ empresa_vencedora_cnpj: '00000000000191', empresa_vencedora_razao: 'BANCO DO BRASIL SA', empresa_vencedora_tipo: 'Matriz' })
+})
+
+test('descritivo aceita texto longo, sem limite de 300 caracteres', async ({ page }) => {
+  const { enviados } = await api(page)
+  await abrirAba(page)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  const longo = 'Objeto detalhado. '.repeat(400) // ~7.200 caracteres
+  await page.getByLabel(/^Status/).selectOption('Go')
+  await page.getByLabel(/^Instituição/).fill('Prefeitura X')
+  await page.getByLabel(/^Descritivo/).fill(longo)
+  await page.getByLabel(/^Torre/).selectOption('ITS')
+  await page.getByLabel(/^Data do pregão/).fill('2026-05-20')
+  await expect(page.getByText(/Até 300 caracteres/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Cadastrar' }).click()
+  await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
+  expect((enviados[0].descritivo as string).length).toBe(longo.length)
+})
+
+test('abre em tela cheia, travado; Editar libera; Cancelar descarta; Salvar grava', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  await page.getByText('Órgão 2', { exact: true }).first().click()
+  const dialogo = page.getByRole('dialog')
+  const caixa = await dialogo.boundingBox()
+  const vp = page.viewportSize()!
+  expect(caixa!.width).toBeGreaterThanOrEqual(vp.width - 2)
+  expect(caixa!.height).toBeGreaterThanOrEqual(vp.height - 2)
+
+  // travado: todos os campos desabilitados, botão Editar no topo, sem Cancelar/Salvar
+  const orgao = page.getByLabel(/^Instituição/)
+  await expect(orgao).toBeDisabled()
+  await expect(page.getByLabel(/^Status/)).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Salvar alterações' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Cancelar' })).toHaveCount(0)
+
+  // Editar: libera os campos e mostra Cancelar/Salvar embaixo
+  await page.getByRole('button', { name: 'Editar' }).click()
+  await expect(orgao).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Cancelar' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Salvar alterações' })).toBeVisible()
+
+  // Cancelar com alteração pede confirmação e descarta
+  await orgao.fill('Alterado e descartado')
+  await page.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page.getByText('Há alterações não salvas. Descartar?')).toBeVisible()
+  await page.getByRole('button', { name: 'Descartar', exact: true }).click()
+  await expect(orgao).toBeDisabled()
+  await expect(orgao).toHaveValue('Órgão 2')
+
+  // Editar + Salvar grava e volta ao modo leitura com o novo valor
+  await page.getByRole('button', { name: 'Editar' }).click()
+  await orgao.fill('Órgão salvo')
+  await page.getByRole('button', { name: 'Salvar alterações' }).click()
+  await expect(page.getByText('Alterações salvas.')).toBeVisible()
+  await expect(orgao).toBeDisabled()
+  await expect(orgao).toHaveValue('Órgão salvo')
+  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible()
+})
+
+test('fechar sem alterar não pergunta nada; com alteração pergunta e fecha ao descartar', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  await page.getByText('Órgão 2', { exact: true }).first().click()
+  await page.getByRole('button', { name: 'Fechar' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByText('Órgão 2', { exact: true }).first().click()
+  await page.getByRole('button', { name: 'Editar' }).click()
+  await page.getByLabel(/^Instituição/).fill('mudou')
+  await page.getByRole('button', { name: 'Fechar' }).click()
+  await expect(page.getByText('Há alterações não salvas. Descartar?')).toBeVisible()
+  await page.getByRole('button', { name: 'Descartar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+

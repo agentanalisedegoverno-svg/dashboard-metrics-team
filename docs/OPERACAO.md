@@ -45,6 +45,8 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 - Todo `@ctctech.com.br` vê, cadastra e edita. **Só o administrador** arquiva/restaura e administra listas e usuários.
 - **Novo pré-vendas:** aba Oportunidades → *Listas e usuários* → Usuários → informar nome e **e-mail** (o e-mail é o que atribui o cartão no Planner).
 - **Nova opção de lista** (modalidade, site, motivos…): *Listas e usuários* → Listas. Itens desativados somem do cadastro, mas continuam válidos em registros que já os usam.
+- **Nova linha de serviço que não seja ITS:** incluir em `linhas_torre` (Neon → SQL Editor): `insert into linhas_torre (linha, torre) values ('Nome exato da linha', 'DIGITAL');` (ou `'HEALTH'`). Linha sem mapeamento resulta em **ITS**, como na planilha.
+- **Consulta de CNPJ fora do ar:** o cadastro segue; a tela avisa e a razão social é consultada de novo ao salvar.
 - **Pendências da migração:** a grade tem o filtro "Só com pendências"; corrigir o registro e salvar remove a pendência.
 
 ### 2.3 Integração com o Planner (a cada 30 minutos)
@@ -79,6 +81,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 |---|---|---|
 | Painel pede login a cada acesso / não aceita o código | E-mail fora de `@ctctech.com.br` ou código no spam | Conferir a política do Access; olhar o spam |
 | "Não foi possível carregar os dados" | API fora do ar ou 502 | Ver os erros abaixo |
+| CNPJ: "Receita indisponível agora" | BrasilAPI fora do ar ou limite de consultas | Salvar mesmo assim (consulta refeita no salvamento) e conferir depois |
 | Aba Oportunidades: "Não foi possível carregar o cadastro" | `DATABASE_URL_APP` ausente/errado, ou 401/503 | Ver a tabela abaixo |
 | `/api/*` responde **401** | JWT do Access ausente/expirado (ex.: curl) | Esperado sem login. No navegador: sair e entrar de novo |
 | `/api/*` responde **503** "Autenticação não configurada" | `CF_ACCESS_*` ausentes | Restaurar as variáveis e redeployar |

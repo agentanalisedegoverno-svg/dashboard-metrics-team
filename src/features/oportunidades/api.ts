@@ -43,11 +43,15 @@ async function chamar<T>(path: string, init: { method?: string; body?: unknown; 
 export type Me = { email: string; nome: string | null; admin: boolean; preVendas: boolean }
 export type Opcao = { valor: string; ativo: boolean; ordem: number }
 export type UsuarioAdmin = { nome: string; email: string | null; admin: boolean; pre_vendas: boolean; ativo: boolean }
-export type Opcoes = { listas: Record<string, Opcao[]>; preVendas: string[]; usuarios?: UsuarioAdmin[] }
+export type Opcoes = { listas: Record<string, Opcao[]>; preVendas: string[]; linhasTorre: Record<string, string>; usuarios?: UsuarioAdmin[] }
+export type EmpresaReceita = { cnpj: string; razao_social: string; tipo: 'Matriz' | 'Filial'; situacao: string | null }
 export type Historico = { id: number; versao: number; acao: string; por: string; em: string; alteracoes: Record<string, [unknown, unknown]> }
 export type Salvo = Oportunidade & { avisos?: { regra: string; ids: number[] }[] }
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: ({ signal }) => chamar<Me>('/me', { signal }), staleTime: 5 * 60_000, retry: false })
+
+/** Consulta o CNPJ na Receita (pela API do Radar). */
+export const useConsultaCnpj = () => useMutation({ mutationFn: (cnpj: string) => chamar<EmpresaReceita>(`/cnpj/${cnpj}`) })
 
 export const useOpcoes = () =>
   useQuery({ queryKey: ['opcoes'], queryFn: ({ signal }) => chamar<Opcoes>('/opcoes', { signal }), staleTime: 60_000, retry: false })

@@ -17,6 +17,10 @@ export function paraForm(o?: Partial<Oportunidade> | null): FormValores {
     else v[c.nome] = String(bruto)
   }
   v.orcamento_sigiloso = Boolean(o?.orcamento_sigiloso)
+  // Campos derivados da empresa vencedora e o texto antigo (somente leitura): vão e voltam sem aparecer como campos.
+  v.empresa_vencedora_razao = o?.empresa_vencedora_razao ?? ''
+  v.empresa_vencedora_tipo = o?.empresa_vencedora_tipo ?? ''
+  v.empresas_vencedoras = o?.empresas_vencedoras ?? ''
   return v as FormValores
 }
 

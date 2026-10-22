@@ -1,7 +1,7 @@
 import type { OportunidadeInput } from '@/domain/oportunidade'
 
 export type Nome = keyof OportunidadeInput
-export type Tipo = 'texto' | 'longo' | 'data' | 'dinheiro' | 'percentual' | 'inteiro' | 'lista' | 'preVendas' | 'bool'
+export type Tipo = 'texto' | 'longo' | 'data' | 'dinheiro' | 'percentual' | 'inteiro' | 'lista' | 'preVendas' | 'bool' | 'cnpj'
 
 export type Campo = {
   nome: Nome
@@ -12,6 +12,8 @@ export type Campo = {
   quando?: readonly string[]
   largo?: boolean
   dica?: string
+  /** Valor calculado por outro campo (não editável quando o campo de origem está preenchido). */
+  calculado?: boolean
 }
 
 export type Secao = { id: string; titulo: string; campos: Campo[] }
@@ -24,7 +26,7 @@ export const SECOES: Secao[] = [
     campos: [
       { nome: 'status', rotulo: 'Status', tipo: 'lista', obrigatorio: true },
       { nome: 'orgao', rotulo: 'Instituição / Órgão', tipo: 'texto', obrigatorio: true, largo: true },
-      { nome: 'descritivo', rotulo: 'Descritivo', tipo: 'longo', obrigatorio: true, largo: true, dica: 'Até 300 caracteres' },
+      { nome: 'descritivo', rotulo: 'Descritivo', tipo: 'longo', obrigatorio: true, largo: true },
       { nome: 'processo', rotulo: 'Processo', tipo: 'texto' },
       { nome: 'uasg', rotulo: 'UASG', tipo: 'texto' },
       { nome: 'uf', rotulo: 'UF', tipo: 'lista' },
@@ -49,9 +51,9 @@ export const SECOES: Secao[] = [
     id: 'escopo',
     titulo: 'Escopo e responsável',
     campos: [
-      { nome: 'torre', rotulo: 'Torre', tipo: 'lista', obrigatorio: true },
       { nome: 'linha_servico', rotulo: 'Linha de serviço', tipo: 'lista' },
-      { nome: 'unidade_fornecimento', rotulo: 'Unidade de fornecimento', tipo: 'texto' },
+      { nome: 'torre', rotulo: 'Torre', tipo: 'lista', obrigatorio: true, calculado: true, dica: 'Preenchida automaticamente pela linha de serviço' },
+      { nome: 'unidade_fornecimento', rotulo: 'Unidade de fornecimento', tipo: 'lista' },
       { nome: 'conta_vinculada', rotulo: 'Conta vinculada', tipo: 'lista' },
       { nome: 'analista', rotulo: 'Pré-vendas', tipo: 'preVendas' },
     ],
@@ -73,7 +75,7 @@ export const SECOES: Secao[] = [
     titulo: 'Resultado do certame',
     campos: [
       { nome: 'valor_vencedor', rotulo: 'Valor vencedor (R$)', tipo: 'dinheiro' },
-      { nome: 'empresas_vencedoras', rotulo: 'Empresas vencedoras', tipo: 'longo', largo: true },
+      { nome: 'empresa_vencedora_cnpj', rotulo: 'Empresa vencedora (CNPJ)', tipo: 'cnpj', largo: true, dica: 'Informe só o CNPJ: a razão social e se é matriz ou filial vêm da Receita Federal' },
       { nome: 'posicao_lance', rotulo: 'Posição pós-lance CTC', tipo: 'inteiro' },
       { nome: 'situacao_lance', rotulo: 'Situação do lance', tipo: 'lista', dica: 'Use quando não há posição (ex.: Desclassificada)' },
       { nome: 'motivo_lost', rotulo: 'Motivo do Lost', tipo: 'lista', quando: ['Lost'] },

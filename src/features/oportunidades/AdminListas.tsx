@@ -7,7 +7,7 @@ import { useSalvarOpcao, useSalvarUsuario, type Opcoes } from './api'
 const ROTULO_LISTA: Record<string, string> = {
   status: 'Status', torre: 'Torre', linha_servico: 'Linha de serviço', criterio: 'Critério', uf: 'UF', modalidade: 'Modalidade',
   modo_disputa: 'Modo de disputa', origem_oportunidade: 'Origem', site: 'Site', vistoria: 'Vistoria', conta_vinculada: 'Conta vinculada',
-  motivo_no_go: 'Motivo do No Go', motivo_lost: 'Motivo do Lost', situacao_lance: 'Situação do lance',
+  motivo_no_go: 'Motivo do No Go', motivo_lost: 'Motivo do Lost', situacao_lance: 'Situação do lance', unidade_fornecimento: 'Unidade de fornecimento',
 }
 
 const inputCls = 'rounded-lg border border-line bg-surface px-2.5 py-[7px] text-[13px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-gold/40'
