@@ -108,7 +108,7 @@ describe('casos de uso', () => {
 })
 
 describe('empresa vencedora (CNPJ pela Receita)', () => {
-  const ok = (tipo: 'Matriz' | 'Filial'): ResultadoCnpj => ({ ok: true, empresa: { cnpj: '00000000000191', razao_social: 'BANCO DO BRASIL SA', tipo, situacao: 'ATIVA' } })
+  const ok = (tipo: 'Matriz' | 'Filial'): ResultadoCnpj => ({ ok: true, empresa: { cnpj: '00000000000191', razao_social: 'BANCO DO BRASIL SA', tipo, situacao: 'ATIVA', fonte: 'teste' } })
   const base = { status: 'Go', orgao: 'X', descritivo: 'y', torre: 'ITS', data_pregao_dt: '2026-05-05', empresa_vencedora_cnpj: '00.000.000/0001-91' }
 
   it('criar: preenche razão social e matriz/filial a partir da Receita, ignorando o que veio do navegador', async () => {
