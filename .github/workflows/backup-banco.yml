@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
+    inputs:
+      semanal:
+        description: 'Gravar também a cópia semanal agora (teste da pasta semanal/)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -72,6 +77,7 @@ jobs:
           RCLONE_CONFIG_GD_SCOPE: drive
           RCLONE_CONFIG_GD_ROOT_FOLDER_ID: ${{ env.GDRIVE_FOLDER_ID }}
           RCLONE_CONFIG_GD_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN }}
+          FORCAR_SEMANAL: ${{ inputs.semanal }}
         run: |
           # O rclone novo imprime o token codificado em base64 (e às vezes embrulhado em {"token": "..."}).
           # Aceita as duas formas e normaliza para o JSON {"access_token":...} que o rclone espera.
@@ -97,7 +103,7 @@ jobs:
           rc mkdir gd:semanal
           rc copy "/out/radar-$STAMP.dump.enc" gd:diario/
           rc copy "/out/radar-$STAMP.dump.enc.sha256" gd:diario/
-          if [ "$(date -u +%u)" = "7" ]; then
+          if [ "$(date -u +%u)" = "7" ] || [ "$FORCAR_SEMANAL" = "true" ]; then
             rc copy "/out/radar-$STAMP.dump.enc" gd:semanal/
             rc copy "/out/radar-$STAMP.dump.enc.sha256" gd:semanal/
           fi

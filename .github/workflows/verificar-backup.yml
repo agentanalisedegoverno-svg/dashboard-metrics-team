@@ -1,0 +1,55 @@
+name: Vigia do backup
+
+# Alerta (falha do workflow = e-mail do GitHub) se o backup diário não rodou com sucesso nas últimas N horas
+# ou se o último teste de restauração está velho. Roda todo dia depois da janela do backup.
+on:
+  schedule:
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+    inputs:
+      max_horas_backup:
+        description: 'Idade máxima aceita do último backup bem-sucedido (horas). Use 0 para forçar uma falha de teste.'
+        default: '30'
+      max_dias_restauracao:
+        description: 'Idade máxima aceita do último teste de restauração (dias)'
+        default: '40'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  vigiar:
+    name: Conferir backup e restauração
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MAX_H: ${{ inputs.max_horas_backup || '30' }}
+      MAX_D: ${{ inputs.max_dias_restauracao || '40' }}
+    steps:
+      - name: Último backup bem-sucedido
+        run: |
+          ultimo=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow backup-banco.yml --status success --limit 1 --json createdAt -q '.[0].createdAt')
+          if [ -z "$ultimo" ]; then echo "::error::Nenhum backup bem-sucedido encontrado"; exit 1; fi
+          idade_h=$(( ( $(date -u +%s) - $(date -u -d "$ultimo" +%s) ) / 3600 ))
+          echo "Último backup bem-sucedido: $ultimo (há ${idade_h} h; limite ${MAX_H} h)"
+          {
+            echo "### Vigia do backup"
+            echo "- Último backup bem-sucedido: \`$ultimo\` (há **${idade_h} h**, limite ${MAX_H} h)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$idade_h" -ge "$MAX_H" ]; then
+            echo "::error::O último backup bem-sucedido tem ${idade_h} h (limite ${MAX_H} h). Verifique o workflow 'Backup do banco'."
+            exit 1
+          fi
+
+      - name: Último teste de restauração
+        run: |
+          ultimo=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow restore-test.yml --status success --limit 1 --json createdAt -q '.[0].createdAt')
+          if [ -z "$ultimo" ]; then echo "::error::Nenhum teste de restauração bem-sucedido encontrado"; exit 1; fi
+          idade_d=$(( ( $(date -u +%s) - $(date -u -d "$ultimo" +%s) ) / 86400 ))
+          echo "- Último teste de restauração bem-sucedido: \`$ultimo\` (há **${idade_d} dias**, limite ${MAX_D})" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$idade_d" -ge "$MAX_D" ]; then
+            echo "::error::O último teste de restauração bem-sucedido tem ${idade_d} dias (limite ${MAX_D}). Rode 'Teste de restauração do backup'."
+            exit 1
+          fi
