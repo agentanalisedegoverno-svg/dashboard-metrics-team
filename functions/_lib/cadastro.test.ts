@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { oportunidadeInput } from '../../src/domain/oportunidade.ts'
-import { arquivar, atualizar, criar, listar, opcoes } from './cadastro.ts'
+import { arquivar, atualizar, criar, listar, me, opcoes, salvarUsuario } from './cadastro.ts'
 import type { ResultadoCnpj } from './cnpj.ts'
 import { csrfOk, erroBanco } from './http.ts'
 
@@ -146,3 +146,43 @@ describe('empresa vencedora (CNPJ pela Receita)', () => {
     expect(enviado).toMatchObject({ empresa_vencedora_cnpj: null, empresa_vencedora_razao: null, empresa_vencedora_tipo: null })
   })
 })
+
+describe('perfis de acesso', () => {
+  const linha = (o: object) => vi.fn().mockResolvedValueOnce([o])
+  it('me: administrador ativo, visualizador e editor (padrão para quem não está na lista)', async () => {
+    const adm = await corpo(await me(linha({ nome: 'A', admin: true, ativo: true, pre_vendas: false, somente_leitura: false }), 'a@x.com'))
+    expect(adm.json).toMatchObject({ admin: true, somenteLeitura: false, perfil: 'administrador' })
+    const vis = await corpo(await me(linha({ nome: 'V', admin: false, ativo: true, pre_vendas: false, somente_leitura: true }), 'v@x.com'))
+    expect(vis.json).toMatchObject({ admin: false, somenteLeitura: true, perfil: 'visualizador' })
+    const novo = await corpo(await me(vi.fn().mockResolvedValueOnce([]), 'qualquer@ctctech.com.br'))
+    expect(novo.json).toMatchObject({ admin: false, somenteLeitura: false, perfil: 'editor' })
+  })
+  it('me: o perfil visualizador vale mesmo com a linha inativa; administrador inativo deixa de ser admin', async () => {
+    const vis = await corpo(await me(linha({ nome: 'V', admin: false, ativo: false, pre_vendas: false, somente_leitura: true }), 'v@x.com'))
+    expect(vis.json.perfil).toBe('visualizador')
+    const adm = await corpo(await me(linha({ nome: 'A', admin: true, ativo: false, pre_vendas: false, somente_leitura: false }), 'a@x.com'))
+    expect(adm.json.perfil).toBe('editor')
+  })
+  it('salvarUsuario: envia o perfil somente leitura ao banco e valida o formato', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{}])
+    const r = await corpo(await salvarUsuario(sql, 'adm@x.com', { nome: 'Ana', email: 'ANA@x.com', admin: false, pre_vendas: false, ativo: true, somente_leitura: true }))
+    expect(r.status).toBe(200)
+    expect(sql.mock.calls[0].slice(1)).toEqual(['Ana', 'ana@x.com', false, false, true, 'adm@x.com', true])
+    expect((await corpo(await salvarUsuario(vi.fn(), 'adm@x.com', { nome: '', somente_leitura: true }))).status).toBe(422)
+  })
+  it('o banco recusa cadastro de visualizador (403) e a regra do último administrador (422)', async () => {
+    const e403 = vi.fn().mockRejectedValue(pgErr('P0403', 'Seu perfil é somente leitura: não é possível cadastrar ou editar'))
+    expect((await corpo(await criar(e403, 'v@x.com', { status: 'Go', orgao: 'X', descritivo: 'y', torre: 'ITS', data_pregao_dt: '2026-05-05' }))).status).toBe(403)
+    const e422 = vi.fn().mockRejectedValue(pgErr('P0422', '[{"campo":"admin","mensagem":"Deve existir ao menos um administrador ativo"}]'))
+    const r = await corpo(await salvarUsuario(e422, 'adm@x.com', { nome: 'Ana', admin: false, ativo: true }))
+    expect(r.status).toBe(422)
+    expect(r.json.erros[0].campo).toBe('admin')
+  })
+  it('e-mail duplicado vira 422 no campo e-mail', async () => {
+    const dup = vi.fn().mockRejectedValue(pgErr('23505', 'duplicate key value violates unique constraint'))
+    const r = await corpo(await salvarUsuario(dup, 'adm@x.com', { nome: 'Ana', email: 'ana@x.com', ativo: true }))
+    expect(r.status).toBe(422)
+    expect(r.json.erros[0].campo).toBe('email')
+  })
+})
+

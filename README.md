@@ -100,7 +100,7 @@ scripts/
 | Ambiente da integração com o Planner | `DATABASE_URL_PLANNER`, `PLANNER_EVENTOS_DIR` | papel `radar_planner` (somente leitura + controle) |
 | GitHub Actions (secrets) | `DATABASE_URL_BACKUP`, `BACKUP_PASSPHRASE`, `RCLONE_DRIVE_TOKEN` | backup diário e teste de restauração |
 
-**Acesso:** Cloudflare Access (Zero Trust, plano Free) com login por código (*One-time PIN*); política *Allow* para `@ctctech.com.br`. Todos veem, cadastram e editam; **só o administrador** arquiva/restaura e administra listas e usuários. Para liberar outro e-mail ou domínio: Zero Trust → Access → Applications → Radar Pré-Vendas → Policies. A API valida o JWT em qualquer endereço do projeto. O flag `ACESSO_PUBLICO="true"` reabre a API sem login (uso temporário; não recomendado).
+**Acesso:** Cloudflare Access (Zero Trust, plano Free) com login por código (*One-time PIN*); política *Allow* para `@ctctech.com.br`. Perfis: **administrador** (tudo), **editor** (cadastra e edita; padrão do domínio) e **visualizador** (só consulta); **só o administrador** arquiva/restaura e gerencia listas e perfis. Para liberar outro e-mail ou domínio: Zero Trust → Access → Applications → Radar Pré-Vendas → Policies. A API valida o JWT em qualquer endereço do projeto. O flag `ACESSO_PUBLICO="true"` reabre a API sem login (uso temporário; não recomendado).
 
 `functions/_lib/planilha.ts` converte a matriz bruta da planilha (34 colunas de dados) e é usado por `scripts/sync-db.mjs`; `functions/_lib/rows.ts` mantém o mapeamento do painel.
 

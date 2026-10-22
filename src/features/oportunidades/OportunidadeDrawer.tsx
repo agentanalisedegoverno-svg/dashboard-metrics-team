@@ -331,7 +331,7 @@ export function OportunidadeDrawer({ aberto, onFechar, registro: registroProp, o
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {!nova && !editando && !arquivado && (
+                {!nova && !editando && !arquivado && !me.somenteLeitura && (
                   <button
                     type="button"
                     onClick={() => setEditando(true)}

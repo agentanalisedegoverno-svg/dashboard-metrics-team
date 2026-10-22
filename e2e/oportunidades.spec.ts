@@ -37,11 +37,21 @@ const semente = (n: number): Reg[] =>
     atualizado_em: '2026-10-14T12:00:00Z',
   }))
 
-async function api(page: Page, admin = false, forcarConflito = false) {
+async function api(page: Page, admin = false, forcarConflito = false, visualizador = false) {
   const base = semente(500)
   const enviados: Reg[] = []
-  await page.route('**/api/me', (r) => r.fulfill({ json: { email: 'joao.henrique@ctctech.com.br', nome: 'João Henrique', admin, preVendas: false } }))
-  await page.route('**/api/opcoes', (r) => r.fulfill({ json: opcoes }))
+  await page.route('**/api/me', (r) =>
+    r.fulfill({ json: { email: 'joao.henrique@ctctech.com.br', nome: 'João Henrique', admin, preVendas: false, somenteLeitura: visualizador, perfil: admin ? 'administrador' : visualizador ? 'visualizador' : 'editor' } }),
+  )
+  const usuarios = [
+    { nome: 'Ana Admin', email: 'ana@ctctech.com.br', admin: true, pre_vendas: false, ativo: true, somente_leitura: false },
+    { nome: 'Vera Viewer', email: 'vera@ctctech.com.br', admin: false, pre_vendas: false, ativo: true, somente_leitura: true },
+  ]
+  await page.route('**/api/opcoes', (r) => r.fulfill({ json: admin ? { ...opcoes, usuarios } : opcoes }))
+  await page.route('**/api/usuarios', (r) => {
+    enviados.push(r.request().postDataJSON() as Reg)
+    return r.fulfill({ json: { ok: true } })
+  })
   // Receita (via API do Radar): 00000000000191 = matriz; qualquer outro CNPJ válido = não encontrado.
   await page.route('**/api/cnpj/*', (r) => {
     const cnpj = new URL(r.request().url()).pathname.split('/').pop()
@@ -292,5 +302,48 @@ test('fechar sem alterar não pergunta nada; com alteração pergunta e fecha ao
   await expect(page.getByText('Há alterações não salvas. Descartar?')).toBeVisible()
   await page.getByRole('button', { name: 'Descartar', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+test('visualizador: só consulta (sem cadastrar, editar ou arquivar)', async ({ page }) => {
+  await api(page, false, false, true)
+  await abrirAba(page)
+  await expect(page.getByText(/\(visualizador\)/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Nova oportunidade' })).toHaveCount(0)
+  await page.getByText('Órgão 2', { exact: true }).first().click()
+  await expect(page.getByLabel(/^Instituição/)).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Arquivar' })).toHaveCount(0)
+  // o histórico continua acessível
+  await page.getByRole('tab', { name: 'Histórico' }).click()
+  await expect(page.getByText(/ana@ctctech.com.br/)).toBeVisible()
+})
+
+test('editor mantém o que tem hoje: cadastra e edita, mas não arquiva nem administra', async ({ page }) => {
+  await api(page, false)
+  await abrirAba(page)
+  await expect(page.getByText(/\(editor\)/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Nova oportunidade' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Listas e usuários/ })).toHaveCount(0)
+  await page.getByText('Órgão 2', { exact: true }).first().click()
+  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Arquivar' })).toHaveCount(0)
+})
+
+test('administrador gerencia perfis: visualizador e administrador são excludentes', async ({ page }) => {
+  const { enviados } = await api(page, true)
+  await abrirAba(page)
+  await page.getByRole('button', { name: /Listas e usuários/ }).click()
+  await page.getByRole('tab', { name: 'Usuários' }).click()
+  const vera = page.getByRole('listitem').filter({ hasText: 'Vera Viewer' })
+  await expect(vera.getByLabel('Visualizador')).toBeChecked()
+  // marcar Administrador desmarca Visualizador (e envia os dois juntos)
+  await vera.getByLabel('Administrador').click()
+  await expect.poll(() => enviados.find((e) => e.nome === 'Vera Viewer')).toMatchObject({ admin: true, somente_leitura: false })
+  // adicionar novo visualizador
+  await page.getByLabel('Nome', { exact: true }).fill('Caio Consulta')
+  await page.getByLabel('E-mail').fill('caio@ctctech.com.br')
+  await page.getByLabel('Perfil').selectOption('visualizador')
+  await page.getByRole('button', { name: 'Adicionar' }).last().click()
+  await expect.poll(() => enviados.find((e) => e.nome === 'Caio Consulta')).toMatchObject({ somente_leitura: true, admin: false, pre_vendas: false })
 })
 

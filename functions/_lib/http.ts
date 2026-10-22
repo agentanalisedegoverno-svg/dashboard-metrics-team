@@ -63,6 +63,8 @@ export function erroBanco(e: unknown): Response {
       return send(403, { error: err.message ?? 'Sem permissão.' })
     case 'P0404':
       return send(404, { error: err.message ?? 'Não encontrado.' })
+    case '23505':
+      return send(422, { error: 'Dados inválidos.', erros: [{ campo: 'email', mensagem: 'Já existe um usuário com este e-mail ou nome.' }] })
     case '22P02':
     case '22007':
     case '22008':
