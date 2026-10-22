@@ -1,4 +1,37 @@
+import { Monitor, Moon, Sun } from 'lucide-react'
 import { fmtInt } from '@/lib/format'
+import { useTema, type EscolhaTema } from '@/lib/tema'
+import { cn } from '@/lib/utils'
+
+const OPCOES: { valor: EscolhaTema; rotulo: string; Icone: typeof Sun }[] = [
+  { valor: 'sistema', rotulo: 'Tema do sistema', Icone: Monitor },
+  { valor: 'claro', rotulo: 'Tema claro', Icone: Sun },
+  { valor: 'escuro', rotulo: 'Tema escuro', Icone: Moon },
+]
+
+function SeletorTema() {
+  const { escolha, definir } = useTema()
+  return (
+    <div role="group" aria-label="Aparência" className="mb-2 inline-flex rounded-lg border border-line bg-surface-2 p-0.5">
+      {OPCOES.map(({ valor, rotulo, Icone }) => (
+        <button
+          key={valor}
+          type="button"
+          aria-label={rotulo}
+          aria-pressed={escolha === valor}
+          title={rotulo}
+          onClick={() => definir(valor)}
+          className={cn(
+            'inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-gold',
+            escolha === valor && 'bg-surface text-ink shadow-card',
+          )}
+        >
+          <Icone className="size-4" aria-hidden />
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export function Header({ total, all, updatedAt, noYear }: { total: number; all: number; updatedAt: string | null; noYear: boolean }) {
   return (
@@ -17,6 +50,7 @@ export function Header({ total, all, updatedAt, noYear }: { total: number; all: 
       </div>
       </div>
       <div className="text-right text-[12.5px] text-muted max-sm:w-full max-sm:text-left">
+        <SeletorTema />
         <div>
           Base carregada: <strong className="font-mono text-[13px] text-ink">{noYear ? '—' : `${fmtInt(total)}${total !== all ? ` de ${fmtInt(all)}` : ''}`}</strong> oportunidades
         </div>
