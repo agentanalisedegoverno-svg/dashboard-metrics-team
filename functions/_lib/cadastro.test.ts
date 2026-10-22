@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { oportunidadeInput } from '../../src/domain/oportunidade.ts'
 import { arquivar, atualizar, criar, listar, opcoes } from './cadastro.ts'
+import type { ResultadoCnpj } from './cnpj.ts'
 import { csrfOk, erroBanco } from './http.ts'
 
 const req = (headers: Record<string, string>, url = 'https://radar.example.com/api/oportunidades') => new Request(url, { method: 'POST', headers })
@@ -81,7 +82,10 @@ describe('casos de uso', () => {
     expect(r.json.erros[0].campo).toBe('motivo_no_go')
   })
   it('atualizar: exige a versão, rejeita id inválido e devolve 409 em conflito', async () => {
-    const sql = vi.fn().mockRejectedValue(pgErr('P0409', '{"versao_atual":2,"atual":{}}'))
+    const sql = vi.fn().mockImplementation(async (strings: TemplateStringsArray) => {
+      if (strings.join('').includes('from oportunidades where id')) return [{ cnpj: null, razao: null, tipo: null }]
+      throw pgErr('P0409', '{"versao_atual":2,"atual":{}}')
+    })
     expect((await corpo(await atualizar(sql, 'a@b.com', 'abc', { versao: 1 }))).status).toBe(404)
     expect((await corpo(await atualizar(sql, 'a@b.com', '5', {}))).status).toBe(422)
     expect((await corpo(await atualizar(sql, 'a@b.com', '5', { versao: 1 }))).status).toBe(409)
@@ -96,9 +100,49 @@ describe('casos de uso', () => {
     expect(sql.mock.calls[1][1]).toBe(false)
   })
   it('opcoes: e-mails de usuários só para admin', async () => {
-    const dados = [[{ admin: false }], [{ lista: 'torre', valor: 'ITS', ativo: true, ordem: 1 }], [{ nome: 'Ana', email: 'ana@x.com', admin: false, pre_vendas: true, ativo: true }]]
+    const dados = [[{ admin: false }], [{ lista: 'torre', valor: 'ITS', ativo: true, ordem: 1 }], [{ linha: 'Lya Gov', torre: 'HEALTH' }], [{ nome: 'Ana', email: 'ana@x.com', admin: false, pre_vendas: true, ativo: true }]]
     const sql = vi.fn().mockImplementation(async () => dados.shift())
     const r = await corpo(await opcoes(sql, 'a@b.com'))
-    expect(r.json).toEqual({ listas: { torre: [{ valor: 'ITS', ativo: true, ordem: 1 }] }, preVendas: ['Ana'] })
+    expect(r.json).toEqual({ listas: { torre: [{ valor: 'ITS', ativo: true, ordem: 1 }] }, preVendas: ['Ana'], linhasTorre: { 'Lya Gov': 'HEALTH' } })
+  })
+})
+
+describe('empresa vencedora (CNPJ pela Receita)', () => {
+  const ok = (tipo: 'Matriz' | 'Filial'): ResultadoCnpj => ({ ok: true, empresa: { cnpj: '00000000000191', razao_social: 'BANCO DO BRASIL SA', tipo, situacao: 'ATIVA' } })
+  const base = { status: 'Go', orgao: 'X', descritivo: 'y', torre: 'ITS', data_pregao_dt: '2026-05-05', empresa_vencedora_cnpj: '00.000.000/0001-91' }
+
+  it('criar: preenche razão social e matriz/filial a partir da Receita, ignorando o que veio do navegador', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{ o: { id: 5, versao: 1 } }])
+    const r = await corpo(await criar(sql, 'a@b.com', { ...base, empresa_vencedora_razao: 'FALSA', empresa_vencedora_tipo: 'Matriz' }, async () => ok('Filial')))
+    expect(r.status).toBe(201)
+    const enviado = JSON.parse(sql.mock.calls[0][sql.mock.calls[0].length - 2] as string)
+    expect(enviado).toMatchObject({ empresa_vencedora_cnpj: '00000000000191', empresa_vencedora_razao: 'BANCO DO BRASIL SA', empresa_vencedora_tipo: 'Filial' })
+  })
+  it('criar: CNPJ inexistente na Receita vira 422 no campo', async () => {
+    const sql = vi.fn()
+    const r = await corpo(await criar(sql, 'a@b.com', base, async () => ({ ok: false, motivo: 'nao_encontrado', mensagem: 'CNPJ não encontrado na Receita Federal.' })))
+    expect(r.status).toBe(422)
+    expect(r.json.erros[0]).toMatchObject({ campo: 'empresa_vencedora_cnpj' })
+    expect(sql).not.toHaveBeenCalled()
+  })
+  it('criar: Receita fora do ar salva só o CNPJ e avisa', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{ o: { id: 6, versao: 1 } }])
+    const r = await corpo(await criar(sql, 'a@b.com', base, async () => ({ ok: false, motivo: 'indisponivel', mensagem: 'x' })))
+    expect(r.status).toBe(201)
+    expect(r.json.avisos).toEqual([{ regra: 'cnpj_nao_consultado' }])
+  })
+  it('atualizar: Receita fora do ar mantém a razão já gravada para o MESMO CNPJ', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{ cnpj: '00000000000191', razao: 'BANCO DO BRASIL SA', tipo: 'Matriz' }]).mockResolvedValueOnce([{ o: { id: 1, versao: 2 } }])
+    const r = await corpo(await atualizar(sql, 'a@b.com', '1', { ...base, versao: 1 }, async () => ({ ok: false, motivo: 'indisponivel', mensagem: 'x' })))
+    expect(r.status).toBe(200)
+    expect(r.json.avisos).toEqual([])
+    const enviado = JSON.parse(sql.mock.calls[1][sql.mock.calls[1].length - 2] as string)
+    expect(enviado.empresa_vencedora_razao).toBe('BANCO DO BRASIL SA')
+  })
+  it('sem CNPJ, limpa razão e tipo', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{ o: { id: 7, versao: 1 } }])
+    await criar(sql, 'a@b.com', { ...base, empresa_vencedora_cnpj: '', empresa_vencedora_razao: 'sobra', empresa_vencedora_tipo: 'Matriz' }, async () => ok('Matriz'))
+    const enviado = JSON.parse(sql.mock.calls[0][sql.mock.calls[0].length - 2] as string)
+    expect(enviado).toMatchObject({ empresa_vencedora_cnpj: null, empresa_vencedora_razao: null, empresa_vencedora_tipo: null })
   })
 })

@@ -94,6 +94,7 @@ Detalhes: [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md), [CARGA-DE-DADOS.md](CARGA-DE
 |---|---|---|---|
 | `/api/rows`, `/api/status` | GET | qualquer usuário autenticado | dados do painel (papel `radar_leitor`) |
 | `/api/me` | GET | autenticado | e-mail, nome, se é admin |
+| `/api/cnpj/:cnpj` | GET | autenticado | razão social e matriz/filial na Receita Federal (BrasilAPI; não usa o banco) |
 | `/api/opcoes` | GET / PUT | todos leem; **admin** altera | listas fechadas e pré-vendas |
 | `/api/usuarios` | PUT | **admin** | usuários, papéis e e-mails |
 | `/api/oportunidades` | GET / POST | todos | grade e cadastro (aviso de duplicata) |
@@ -107,8 +108,9 @@ Camadas de proteção:
 3. **CSRF:** escritas exigem o cabeçalho `x-radar-csrf` e `Origin` igual ao host.
 4. **Formato:** esquema Zod compartilhado entre navegador e API (`src/domain/oportunidade.ts`), descartando campos desconhecidos.
 5. **Regras de negócio no banco:** `validar_oportunidade` (obrigatórios, listas fechadas, Lost/No Go com motivo, Win com Valor CTC, datas, valores) — a **fonte da verdade** da validação; erros voltam campo a campo (HTTP 422).
-6. **Banco:** a API usa `radar_app`, que só executa as funções de cadastro (não faz `INSERT` direto).
-7. **Cabeçalhos:** CSP restritiva, `X-Frame-Options: DENY`, HSTS e `noindex`.
+6. **Torre e empresa vencedora:** a torre é recalculada no banco pela linha de serviço (tabela `linhas_torre`); razão social e matriz/filial são preenchidas pelo servidor com a consulta à Receita, ignorando o que vier do navegador.
+7. **Banco:** a API usa `radar_app`, que só executa as funções de cadastro (não faz `INSERT` direto).
+8. **Cabeçalhos:** CSP restritiva, `X-Frame-Options: DENY`, HSTS e `noindex`.
 
 ## 4. Acesso do usuário (login → dados)
 
@@ -210,6 +212,9 @@ erDiagram
     text orgao
     text descritivo
     text codigo "AAAA-NNNN, único e imutável"
+    text empresa_vencedora_cnpj "14 dígitos"
+    text empresa_vencedora_razao "da Receita"
+    text empresa_vencedora_tipo "Matriz ou Filial"
     text processo
     text uasg
     date data_pregao_dt
@@ -255,6 +260,10 @@ erDiagram
     bigint oportunidade_id PK
     int versao_exportada
     text chave
+  }
+  linhas_torre {
+    text linha PK
+    text torre "DIGITAL ou HEALTH; as demais linhas são ITS"
   }
   carga_status {
     int id PK "sempre 1"
@@ -316,4 +325,6 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 - **Plano gratuito do Neon:** histórico de 6 h (coberto pelo backup diário); limites de computação, folgados para ~600 linhas.
 - **Backup no Google Drive:** o token do rclone tem acesso à conta Google que o gerou; ver [BACKUP.md](BACKUP.md).
 - **Domínio completo no Access:** quem tem e-mail `@ctctech.com.br` entra. Para restringir, trocar a regra por e-mails específicos.
+- **Consulta de CNPJ:** depende de um serviço público (BrasilAPI, dados abertos da Receita). Se estiver fora do ar, o cadastro continua e a razão social é consultada de novo no próximo salvamento.
+- **Nova linha de serviço:** o administrador pode criar a linha em *Listas e usuários*, mas ela só vira DIGITAL/HEALTH se for incluída em `linhas_torre` (hoje por SQL); sem isso, resulta em ITS.
 - **Permissões da aba:** todos cadastram e editam; só o admin arquiva e administra listas/usuários (decisão mantida).

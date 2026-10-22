@@ -4,6 +4,7 @@
  * obrigatoriedade por status, datas) vivem no banco (`validar_oportunidade`), que é a fonte da verdade.
  */
 import { z } from 'zod'
+import { soDigitos, validaCnpj } from './cnpj.ts'
 
 const vazioParaNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v)
 
@@ -15,6 +16,15 @@ const numero = z
     const s = vazioParaNull(v)
     return typeof s === 'string' ? Number(s.replace(',', '.')) : s
   }, z.number({ error: 'Número inválido' }).finite('Número inválido').nullable().optional())
+  .transform((v) => v ?? null)
+
+/** CNPJ: aceita máscara, guarda só os 14 dígitos e valida os dígitos verificadores. */
+const cnpj = z
+  .preprocess((v) => (typeof v === 'string' ? soDigitos(v) || null : v), z.string().refine(validaCnpj, 'CNPJ inválido (confira os dígitos)').nullable().optional())
+  .transform((v) => v ?? null)
+
+const tipoEmpresa = z
+  .preprocess(vazioParaNull, z.enum(['Matriz', 'Filial']).nullable().optional())
   .transform((v) => v ?? null)
 
 const inteiro = z
@@ -41,7 +51,7 @@ export const oportunidadeInput = z.object({
   data_pregao_dt: data,
   status: texto(60),
   orgao: texto(200),
-  descritivo: texto(1000),
+  descritivo: texto(100_000), // sem limite prático de caracteres
   criterio: texto(60),
   uf: texto(2),
   processo: texto(100),
@@ -66,7 +76,10 @@ export const oportunidadeInput = z.object({
   custo_total_ctc: numero,
   motivo_no_go: texto(120),
   detalhe_no_go: texto(5000),
-  empresas_vencedoras: texto(1000),
+  empresas_vencedoras: texto(1000), // texto antigo (somente leitura na web)
+  empresa_vencedora_cnpj: cnpj,
+  empresa_vencedora_razao: texto(300),
+  empresa_vencedora_tipo: tipoEmpresa,
   motivo_lost: texto(120),
   observacoes: texto(5000),
   posicao_lance: inteiro,
@@ -116,7 +129,17 @@ export const CAMPO_LISTA = {
   motivo_no_go: 'motivo_no_go',
   motivo_lost: 'motivo_lost',
   situacao_lance: 'situacao_lance',
+  unidade_fornecimento: 'unidade_fornecimento',
 } as const satisfies Partial<Record<keyof OportunidadeInput, string>>
+
+/**
+ * Torre calculada pela linha de serviço (regra da planilha): as linhas mapeadas vão para DIGITAL/HEALTH;
+ * qualquer outra linha é ITS. `linhasTorre` vem de /api/opcoes (tabela linhas_torre).
+ */
+export function torreDaLinha(linhasTorre: Record<string, string>, linha: string | null | undefined): string | null {
+  const l = (linha ?? '').trim()
+  return l ? (linhasTorre[l] ?? 'ITS') : null
+}
 
 /** Registro como devolvido pela API (entrada + metadados). */
 export type Oportunidade = OportunidadeInput & {
@@ -163,7 +186,6 @@ export function regrasNegocio(d: OportunidadeInput): ErroCampo[] {
   }
   if (d.posicao_lance !== null && d.posicao_lance < 1) erros.push({ campo: 'posicao_lance', mensagem: 'Posição deve ser 1 ou maior' })
   if (d.orgao && d.orgao.length > 120) erros.push({ campo: 'orgao', mensagem: 'Máximo de 120 caracteres' })
-  if (d.descritivo && d.descritivo.length > 300) erros.push({ campo: 'descritivo', mensagem: 'Máximo de 300 caracteres' })
   if (d.processo && d.processo.length > 60) erros.push({ campo: 'processo', mensagem: 'Máximo de 60 caracteres' })
   return erros
 }

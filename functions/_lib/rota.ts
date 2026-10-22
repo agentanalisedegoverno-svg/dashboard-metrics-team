@@ -7,14 +7,14 @@ type Args = { sql: Sql; email: string; request: Request; params: Ctx['params']; 
 type Handler = (a: Args) => Promise<Response>
 
 export const rota =
-  (metodos: Record<string, Handler>) =>
+  (metodos: Record<string, Handler>, opcoes: { semBanco?: boolean } = {}) =>
   async ({ request, env, params }: Ctx): Promise<Response> => {
     const handler = metodos[request.method]
     if (!handler) return send(405, { error: 'Método não permitido.' })
     const id = await identificar(request, env)
     if (id instanceof Response) return id
     if (request.method !== 'GET' && !csrfOk(request)) return send(403, { error: 'Requisição rejeitada (origem não confiável).' })
-    const sql = bancoApp(env) as Sql | null
+    const sql = (opcoes.semBanco ? ((() => Promise.reject(new Error('rota sem banco'))) as unknown as Sql) : (bancoApp(env) as Sql | null))
     if (!sql) return send(503, { error: 'Banco de dados do cadastro não configurado.' })
     try {
       return await handler({ sql, email: id.email, request, params, corpo: () => lerJson(request) })

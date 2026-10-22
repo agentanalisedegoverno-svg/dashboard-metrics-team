@@ -104,6 +104,18 @@ flowchart LR
 - **Responsivo de 320 px a 8K:** layout em *grid* fluido com `minmax` e consultas de contêiner; largura máxima de leitura controlada e tipografia fluida (`clamp`); em telas muito largas a grade ganha colunas e o formulário vira duas ou três colunas, em vez de esticar campos; alvos de toque ≥ 44 px no celular; tema claro/escuro; testes visuais em 390, 768, 1280, 1920, 3840 e 7680 px.
 - **Acessibilidade WCAG 2.2 AA:** rótulos e erros associados aos campos, foco visível e navegação por teclado, contraste verificado (já temos teste automático com axe).
 
+## 6.1 Ajustes pós-lançamento (22/10/2026)
+
+| Ajuste | Como ficou |
+|---|---|
+| **Tela cheia, travada** | Clicar numa oportunidade abre em **tela cheia** com todos os campos **travados** (leitura). O botão **Editar** fica no topo; ao clicar, os campos liberam e aparecem **Cancelar** e **Salvar alterações** embaixo. Cancelar com alterações pede confirmação; depois de salvar, a tela volta ao modo leitura com os dados novos. Oportunidade nova abre direto em edição. |
+| **Descritivo** | Sem limite de caracteres. |
+| **Logo** | Logo da CTC no cabeçalho (branco, dentro de faixa azul-marinho para funcionar nos temas claro e escuro). |
+| **Status na grade** | Bolinhas: **Win** verde · **Go** azul · **No Go** laranja · **On going** amarela · **Lost** vermelha · demais cinza. |
+| **Linha de serviço antes da Torre** | A ordem foi invertida. A **Torre é calculada** pela linha (mesma regra da planilha): *Software Development*, *Key Talent* (e as antigas *Aplication Development*, *Business Automation*, *Soluções Digitais*) → **DIGITAL**; *Lya Gov*, *AutoAtendimento Gov*, *Fastcomm Gov* → **HEALTH**; qualquer outra → **ITS**. Com a linha preenchida a torre fica travada; sem linha, escolhe-se à mão. O banco garante a regra (gatilho), qualquer que seja o caminho de gravação. |
+| **Unidade de fornecimento** | Lista fechada (combo): Serviço, Posto de Trabalho, Ponto de Função, Hora. Os valores antigos foram normalizados (HORA/Horas → Hora; PONTO DE FUNÇÃO → Ponto de Função). |
+| **Empresa vencedora (CNPJ)** | Digita-se **só o CNPJ** (com máscara e validação dos dígitos). O Radar consulta a **Receita Federal** (dados abertos, via BrasilAPI, pelo servidor) e mostra a **razão social** e se é **Matriz** ou **Filial**. A consulta é refeita no salvamento e o navegador nunca é a fonte desses dados. Receita fora do ar: salva só o CNPJ e avisa (mantém a razão já gravada se o CNPJ não mudou). O texto antigo de "Empresas vencedoras" (238 registros) fica visível como *registro anterior* e não é apagado. |
+
 ## 7. Bibliotecas
 
 Mantemos a base atual (React 19, TypeScript, Tailwind v4, componentes no padrão shadcn/ui sobre Radix) e adicionamos só o necessário:

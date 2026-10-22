@@ -3,6 +3,7 @@
  * e devolve uma Response; as regras de negócio ficam no banco (funções SECURITY DEFINER).
  */
 import { atualizacaoInput, errosZod, opcaoInput, oportunidadeInput, usuarioInput } from '../../src/domain/oportunidade.ts'
+import { consultaCnpj, type ResultadoCnpj } from './cnpj.ts'
 import { erroBanco, send } from './http.ts'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,10 +40,43 @@ export async function historico(sql: Sql, id: string) {
   return send(200, { itens })
 }
 
-export async function criar(sql: Sql, email: string, corpo: unknown) {
+type Consulta = (cnpj: string) => Promise<ResultadoCnpj>
+
+/**
+ * Preenche razão social e matriz/filial pela Receita (nunca confia no que veio do navegador).
+ * Receita fora do ar: mantém o que já estava gravado para o MESMO CNPJ; senão salva só o CNPJ e avisa.
+ */
+async function aplicaEmpresa(
+  d: { empresa_vencedora_cnpj: string | null; empresa_vencedora_razao: string | null; empresa_vencedora_tipo: 'Matriz' | 'Filial' | null },
+  consultar: Consulta,
+  anterior?: { cnpj: string | null; razao: string | null; tipo: string | null },
+): Promise<{ erro?: Response; avisos: { regra: string }[] }> {
+  if (!d.empresa_vencedora_cnpj) {
+    d.empresa_vencedora_razao = null
+    d.empresa_vencedora_tipo = null
+    return { avisos: [] }
+  }
+  const r = await consultar(d.empresa_vencedora_cnpj)
+  if (r.ok) {
+    d.empresa_vencedora_razao = r.empresa.razao_social
+    d.empresa_vencedora_tipo = r.empresa.tipo
+    return { avisos: [] }
+  }
+  if (r.motivo !== 'indisponivel') {
+    return { erro: send(422, { error: 'Dados inválidos.', erros: [{ campo: 'empresa_vencedora_cnpj', mensagem: r.mensagem }] }), avisos: [] }
+  }
+  const mantem = anterior?.cnpj === d.empresa_vencedora_cnpj && anterior.razao
+  d.empresa_vencedora_razao = mantem ? anterior.razao : null
+  d.empresa_vencedora_tipo = mantem ? ((anterior.tipo as 'Matriz' | 'Filial' | null) ?? null) : null
+  return { avisos: mantem ? [] : [{ regra: 'cnpj_nao_consultado' }] }
+}
+
+export async function criar(sql: Sql, email: string, corpo: unknown, consultar: Consulta = consultaCnpj) {
   const parsed = oportunidadeInput.safeParse(corpo)
   if (!parsed.success) return invalido(parsed.error)
   const d = parsed.data
+  const emp = await aplicaEmpresa(d, consultar)
+  if (emp.erro) return emp.erro
   try {
     const duplicadas = d.processo
       ? await sql`
@@ -53,21 +87,24 @@ export async function criar(sql: Sql, email: string, corpo: unknown) {
           limit 5`
       : []
     const [{ o }] = await sql`select criar_oportunidade(${JSON.stringify(d)}::jsonb, ${email}) as o`
-    const avisos = duplicadas.length ? [{ regra: 'possivel_duplicata', ids: duplicadas.map((x: { id: number }) => x.id) }] : []
+    const avisos = [...(duplicadas.length ? [{ regra: 'possivel_duplicata', ids: duplicadas.map((x: { id: number }) => x.id) }] : []), ...emp.avisos]
     return send(201, { ...o, avisos })
   } catch (e) {
     return erroBanco(e)
   }
 }
 
-export async function atualizar(sql: Sql, email: string, id: string, corpo: unknown) {
+export async function atualizar(sql: Sql, email: string, id: string, corpo: unknown, consultar: Consulta = consultaCnpj) {
   if (!idValido(id)) return send(404, { error: 'Oportunidade não encontrada.' })
   const parsed = atualizacaoInput.safeParse(corpo)
   if (!parsed.success) return invalido(parsed.error)
   const { versao, ...campos } = parsed.data
+  const [ant] = await sql`select empresa_vencedora_cnpj as cnpj, empresa_vencedora_razao as razao, empresa_vencedora_tipo as tipo from oportunidades where id = ${id}::bigint`
+  const emp = await aplicaEmpresa(campos, consultar, ant)
+  if (emp.erro) return emp.erro
   try {
     const [{ o }] = await sql`select atualizar_oportunidade(${id}::bigint, ${versao}::int, ${JSON.stringify(campos)}::jsonb, ${email}) as o`
-    return send(200, o)
+    return send(200, { ...o, avisos: emp.avisos })
   } catch (e) {
     return erroBanco(e)
   }
@@ -93,6 +130,8 @@ export async function opcoes(sql: Sql, email: string) {
   }[]
   const listas: Record<string, { valor: string; ativo: boolean; ordem: number }[]> = {}
   for (const o of lista) (listas[o.lista] ??= []).push({ valor: o.valor, ativo: o.ativo, ordem: o.ordem })
+  const linhasTorre: Record<string, string> = {}
+  for (const l of (await sql`select linha, torre from linhas_torre order by linha`) as { linha: string; torre: string }[]) linhasTorre[l.linha] = l.torre
   const usuarios = (await sql`select nome, email, admin, pre_vendas, ativo from usuarios order by nome`) as {
     nome: string
     email: string | null
@@ -103,6 +142,8 @@ export async function opcoes(sql: Sql, email: string) {
   return send(200, {
     listas,
     preVendas: usuarios.filter((u) => u.pre_vendas && u.ativo).map((u) => u.nome),
+    // Linhas que NÃO são ITS; qualquer outra linha resulta em ITS (mesma regra da planilha).
+    linhasTorre,
     // E-mails e papéis só para administradores.
     usuarios: admin ? usuarios : undefined,
   })
