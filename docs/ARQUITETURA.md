@@ -93,6 +93,7 @@ Detalhes: [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md), [CARGA-DE-DADOS.md](CARGA-DE
 | Rota | Método | Quem | O que faz |
 |---|---|---|---|
 | `/api/rows`, `/api/status` | GET | qualquer usuário autenticado | dados do painel (papel `radar_leitor`) |
+| (tela) **Administração** | — | só **administrador** | aba própria, em página inteira, com navegação lateral: *Usuários e perfis*, *Listas de opções* e *Linha → Torre* |
 | `/api/me` | GET | autenticado | e-mail, nome, perfil (administrador, editor ou visualizador) |
 | `/api/cnpj/:cnpj` | GET | autenticado | razão social e matriz/filial na Receita Federal (BrasilAPI; não usa o banco) |
 | `/api/opcoes` | GET / PUT | todos leem; **admin** altera | listas fechadas e pré-vendas |
@@ -155,7 +156,7 @@ flowchart LR
 
 - **Sentido único** (Radar → Planner). Só oportunidades **criadas na web depois da ativação**; as vindas da planilha nunca são enviadas.
 - **Torre → plano:** ITS vai para *ITS Oportunidades*; DIGITAL e HEALTH vão para *Digital e Health*.
-- **Status → bucket e progresso**; **Pré-vendas → responsável** (e-mail cadastrado em *Listas e usuários*); título `[AAAA-NNNN] Órgão | Objeto | PE | UASG | DATA` (o **código da oportunidade**).
+- **Status → bucket e progresso**; **Pré-vendas → responsável** (e-mail cadastrado em *Administração → Usuários e perfis*); título `[AAAA-NNNN] Órgão | Objeto | PE | UASG | DATA` (o **código da oportunidade**).
 - **Idempotente e conservador:** a chave (o código `AAAA-NNNN`) evita duplicar; versão antiga é ignorada; responsável vazio não mexe; nunca apaga cartão nem arquivo; erro vai para `erros\` com o motivo.
 
 Contrato completo e mapeamentos: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md).
@@ -327,6 +328,6 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 - **Backup no Google Drive:** o token do rclone tem acesso à conta Google que o gerou; ver [BACKUP.md](BACKUP.md).
 - **Domínio completo no Access:** quem tem e-mail `@ctctech.com.br` entra. Para restringir, trocar a regra por e-mails específicos.
 - **Consulta de CNPJ:** depende de um serviço público (BrasilAPI, dados abertos da Receita). Se estiver fora do ar, o cadastro continua e a razão social é consultada de novo no próximo salvamento.
-- **Nova linha de serviço:** o administrador pode criar a linha em *Listas e usuários*, mas ela só vira DIGITAL/HEALTH se for incluída em `linhas_torre` (hoje por SQL); sem isso, resulta em ITS.
+- **Nova linha de serviço:** o administrador pode criar a linha em *Administração → Listas de opções*, mas ela só vira DIGITAL/HEALTH se for incluída em `linhas_torre` (hoje por SQL); sem isso, resulta em ITS.
 - **Perfis de acesso:** administrador (tudo), editor (cadastra e edita; padrão do domínio) e visualizador (só consulta, aplicado pelo e-mail). Só o administrador gerencia os grupos; o banco recusa cadastro/edição do visualizador e a remoção do último administrador.
 - **Quem não está em `usuarios`** é tratado como editor (comportamento original). Para restringir de verdade o acesso ao Radar a uma lista nominal é preciso usar a política do Cloudflare Access.

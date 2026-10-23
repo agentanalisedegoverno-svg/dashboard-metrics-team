@@ -9,7 +9,7 @@ Sentido único: **Radar → Planner**. O Radar é a fonte da verdade; o Planner 
 - **Só o que nascer no Radar.** Oportunidades que já existiam (vindas da planilha) **não** são enviadas nem contadas. Vale apenas para as criadas pela web **depois da ativação** (marco gravado por `--ativar`, em 21/10/2026 14:00 UTC).
 - **Qualquer status** gera cartão. O status define o bucket.
 - **A torre define o plano:** `ITS` → *ITS Oportunidades*; `DIGITAL` e `HEALTH` → *Digital e Health - Oportunidades*. Torre vazia ou desconhecida não gera cartão (o exportador avisa).
-- **O responsável vem do Radar:** é o **Pré-vendas** escolhido na oportunidade, convertido no e-mail cadastrado em *Listas e usuários*. Hoje: Júlio César, Flávio Santanna, João Henrique e Jefferson Oliveira. O contrato aceita também uma **lista** de responsáveis (`responsaveis`), mas o Radar hoje envia um.
+- **O responsável vem do Radar:** é o **Pré-vendas** escolhido na oportunidade, convertido no e-mail cadastrado em *Administração → Usuários e perfis*. Hoje: Júlio César, Flávio Santanna, João Henrique e Jefferson Oliveira. O contrato aceita também uma **lista** de responsáveis (`responsaveis`), mas o Radar hoje envia um.
 - **Chave do cartão = código da oportunidade** (`AAAA-NNNN`, ex.: `2026-0512`), entre colchetes no início do título. É o mesmo código que aparece na aba Oportunidades do Radar, então a oportunidade é encontrada nos dois lados pelo mesmo identificador. É também o que torna o processamento idempotente. O formato antigo `RAD-<id>` só existe no cartão de teste e como reserva para registros sem código.
 
 ## Componentes

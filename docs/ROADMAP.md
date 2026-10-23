@@ -42,7 +42,7 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | 16 | **Notificação de edição simultânea** em tempo real (ou aviso ao abrir) | Hoje só detecta ao salvar (409) | M |
 | 17 | **Auditoria navegável:** tela de histórico global (quem mexeu em quê) com filtros | A trilha existe por registro; falta visão geral | M |
 | 18 | **E2E contra a API real** (ambiente de teste com branch do Neon) | Hoje o e2e usa API simulada | M |
-| 28 | **Tela para administrar linha → torre** (hoje `linhas_torre` é editada por SQL) | Evitar SQL quando surgir uma linha nova | P |
+| 28 | **Editar linha → torre pela tela** (a aba Administração já mostra a regra em modo consulta; a edição ainda é por SQL) | Evitar SQL quando surgir uma linha nova | P |
 | 29 | **Mais de uma empresa vencedora** (lista de CNPJs) e preço por empresa | Hoje há um único CNPJ; o texto antigo fica só como registro anterior | M |
 | 30 | **Valores formatados no modo leitura** (R$ e %) e destaque dos campos alterados | Hoje a tela travada mostra o número bruto | P |
 | 31 | **Fonte alternativa para o CNPJ** (e cache) se a BrasilAPI ficar instável | Reduz dependência de um serviço público | P |

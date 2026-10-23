@@ -1,9 +1,7 @@
-import { Plus, Settings2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import type { Oportunidade } from '@/domain/oportunidade'
 import { useMe, useOpcoes, useOportunidades } from './api'
-import { AdminListas } from './AdminListas'
 import { OportunidadeDrawer } from './OportunidadeDrawer'
 import { OportunidadesGrid } from './OportunidadesGrid'
 
@@ -35,7 +33,6 @@ export default function OportunidadesTab() {
   const [analista, setAnalista] = useState('')
   const [soPendencias, setSoPendencias] = useState(false)
   const [editando, setEditando] = useState<Oportunidade | null | undefined>(undefined)
-  const [admin, setAdmin] = useState(false)
   const compacto = useMenorQue(768)
 
   const dados = useMemo(() => {
@@ -97,11 +94,6 @@ export default function OportunidadesTab() {
           </label>
         )}
         <div className="ml-auto flex gap-2">
-          {me.data.admin && (
-            <Button onClick={() => setAdmin(true)}>
-              <Settings2 className="size-4" /> Listas e usuários
-            </Button>
-          )}
           {!me.data.somenteLeitura && (
             <button
               onClick={() => setEditando(null)}
@@ -118,7 +110,6 @@ export default function OportunidadesTab() {
       </p>
       <OportunidadesGrid dados={dados} onAbrir={setEditando} compacto={compacto} />
       <OportunidadeDrawer aberto={editando !== undefined} onFechar={() => setEditando(undefined)} registro={editando ?? null} opcoes={opcoes.data} me={me.data} />
-      {me.data.admin && <AdminListas aberto={admin} onFechar={() => setAdmin(false)} opcoes={opcoes.data} />}
     </section>
   )
 }
