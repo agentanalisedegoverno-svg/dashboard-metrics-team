@@ -67,6 +67,10 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 - **Teste de restauração:** mensal (dia 1) e sob demanda em *Actions → Teste de restauração do backup → Run workflow* (campo *alvo*: ambos, temporário ou neon). Restaura num Postgres temporário **e** no branch real `teste-restauracao` do Neon e confere linhas, códigos, soma, histórico, funções, gatilhos e um cadastro de teste.
 - **Restaurar de verdade:** ver [BACKUP.md](BACKUP.md).
 
+### 2.4.1 Aparência (tema claro/escuro)
+- No canto superior direito do cabeçalho há três botões: **Tema do sistema** (padrão, acompanha o computador, inclusive quando ele troca de claro para escuro), **Tema claro** e **Tema escuro**. A escolha fica salva **no navegador** de cada pessoa (`localStorage`, chave `radar-tema`) e vale também após recarregar. Se o navegador bloquear o armazenamento, a escolha vale só na sessão.
+- Técnica: o script `public/tema-init.js` define `data-theme` no `<html>` antes da primeira pintura (sem "pisca"); as cores vêm dos tokens de `src/index.css`.
+
 ### 2.5 Dar ou tirar acesso ao painel
 - **Todo o time `@ctctech.com.br` já entra.**
 - **Liberar um e-mail de fora do domínio:** Zero Trust → Access → Applications → *Radar Pré-Vendas* → Policies → regra *Include → Emails*.
