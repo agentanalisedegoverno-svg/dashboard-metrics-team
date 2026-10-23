@@ -43,6 +43,7 @@ Perfil feito sobre as 600 linhas de 14/10/2026. "Preench." é o percentual de li
 | 20 | Conta Vinculada | `conta_vinculada` | lista | 9% | Sim/Não (unifica "SIM"/"Sim"). |
 | 21 | MC CTC | `mc_ctc` | número | 2% | Percentual. Hoje mistura 0,18 e 18: padronizar em fração (0–1) e validar faixa. |
 | 22 | Simulação da MC x Arrematante | `simulacao_mc_arrematante` | número | 0% | Mesma regra de percentual. "Avançado". |
+| — | Impostos (**campo novo, só no banco/web**) | `impostos` | percentual | — | Migração 008. Guardado como fração (0,0865 = 8,65%), faixa 0–100%, **duas casas decimais** no percentual (digitou 8,654, grava 8,65). Não vem da planilha: a carga por merge não o altera. Aparece em "Valores e margens", na grade e no histórico. |
 | 23 | Orçamento | `orcamento` + `orcamento_sigiloso` | R$ ≥ 0 | 76% | "Sigiloso" (20 linhas) vira marcação própria, sem valor. |
 | 24 | Valor Vencedor | `valor_vencedor` | R$ ≥ 0 | 28% | Aceita colar "R$ 7.500.000,00" e converte. Alerta se maior que o orçamento (2 linhas). |
 | 25 | Valor CTC | `valor_ctc` | R$ ≥ 0 | 13% | **Obrigatório** quando Status = Win (hoje ok em 12/12). |

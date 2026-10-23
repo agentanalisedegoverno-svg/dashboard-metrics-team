@@ -12,7 +12,10 @@ export function paraForm(o?: Partial<Oportunidade> | null): FormValores {
     if (c.nome === 'orcamento_sigiloso') continue
     const bruto = o?.[c.nome as keyof Oportunidade] as unknown
     if (bruto === null || bruto === undefined) v[c.nome] = ''
-    else if (c.tipo === 'percentual') v[c.nome] = fmtNum(Math.round(Number(bruto) * 10000) / 100)
+    else if (c.tipo === 'percentual') {
+      const p = Math.round(Number(bruto) * 10000) / 100
+      v[c.nome] = c.casas === undefined ? fmtNum(p) : p.toFixed(c.casas).replace('.', ',')
+    }
     else if (c.tipo === 'dinheiro' || c.tipo === 'inteiro') v[c.nome] = fmtNum(Number(bruto))
     else v[c.nome] = String(bruto)
   }
@@ -30,7 +33,9 @@ export function deForm(v: FormValores, pendenciasAtuais: string[] = []) {
   for (const c of TODOS_CAMPOS) {
     if (c.tipo === 'percentual' && v[c.nome as keyof FormValores] !== '') {
       const n = Number(String(v[c.nome as keyof FormValores]).replace(',', '.'))
-      bruto[c.nome] = Number.isFinite(n) ? n / 100 : v[c.nome as keyof FormValores]
+      // Com `casas`, arredonda o percentual digitado (8,654 -> 8,65) antes de virar fração.
+      const p = c.casas === undefined ? n : Math.round(n * 10 ** c.casas) / 10 ** c.casas
+      bruto[c.nome] = !Number.isFinite(n) ? v[c.nome as keyof FormValores] : c.casas === undefined ? n / 100 : Math.round(p * 100) / 10000
     }
   }
   // Pendência resolvida some sozinha: o campo marcado ganhou valor.
@@ -50,7 +55,11 @@ export type Resultado = ReturnType<typeof deForm>
 export const brl = (n: number | null | undefined) =>
   n === null || n === undefined ? '—' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-export const dataBr = (iso: string | null | undefined) => {
+/** Fração -> percentual com duas casas (0,0865 -> "8,65%"). */
+export const pct = (n: number | null | undefined) =>
+  n === null || n === undefined ? '—' : n.toLocaleString('pt-BR', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+export const dataBr =(iso: string | null | undefined) => {
   if (!iso) return '—'
   const [y, m, d] = iso.slice(0, 10).split('-')
   return `${d}/${m}/${y}`

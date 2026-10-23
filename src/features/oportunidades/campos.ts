@@ -14,6 +14,8 @@ export type Campo = {
   dica?: string
   /** Valor calculado por outro campo (não editável quando o campo de origem está preenchido). */
   calculado?: boolean
+  /** Percentual: casas decimais mostradas no formulário e aplicadas ao salvar (padrão: as que o usuário digitar). */
+  casas?: number
 }
 
 export type Secao = { id: string; titulo: string; campos: Campo[] }
@@ -68,6 +70,7 @@ export const SECOES: Secao[] = [
       { nome: 'custo_total_ctc', rotulo: 'Custo total CTC (R$)', tipo: 'dinheiro' },
       { nome: 'mc_ctc', rotulo: 'MC CTC (%)', tipo: 'percentual' },
       { nome: 'simulacao_mc_arrematante', rotulo: 'Simulação da MC × arrematante (%)', tipo: 'percentual' },
+      { nome: 'impostos', rotulo: 'Impostos (%)', tipo: 'percentual', casas: 2, dica: 'Percentual com duas casas decimais (ex.: 8,65)' },
     ],
   },
   {
@@ -91,4 +94,5 @@ export const SECOES: Secao[] = [
 ]
 
 export const TODOS_CAMPOS = SECOES.flatMap((s) => s.campos)
+export const TIPO_CAMPO: Record<string, Tipo> = Object.fromEntries(TODOS_CAMPOS.map((c) => [c.nome, c.tipo]))
 export const ROTULO: Record<string, string> = Object.fromEntries(TODOS_CAMPOS.map((c) => [c.nome, c.rotulo]))
