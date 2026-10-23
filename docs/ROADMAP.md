@@ -13,13 +13,14 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | Carga da planilha por **merge** (`sync-db.mjs`) com relatório de qualidade | ✅ |
 | Backup diário criptografado no Google Drive + teste de restauração | ✅ |
 | Integração Radar → Planner (exportador, `planner-auto`, agendamento) | ✅ |
-| Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ⏳ após a 1ª rodada do agente no novo fluxo |
+| Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) |
+| Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ✅ (22/10) |
 
 ## 2. Próximos passos (curto prazo)
 
 | # | Item | Por quê | Tam. |
 |---|---|---|---|
-| 1 | **Aplicar a migração 002** (revogar `carregar_oportunidades` do escritor) | Impede que um agente desatualizado apague o que foi cadastrado na web | P |
+| 1 | ~~Aplicar a migração 002~~ **Feito (22/10)** | A carga antiga que apagava tudo não é mais executável pelo escritor | — |
 | 2 | **Corrigir as pendências da migração** pela aba (63 registros: Lost sem motivo, "Validar", pregão antes da distribuição, sem Pré-vendas) | Qualidade das métricas; hoje elas entram como "pendência" | M |
 | 3 | **Acompanhar os primeiros cartões reais do Planner** (cadastrar, conferir bucket/responsável/prazo, mudar status) e apagar o cartão `RAD-999001` | É a primeira escrita real; o 50%/100% pode sobrescrever progresso manual | P |
 | 4 | **Alerta de falha** do agente de carga e da integração (e-mail/Teams quando o log trouxer `[ERRO]` ou a última carga passar de N dias) | Hoje só se descobre olhando o log ou o "Última atualização" | M |
