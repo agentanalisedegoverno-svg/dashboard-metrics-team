@@ -12,7 +12,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `DATABASE_URL_APP` (papel `radar_app`, cadastro) | Cloudflare Pages → mesmo local | **Secret** | Administrador |
 | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | `wrangler.toml` `[vars]` | público | Pull request |
 | `ACESSO_PUBLICO` | `wrangler.toml` (ausente = API protegida) | público | Pull request (**não usar**) |
-| `DATABASE_URL_WRITER` (papel `radar_escritor`) | variável de ambiente do usuário Windows da máquina do agente | **Segredo** | Administrador |
+| `DATABASE_URL_WRITER` (papel `radar_escritor`) | variável de ambiente do usuário Windows da máquina da carga | **Segredo** | Administrador |
 | `DATABASE_URL_PLANNER` (papel `radar_planner`) | variável de ambiente do usuário Windows da máquina da integração | **Segredo** | Administrador |
 | `PLANNER_EVENTOS_DIR` | variável de ambiente do usuário Windows (`...\planner-auto\eventos\entrada`) | caminho | Administrador |
 | `DATABASE_URL_BACKUP` (papel `radar_backup`) | GitHub → Settings → Secrets and variables → Actions | **Secret** | Administrador |
@@ -27,8 +27,8 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 
 ## 2. Rotinas
 
-### 2.1 Carga da planilha (a cada 2 dias, por merge)
-- A tarefa `RadarPreVendas-Carga` (Agendador de Tarefas do Windows) roda o agente, que copia a planilha para o banco **por merge** (`scripts/sync-db.mjs`). Roteiro: [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md).
+### 2.1 Carga da planilha (dias úteis 07:30, por merge)
+- A tarefa **`Radar-Carga-Planilha`** (Agendador de Tarefas do Windows) exporta a planilha e a copia para o banco **por merge** (`scripts/carga-planilha.cmd` → `exportar_planilha.py` + `sync-db.mjs`), sem agente de IA. Detalhes: [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md). Log: `%USERPROFILE%\.radar\carga.log`.
 - **O merge não apaga nada:** atualiza o que mudou, insere o novo, preserva o que foi editado na web e marca como "ausente" o que sumiu da planilha.
 - **Pré-condições:** máquina ligada, OneDrive sincronizado ("sempre neste dispositivo") e `DATABASE_URL_WRITER` definida.
 - **Verificar a última carga:** o painel mostra "Última atualização". No console do Neon (SQL Editor):
@@ -40,7 +40,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
   node scripts/sync-db.mjs aba.json --dry-run        # valida e mostra o relatório de qualidade, sem gravar
   node scripts/sync-db.mjs aba.json --fonte "manual"
   ```
-- **Pendente (trava final):** depois que o agente rodar uma vez no novo fluxo, aplicar `db/migrations/002_revogar_carga_total.sql`. Ela tira do `radar_escritor` a carga total antiga, para um agente desatualizado nunca apagar o que foi cadastrado na web.
+- **Trava final (feita em 22/10/2026):** a carga total antiga (que apagava tudo) foi revogada do `radar_escritor` (migração 002); ele só executa o merge.
 
 ### 2.2 Cadastro e administração (aba Oportunidades)
 - **Perfis:** *Administrador* (tudo), *Editor* (cadastra e edita; é o padrão de todo `@ctctech.com.br`) e *Visualizador* (só consulta). **Só o administrador** arquiva/restaura e administra listas e usuários.
@@ -102,7 +102,8 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | Cadastro/edição: **403** "Seu perfil é somente leitura" | A pessoa está marcada como *Visualizador* | Um administrador muda o perfil dela em *Administração → Usuários e perfis* |
 | "Deve existir ao menos um administrador ativo" | Tentativa de rebaixar/desativar o último admin | Promover outro administrador antes |
 | Painel com número de oportunidades acima do esperado | Linhas "ausentes" sendo contadas | Não deve ocorrer (a API as ignora); se ocorrer, verificar a versão publicada |
-| "Última atualização" parada há dias | Agente não rodou | Ver o histórico da tarefa; rodar a carga manual |
+| "Última atualização" parada há dias | A tarefa `Radar-Carga-Planilha` não rodou (computador desligado, OneDrive offline) | Ver `%USERPROFILE%\.radar\carga.log`; `Start-ScheduledTask -TaskName "Radar-Carga-Planilha"` |
+| E-mail "Vigia do backup" falhou em "Última carga da planilha" | Mais de 80 h sem carga | Mesma verificação da linha acima |
 | Carga recusada: "só N linhas (mínimo 400)" | Leitura parcial da planilha | Reler a planilha; conferir o OneDrive |
 | Cartão não aparece no Planner | Tarefa parada, login expirado ou evento em `erros\` | Ver `logs\integracao.log` e a pasta `erros\`; `python planner_auto.py login` se preciso |
 | Evento em `erros\`: "bucket/rótulo não encontrado" | Nome mudou no Planner | Atualizar `config/planner-mapa.json` (e rodar `inspecionar`) |

@@ -14,7 +14,7 @@ flowchart LR
   end
 
   subgraph local["Máquina local (Windows)"]
-    AG["Agente de carga<br/>sync-db.mjs (merge)<br/>papel radar_escritor"]
+    AG["Carga agendada (dias úteis 07:30)<br/>sync-db.mjs (merge)<br/>papel radar_escritor"]
     EXP["Exportador<br/>planner-eventos.mjs<br/>papel radar_planner"]
     PA["planner-auto<br/>processar-eventos"]
     EV[("eventos/<br/>entrada · processados · erros")]
@@ -282,7 +282,7 @@ erDiagram
 |---|---|---|---|
 | `radar_leitor` | API do painel | `SELECT` nas tabelas de leitura | escrever, apagar, executar carga |
 | `radar_app` | API de cadastro | `SELECT` + `EXECUTE` das funções de cadastro | `INSERT` direto, sincronizar planilha |
-| `radar_escritor` | Agente de carga | `EXECUTE sincronizar_planilha` | ler tabelas, apagar, alterar esquema |
+| `radar_escritor` | Carga agendada | `EXECUTE sincronizar_planilha` (a carga total antiga foi revogada) | ler tabelas, apagar, alterar esquema |
 | `radar_planner` | Exportador do Planner | `SELECT` em oportunidades e usuários; grava só nas tabelas `planner_*` | alterar oportunidades |
 | `radar_backup` | Backup diário | leitura de tudo (`pg_read_all_data`) | gravar |
 | `neondb_owner` | Administração (console/CLI) | tudo | — (uso excepcional) |
@@ -294,7 +294,7 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 | Componente | Onde | Identificação |
 |---|---|---|
 | Planilha | SharePoint GOVERNO2 | `BaseLicitacao.xlsx`, aba *Base Governo* (~610 linhas, 39 colunas; as 6 "(Pivot)" são auxiliares e ignoradas) |
-| Agente de carga | máquina local do João | tarefa `RadarPreVendas-Carga` (a cada 2 dias) |
+| Carga da planilha | máquina local do João | tarefa `Radar-Carga-Planilha` (dias úteis 07:30; sem IA) |
 | Integração Planner | máquina local do João | tarefa `Radar-Planner integracao` (seg–sex, 07h–19h, a cada 30 min); código em [`planner-auto/`](../planner-auto/) |
 | Banco | Neon, `aws-sa-east-1` | projeto `radar-prevendas`, branch `main`, banco `neondb` |
 | Hospedagem | Cloudflare Pages | `https://radar-prevendas.pages.dev` |
