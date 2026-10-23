@@ -69,6 +69,7 @@ export const oportunidadeInput = z.object({
   conta_vinculada: texto(60),
   mc_ctc: numero,
   simulacao_mc_arrematante: numero,
+  impostos: numero,
   orcamento: numero,
   orcamento_sigiloso: z.boolean().optional().default(false),
   valor_vencedor: numero,
@@ -185,6 +186,7 @@ export function regrasNegocio(d: OportunidadeInput): ErroCampo[] {
   for (const campo of ['mc_ctc', 'simulacao_mc_arrematante'] as const) {
     if (d[campo] !== null && (d[campo] < -1 || d[campo] > 1)) erros.push({ campo, mensagem: 'Margem entre -100% e 100%' })
   }
+  if (d.impostos !== null && (d.impostos < 0 || d.impostos > 1)) erros.push({ campo: 'impostos', mensagem: 'Impostos entre 0% e 100%' })
   if (d.posicao_lance !== null && d.posicao_lance < 1) erros.push({ campo: 'posicao_lance', mensagem: 'Posição deve ser 1 ou maior' })
   if (d.orgao && d.orgao.length > 120) erros.push({ campo: 'orgao', mensagem: 'Máximo de 120 caracteres' })
   if (d.processo && d.processo.length > 60) erros.push({ campo: 'processo', mensagem: 'Máximo de 60 caracteres' })

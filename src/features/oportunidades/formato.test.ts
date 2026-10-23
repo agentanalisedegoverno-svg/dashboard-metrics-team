@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { regrasNegocio, type OportunidadeInput } from '@/domain/oportunidade'
-import { deForm, paraForm } from './formato'
+import { deForm, paraForm, pct } from './formato'
 
 const base = paraForm({ status: 'Go', orgao: 'SEDES', descritivo: 'Link', torre: 'ITS', data_pregao_dt: '2026-03-10' })
 
@@ -10,6 +10,24 @@ describe('formulário <-> API', () => {
     expect(f).toMatchObject({ mc_ctc: '18,5', orcamento: '1234,5', posicao_lance: '3', data_pregao_dt: '2026-03-10', status: '' })
     const r = deForm({ ...base, mc_ctc: '18,5', orcamento: '1.234,50', posicao_lance: '3' })
     expect(r.success && r.data).toMatchObject({ mc_ctc: 0.185, orcamento: 1234.5, posicao_lance: 3, status: 'Go' })
+  })
+  it('impostos: percentual com duas casas no formulário, arredondado e em fração na API', () => {
+    expect(paraForm({ impostos: 0.0865 }).impostos).toBe('8,65')
+    expect(paraForm({ impostos: 0.1 }).impostos).toBe('10,00')
+    expect(paraForm({}).impostos).toBe('')
+    const a = deForm({ ...base, impostos: '8,654' })
+    expect(a.success && a.data.impostos).toBe(0.0865)
+    const b = deForm({ ...base, impostos: '10' })
+    expect(b.success && b.data.impostos).toBe(0.1)
+    expect(pct(0.0865)).toBe('8,65%')
+    expect(pct(0.1)).toBe('10,00%')
+    expect(pct(null)).toBe('—')
+  })
+  it('impostos fora de 0% a 100% é recusado', () => {
+    const r = deForm({ ...base, impostos: '120' })
+    expect(r.success && regrasNegocio(r.data).map((e) => e.campo)).toContain('impostos')
+    const neg = deForm({ ...base, impostos: '-1' })
+    expect(neg.success && regrasNegocio(neg.data).map((e) => e.campo)).toContain('impostos')
   })
   it('vazio vira null e erro de formato aponta o campo', () => {
     const ok = deForm(base)

@@ -127,9 +127,10 @@ test('cadastro: valida obrigatórios no cliente e envia números normalizados', 
   await page.getByLabel(/^Data do pregão/).fill('2026-05-20')
   await page.getByLabel(/^Orçamento \(R\$\)/).fill('1.234,50')
   await page.getByLabel(/^MC CTC/).fill('18,5')
+  await page.getByLabel(/^Impostos/).fill('8,654')
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
-  expect(enviados[0]).toMatchObject({ orgao: 'Prefeitura X', orcamento: 1234.5, mc_ctc: 0.185, processo: null, orcamento_sigiloso: false })
+  expect(enviados[0]).toMatchObject({ orgao: 'Prefeitura X', orcamento: 1234.5, mc_ctc: 0.185, impostos: 0.0865, processo: null, orcamento_sigiloso: false })
 })
 
 test('motivo do No Go aparece e é exigido só nesse status', async ({ page }) => {

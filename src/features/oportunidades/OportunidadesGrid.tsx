@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { Oportunidade } from '@/domain/oportunidade'
 import { cn } from '@/lib/utils'
-import { brl, dataBr } from './formato'
+import { brl, dataBr, pct } from './formato'
 
 // Win verde · Go azul · No Go laranja · On going amarela · Lost vermelha · demais cinza
 const STATUS_PONTO: Record<string, string> = {
@@ -41,6 +41,7 @@ const colunas: ColumnDef<Oportunidade>[] = [
     cell: (c) => (c.row.original.orcamento_sigiloso ? <em className="text-muted">Sigiloso</em> : brl(c.getValue<number | null>())),
   },
   { accessorKey: 'valor_ctc', header: 'Valor CTC', size: 130, meta: { direita: true }, cell: (c) => brl(c.getValue<number | null>()) },
+  { accessorKey: 'impostos', header: 'Impostos', size: 100, meta: { direita: true }, cell: (c) => pct(c.getValue<number | null>()) },
   {
     id: 'pendencias',
     header: 'Pendências',

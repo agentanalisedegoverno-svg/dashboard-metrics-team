@@ -8,8 +8,8 @@ import { formataCnpj, soDigitos, validaCnpj } from '@/domain/cnpj'
 import { CAMPO_LISTA, regrasNegocio, torreDaLinha, type ErroCampo, type Oportunidade } from '@/domain/oportunidade'
 import { cn } from '@/lib/utils'
 import { ApiError, useArquivar, useAtualizar, useConsultaCnpj, useCriar, useHistorico, type Me, type Opcoes } from './api'
-import { SECOES, ROTULO, type Campo } from './campos'
-import { dataHoraBr, deForm, paraForm, type FormValores } from './formato'
+import { SECOES, ROTULO, TIPO_CAMPO, type Campo } from './campos'
+import { dataHoraBr, deForm, paraForm, pct, type FormValores } from './formato'
 
 type Props = {
   aberto: boolean
@@ -174,6 +174,10 @@ function CampoInput({
   )
 }
 
+/** Percentuais chegam do banco como fração (0,0865): no histórico aparecem como 8,65%. */
+const valorHistorico = (campo: string, v: unknown) =>
+  TIPO_CAMPO[campo] === 'percentual' && v !== null && v !== undefined && Number.isFinite(Number(v)) ? pct(Number(v)) : String(v ?? '—')
+
 function PainelHistorico({ id }: { id: number }) {
   const { data, isPending, error } = useHistorico(id)
   if (isPending) return <p className="p-4 text-[13px] text-muted">Carregando histórico…</p>
@@ -190,7 +194,7 @@ function PainelHistorico({ id }: { id: number }) {
             <ul className="mt-1.5 space-y-0.5 text-xs text-ink-soft">
               {Object.entries(h.alteracoes).map(([campo, [de, para]]) => (
                 <li key={campo}>
-                  <span className="font-semibold">{ROTULO[campo] ?? campo}:</span> {String(de ?? '—')} → {String(para ?? '—')}
+                  <span className="font-semibold">{ROTULO[campo] ?? campo}:</span> {valorHistorico(campo, de)} → {valorHistorico(campo, para)}
                 </li>
               ))}
             </ul>
