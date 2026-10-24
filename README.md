@@ -11,6 +11,7 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Estado atual e melhorias futuras (curto, médio e longo prazo) |
 | [docs/CADASTRO-OPORTUNIDADES.md](docs/CADASTRO-OPORTUNIDADES.md) | Especificação do cadastro de oportunidades na web (34 colunas, validações, UX) |
 | [docs/INTEGRACAO-PLANNER.md](docs/INTEGRACAO-PLANNER.md) | Radar → Microsoft Planner: contrato do evento, regras, operação |
+| [docs/EMAIL-NOVAS-OPORTUNIDADES.md](docs/EMAIL-NOVAS-OPORTUNIDADES.md) | E-mail a cada nova oportunidade: regras na Administração, envio por SMTP do Gmail |
 | [docs/BACKUP.md](docs/BACKUP.md) | Backup diário criptografado no Drive, restauração e teste |
 | [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md) | Carga da planilha por merge (`scripts/sync-db.mjs`) |
 | [docs/AGENTE-DE-CARGA.md](docs/AGENTE-DE-CARGA.md) | Prompt do agente e agendamento a cada 2 dias |
