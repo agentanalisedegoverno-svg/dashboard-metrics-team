@@ -1,0 +1,62 @@
+name: Enviar e-mails
+
+# Envia, pelo SMTP do Gmail, os e-mails de nova oportunidade que estão na fila do banco (email_fila).
+# Quem entra na fila, a partir de quais status e para quem vai é configurado pelo administrador no Radar
+# (Administração → E-mails). Ver docs/EMAIL-NOVAS-OPORTUNIDADES.md.
+# O log deste repositório é público: o script só imprime contagens, nunca endereços nem dados de oportunidades.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      simular:
+        description: 'Só contar o que seria enviado (não envia e não altera a fila)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enviar-emails
+  cancel-in-progress: false
+
+jobs:
+  enviar:
+    name: Enviar fila de e-mails
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL_EMAIL: ${{ secrets.DATABASE_URL_EMAIL }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
+      APP_URL: ${{ vars.APP_URL }}
+      SIMULAR: ${{ inputs.simular }}
+    steps:
+      - name: Conferir configuração
+        id: cfg
+        run: |
+          if [ -z "$DATABASE_URL_EMAIL" ]; then
+            echo "::notice::DATABASE_URL_EMAIL não configurado: o módulo de e-mail ainda não foi ativado. Nada a fazer."
+            echo "pronto=false" >> "$GITHUB_OUTPUT"
+          elif [ "$SIMULAR" != "true" ] && { [ -z "$SMTP_USER" ] || [ -z "$SMTP_PASS" ]; }; then
+            echo "::notice::SMTP_USER/SMTP_PASS não configurados: nada será enviado até cadastrar os secrets."
+            echo "pronto=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "pronto=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.cfg.outputs.pronto == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.cfg.outputs.pronto == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Instalar dependências
+        if: steps.cfg.outputs.pronto == 'true'
+        run: npm ci --ignore-scripts
+      - name: Enviar
+        if: steps.cfg.outputs.pronto == 'true'
+        run: |
+          if [ "$SIMULAR" = "true" ]; then node scripts/enviar-emails.mjs --simular; else node scripts/enviar-emails.mjs; fi

@@ -17,6 +17,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `PLANNER_EVENTOS_DIR` | variável de ambiente do usuário Windows (`...\planner-auto\eventos\entrada`) | caminho | Administrador |
 | `DATABASE_URL_BACKUP` (papel `radar_backup`) | GitHub → Settings → Secrets and variables → Actions | **Secret** | Administrador |
 | `DATABASE_URL_RESTORE` (papel `radar_restore`, só no branch `teste-restauracao`) | GitHub (Actions) | **Secret** | Administrador |
+| `DATABASE_URL_EMAIL` (papel `radar_email`), `SMTP_USER`, `SMTP_PASS` (senha de app do Gmail), `SMTP_FROM` (opcional) e variável `APP_URL` | GitHub (Actions) | **Secret** (`APP_URL` é variável) | Administrador |
 | `BACKUP_PASSPHRASE` | GitHub (Actions) **e** cofre de senhas da empresa | **Secret** | Administrador |
 | `RCLONE_DRIVE_TOKEN` | GitHub (Actions) | **Secret** | Administrador |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub (Actions) | **Secret** | Administrador |
@@ -112,6 +113,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | Pipeline falha no "Deploy produção" | Token da Cloudflare sem permissão/expirado | Novo token *Pages: Edit* **sem filtro de IP**; atualizar `CLOUDFLARE_API_TOKEN` |
 | Backup falha ao enviar | `RCLONE_DRIVE_TOKEN` inválido/expirado | Refazer `rclone authorize "drive"` e atualizar o secret |
 | E-mail "Vigia do backup" falhou | Backup sem sucesso há mais de 30 h, ou teste de restauração com mais de 40 dias | Abrir *Actions → Backup do banco*, ver o erro e rodar de novo; rodar o teste de restauração |
+| E-mail de nova oportunidade não chegou | Módulo desligado, status não marcado, workflow `Enviar e-mails` sem secrets/falhando ou senha de app inválida | *Administração → E-mails* (envios recentes mostram o motivo); ver [EMAIL-NOVAS-OPORTUNIDADES.md](EMAIL-NOVAS-OPORTUNIDADES.md) |
 | Teste de restauração falha no destino `neon` | Branch/papel `radar_restore` apagado ou secret `DATABASE_URL_RESTORE` antigo | Ver [BACKUP.md](BACKUP.md) (Manutenção do branch de teste) |
 
 **Erro 9109 da Cloudflare** ("Cannot use the access token from location"): o token tem filtro de IP. Para o GitHub Actions o token não pode ter filtro de IP.
@@ -130,6 +132,7 @@ Papéis com senha: `radar_leitor`, `radar_app`, `radar_escritor`, `radar_planner
 | `radar_escritor` | `DATABASE_URL_WRITER` na máquina do agente |
 | `radar_planner` | `DATABASE_URL_PLANNER` na máquina da integração |
 | `radar_backup` | secret `DATABASE_URL_BACKUP` no GitHub |
+| `radar_email` | secret `DATABASE_URL_EMAIL` no GitHub |
 
 3. Conferir: o painel carrega, o cadastro salva, a próxima carga/integração/backup funciona.
 
