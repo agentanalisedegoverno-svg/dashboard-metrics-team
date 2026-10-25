@@ -20,3 +20,10 @@ coverage/
 # Skills de agentes instaladas localmente (nao versionar)
 .claude/skills/
 skills-lock.json
+
+# Segredos locais do Wrangler e dados reais (planilhas de licitações): nunca versionar
+.dev.vars
+.dev.vars.*
+*.xlsx
+*.xlsm
+*.xls
