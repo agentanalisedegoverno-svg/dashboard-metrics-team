@@ -7,12 +7,13 @@ const item = (extra: Record<string, unknown> = {}) => ({
   data_pregao_dt: '2026-11-05', analista: 'Ana', orcamento: 1000, orcamento_sigiloso: false, criado_por: 'a@ctctech.com.br', ...extra,
 })
 
-function fake(itens: unknown[], opc: { ativo?: boolean; dest?: { email: string; tipo: string }[] } = {}) {
+function fake(itens: unknown[], opc: { ativo?: boolean; avisar?: boolean; dest?: { email: string; tipo: string }[]; usuarios?: { nome: string; email: string }[] } = {}) {
   const updates: { q: string; v: unknown[] }[] = []
   const sql = (async (s: TemplateStringsArray, ...v: unknown[]) => {
     const q = s.join('?').replace(/\s+/g, ' ')
     if (q.includes('from email_fila f')) return itens
-    if (q.includes('from email_config')) return [{ ativo: opc.ativo ?? true }]
+    if (q.includes('from email_config')) return [{ ativo: opc.ativo ?? true, avisar_pre_vendas: opc.avisar ?? false }]
+    if (q.includes('from usuarios')) return opc.usuarios ?? []
     if (q.includes('from email_destinatarios')) return opc.dest ?? [{ email: 'p@x.com', tipo: 'para' }, { email: 'c@x.com', tipo: 'cc' }]
     updates.push({ q, v })
     return []
@@ -69,6 +70,47 @@ describe('processarFila', () => {
   it('fila vazia não consulta regras', async () => {
     const { sql } = fake([])
     expect(await processarFila(sql, vi.fn(), { url: 'u' })).toMatchObject({ pendentes: 0 })
+  })
+})
+
+describe('avisar o pré-vendas da oportunidade', () => {
+  const usuarios = [{ nome: 'Ana', email: 'Ana@ctctech.com.br' }]
+  it('liga: o pré-vendas entra em Para, junto da lista', async () => {
+    const { sql } = fake([item({ analista: 'Ana' })], { avisar: true, usuarios })
+    const enviar = vi.fn().mockResolvedValue(undefined)
+    await processarFila(sql, enviar, { url: 'u' })
+    expect(enviar.mock.calls[0][0]).toMatchObject({ to: ['p@x.com', 'ana@ctctech.com.br'], cc: ['c@x.com'] })
+  })
+  it('desligado: o pré-vendas não recebe', async () => {
+    const { sql } = fake([item({ analista: 'Ana' })], { avisar: false, usuarios })
+    const enviar = vi.fn().mockResolvedValue(undefined)
+    await processarFila(sql, enviar, { url: 'u' })
+    expect(enviar.mock.calls[0][0].to).toEqual(['p@x.com'])
+  })
+  it('sem duplicar quem já está na lista (para ou cópia)', async () => {
+    const dest = [{ email: 'ana@ctctech.com.br', tipo: 'cc' }, { email: 'p@x.com', tipo: 'para' }]
+    const { sql } = fake([item({ analista: 'Ana' })], { avisar: true, usuarios, dest })
+    const enviar = vi.fn().mockResolvedValue(undefined)
+    await processarFila(sql, enviar, { url: 'u' })
+    expect(enviar.mock.calls[0][0]).toMatchObject({ to: ['p@x.com'], cc: ['ana@ctctech.com.br'] })
+  })
+  it('pré-vendas sem e-mail cadastrado ou sem nome na oportunidade: segue só com a lista', async () => {
+    const { sql } = fake([item({ analista: 'Sem Email' }), item({ id: 2, analista: null })], { avisar: true, usuarios })
+    const enviar = vi.fn().mockResolvedValue(undefined)
+    await processarFila(sql, enviar, { url: 'u' })
+    expect(enviar.mock.calls.map((c) => c[0].to)).toEqual([['p@x.com'], ['p@x.com']])
+  })
+  it('lista vazia, mas com o aviso ao pré-vendas: envia só para ele; sem pré-vendas, ignora', async () => {
+    const { sql } = fake([item({ analista: 'Ana' }), item({ id: 2, analista: null })], { avisar: true, usuarios, dest: [] })
+    const enviar = vi.fn().mockResolvedValue(undefined)
+    expect(await processarFila(sql, enviar, { url: 'u' })).toMatchObject({ enviados: 1, ignorados: 1 })
+    expect(enviar.mock.calls[0][0].to).toEqual(['ana@ctctech.com.br'])
+  })
+  it('e-mail de teste nunca vai ao pré-vendas', async () => {
+    const { sql } = fake([item({ tipo: 'teste', destino_teste: 'adm@ctctech.com.br', analista: 'Ana' })], { avisar: true, usuarios })
+    const enviar = vi.fn().mockResolvedValue(undefined)
+    await processarFila(sql, enviar, { url: 'u' })
+    expect(enviar.mock.calls[0][0].to).toEqual(['adm@ctctech.com.br'])
   })
 })
 

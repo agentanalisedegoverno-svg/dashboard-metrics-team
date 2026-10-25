@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Sql } from './cadastro.ts'
 import { lerEmailConfig, pedirEmailTeste, salvarEmailConfig } from './emailConfig.ts'
 
-const valido = { ativo: true, status: ['Go'], destinatarios: [{ email: ' Ana@CTCTech.com.br ', tipo: 'para', ativo: true }] }
+const valido = { ativo: true, avisar_pre_vendas: true, status: ['Go'], destinatarios: [{ email: ' Ana@CTCTech.com.br ', tipo: 'para', ativo: true }] }
 
 describe('lerEmailConfig', () => {
   it('não-administrador recebe 403 e nada é lido', async () => {
@@ -15,12 +15,12 @@ describe('lerEmailConfig', () => {
     const sql = vi
       .fn()
       .mockResolvedValueOnce([{ admin: true }])
-      .mockResolvedValueOnce([{ ativo: true, status_gatilho: ['Go'], atualizado_por: 'a@x.com', atualizado_em: '2026-10-24T12:00:00Z' }])
+      .mockResolvedValueOnce([{ ativo: true, avisar_pre_vendas: true, status_gatilho: ['Go'], atualizado_por: 'a@x.com', atualizado_em: '2026-10-24T12:00:00Z' }])
       .mockResolvedValueOnce([{ email: 'p@x.com', tipo: 'para', ativo: true }])
       .mockResolvedValueOnce([{ id: 1, tipo: 'nova', situacao: 'enviado' }]) as unknown as Sql
     const res = await lerEmailConfig(sql, 'adm@ctctech.com.br')
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ ativo: true, status: ['Go'], destinatarios: [{ email: 'p@x.com' }], recentes: [{ id: 1 }] })
+    expect(await res.json()).toMatchObject({ ativo: true, avisar_pre_vendas: true, status: ['Go'], destinatarios: [{ email: 'p@x.com' }], recentes: [{ id: 1 }] })
   })
 })
 
@@ -30,7 +30,7 @@ describe('salvarEmailConfig', () => {
     const res = await salvarEmailConfig(sql, 'adm@ctctech.com.br', valido)
     expect(res.status).toBe(200)
     const chamada = (sql as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(chamada.slice(1)).toEqual([true, ['Go'], JSON.stringify([{ email: 'ana@ctctech.com.br', tipo: 'para', ativo: true }]), 'adm@ctctech.com.br'])
+    expect(chamada.slice(1)).toEqual([true, ['Go'], JSON.stringify([{ email: 'ana@ctctech.com.br', tipo: 'para', ativo: true }]), 'adm@ctctech.com.br', true])
   })
   it('recusa e-mail inválido e excesso de destinatários sem tocar no banco', async () => {
     const sql = vi.fn() as unknown as Sql

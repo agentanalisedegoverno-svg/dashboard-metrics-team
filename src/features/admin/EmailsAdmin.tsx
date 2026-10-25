@@ -35,7 +35,7 @@ export function EmailsAdmin({ opcoes }: { opcoes: Opcoes }) {
     return <div role="alert" className="rounded-[10px] border border-st-critical/40 bg-surface p-4 text-[13px] text-ink-soft">Não foi possível carregar a configuração de e-mails. {error?.message}</div>
   }
 
-  const servidor: EmailConfigInput = { ativo: data.ativo, status: data.status, destinatarios: data.destinatarios }
+  const servidor: EmailConfigInput = { ativo: data.ativo, avisar_pre_vendas: data.avisar_pre_vendas, status: data.status, destinatarios: data.destinatarios }
   const atual = edit ?? servidor
   const sujo = edit !== null && JSON.stringify(edit) !== JSON.stringify(servidor)
   const statusDisponiveis = (opcoes.listas.status ?? []).filter((o) => o.ativo).map((o) => o.valor)
@@ -91,6 +91,14 @@ export function EmailsAdmin({ opcoes }: { opcoes: Opcoes }) {
           <input type="checkbox" className="size-4 accent-[var(--gold)]" checked={atual.ativo} onChange={(e) => muda({ ativo: e.target.checked })} />
           Enviar e-mail a cada nova oportunidade
           <span className={cn('rounded px-1.5 py-0.5 text-[11px]', atual.ativo ? 'bg-line-soft text-ink' : 'bg-line-soft text-muted')}>{atual.ativo ? 'ligado' : 'desligado'}</span>
+        </label>
+
+        <label className="mt-3 flex cursor-pointer items-start gap-2 text-[13px] text-ink-soft">
+          <input type="checkbox" className="mt-0.5 size-4 accent-[var(--gold)]" checked={atual.avisar_pre_vendas} onChange={(e) => muda({ avisar_pre_vendas: e.target.checked })} />
+          <span>
+            <strong className="text-ink">Avisar também o pré-vendas da oportunidade</strong>
+            <span className="block text-xs text-muted">O aviso vai ao e-mail do pré-vendas escolhido naquela oportunidade, além da lista abaixo. Só se ele tiver e-mail cadastrado em Usuários e perfis; quem já está na lista não recebe duas vezes.</span>
+          </span>
         </label>
 
         <fieldset className="mt-4">

@@ -9,7 +9,7 @@ const negado = () => send(403, { error: 'Somente administradores configuram o en
 export async function lerEmailConfig(sql: Sql, email: string) {
   const [{ admin }] = await sql`select eh_admin(${email}) as admin`
   if (!admin) return negado()
-  const [c] = await sql`select ativo, status_gatilho, atualizado_por, atualizado_em from email_config where id = 1`
+  const [c] = await sql`select ativo, avisar_pre_vendas, status_gatilho, atualizado_por, atualizado_em from email_config where id = 1`
   const dest = await sql`select email, tipo, ativo from email_destinatarios order by email`
   const recentes = await sql`
     select f.id, f.tipo, f.situacao, f.tentativas, f.ultimo_erro, f.criado_em, f.enviado_em, o.codigo, o.orgao
@@ -17,6 +17,7 @@ export async function lerEmailConfig(sql: Sql, email: string) {
     order by f.id desc limit 15`
   const corpo: EmailConfig = {
     ativo: Boolean(c?.ativo),
+    avisar_pre_vendas: Boolean(c?.avisar_pre_vendas),
     status: c?.status_gatilho ?? [],
     destinatarios: dest,
     atualizado_por: c?.atualizado_por ?? null,
@@ -31,7 +32,7 @@ export async function salvarEmailConfig(sql: Sql, email: string, corpo: unknown)
   if (!parsed.success) return send(422, { error: 'Dados inválidos.', erros: errosZod(parsed.error) })
   const c = parsed.data
   try {
-    await sql`select salvar_email_config(${c.ativo}, ${c.status}::text[], ${JSON.stringify(c.destinatarios)}::jsonb, ${email})`
+    await sql`select salvar_email_config(${c.ativo}, ${c.status}::text[], ${JSON.stringify(c.destinatarios)}::jsonb, ${email}, ${c.avisar_pre_vendas})`
     return send(200, { ok: true })
   } catch (e) {
     return erroBanco(e)
