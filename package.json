@@ -19,6 +19,7 @@
     "test:desempenho": "playwright test e2e/desempenho.spec.ts --workers=1",
     "test:carga": "vitest run --config vitest.carga.config.ts",
     "medir:banco": "node scripts/medir-banco.mjs",
+    "diagramas": "node scripts/gerar-diagramas.mjs",
     "check": "npm run typecheck && npm test && npm run build",
     "check:dist": "node scripts/check-dist.mjs",
     "deploy": "wrangler pages deploy dist --project-name=radar-prevendas",
