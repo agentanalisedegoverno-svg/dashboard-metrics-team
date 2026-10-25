@@ -59,6 +59,7 @@ async function api(page: Page, admin = false, forcarConflito = false, visualizad
   // E-mails de nova oportunidade (Administração -> E-mails)
   let emailCfg = {
     ativo: false,
+    avisar_pre_vendas: false,
     status: [] as string[],
     destinatarios: [{ email: 'comercial@ctctech.com.br', tipo: 'para', ativo: true }],
     atualizado_por: null as string | null,
@@ -444,6 +445,7 @@ test('Administração → E-mails: liga o envio, marca status e cadastra destina
   await expect(salvar).toBeDisabled() // nada alterado ainda
 
   await page.getByLabel('Enviar e-mail a cada nova oportunidade').check()
+  await page.getByLabel(/Avisar também o pré-vendas da oportunidade/).check()
   await page.getByRole('group', { name: /Enviar quando o status/ }).getByLabel('Go', { exact: true }).check()
   await page.getByLabel('E-mail', { exact: true }).fill('sem-arroba')
   await page.getByRole('button', { name: 'Adicionar' }).click()
@@ -457,7 +459,7 @@ test('Administração → E-mails: liga o envio, marca status e cadastra destina
   await expect(page.getByText('Configuração de e-mails salva.')).toBeVisible()
   await expect
     .poll(() => enviados.find((e) => 'destinatarios' in e))
-    .toMatchObject({ ativo: true, status: ['Go'], destinatarios: [{ email: 'comercial@ctctech.com.br', tipo: 'para' }, { email: 'novo@ctctech.com.br', tipo: 'cc', ativo: true }] })
+    .toMatchObject({ ativo: true, avisar_pre_vendas: true, status: ['Go'], destinatarios: [{ email: 'comercial@ctctech.com.br', tipo: 'para' }, { email: 'novo@ctctech.com.br', tipo: 'cc', ativo: true }] })
 
   await page.getByRole('button', { name: 'Enviar e-mail de teste para mim' }).click()
   await expect.poll(() => enviados.some((e) => (e as Record<string, unknown>).teste === true)).toBe(true)

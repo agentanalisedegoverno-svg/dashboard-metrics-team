@@ -9,6 +9,8 @@ export const destinatarioInput = z.object({
 
 export const emailConfigInput = z.object({
   ativo: z.boolean(),
+  /** Avisa também o pré-vendas escolhido na oportunidade (se tiver e-mail cadastrado). */
+  avisar_pre_vendas: z.boolean().default(false),
   status: z.array(z.string().trim().min(1).max(60)).max(30),
   destinatarios: z.array(destinatarioInput).max(30, 'No máximo 30 destinatários'),
 })

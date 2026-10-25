@@ -34,15 +34,24 @@ export async function processarFila(sql: Sql, enviar: Enviar, opc: { url: string
   r.pendentes = itens.length
   if (!itens.length) return r
 
-  const [cfg] = await sql`select ativo from email_config where id = 1`
+  const [cfg] = await sql`select ativo, avisar_pre_vendas from email_config where id = 1`
   const dest = (await sql`select email, tipo from email_destinatarios where ativo order by email`) as { email: string; tipo: 'para' | 'cc' }[]
   const para = dest.filter((d) => d.tipo === 'para').map((d) => d.email)
   const cc = dest.filter((d) => d.tipo === 'cc').map((d) => d.email)
+  // Pré-vendas: só quem está ativo e tem e-mail cadastrado (a busca é por nome, igual ao que a oportunidade guarda).
+  const emailPorNome = new Map<string, string>()
+  if (cfg?.avisar_pre_vendas) {
+    const us = (await sql`select nome, email from usuarios where ativo and email is not null`) as { nome: string; email: string }[]
+    for (const u of us) emailPorNome.set(u.nome, u.email.toLowerCase())
+  }
 
   for (const it of itens) {
     const ehTeste = it.tipo === 'teste'
     // Regras valem na hora do envio: se foi desligado (ou ficou sem destinatário) depois de entrar na fila, não envia.
-    if (!ehTeste && (!cfg?.ativo || para.length === 0)) {
+    const doPreVendas = !ehTeste && it.analista ? emailPorNome.get(it.analista) : undefined
+    // O pré-vendas entra em "Para", a menos que já esteja na lista (para ou cópia): ninguém recebe duas vezes.
+    const paraItem = doPreVendas && !para.includes(doPreVendas) && !cc.includes(doPreVendas) ? [...para, doPreVendas] : para
+    if (!ehTeste && (!cfg?.ativo || paraItem.length === 0)) {
       if (!opc.simular) {
         const motivo = !cfg?.ativo ? 'Envio desligado quando chegou a vez' : 'Sem destinatário "para" ativo'
         await sql`update email_fila set situacao = 'ignorado', ultimo_erro = ${motivo} where id = ${it.id}::bigint`
@@ -51,7 +60,7 @@ export async function processarFila(sql: Sql, enviar: Enviar, opc: { url: string
       continue
     }
     const msg = ehTeste ? montarEmailTeste(opc.url) : montarEmail(it, opc.url)
-    const envio: Envio = { ...msg, to: ehTeste ? [it.destino_teste as string] : para, cc: ehTeste ? [] : cc }
+    const envio: Envio = { ...msg, to: ehTeste ? [it.destino_teste as string] : paraItem, cc: ehTeste ? [] : cc }
     if (opc.simular) {
       r.enviados++
       continue

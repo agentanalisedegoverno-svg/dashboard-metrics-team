@@ -15,6 +15,7 @@ Só entram na fila oportunidades **criadas pela web**. A carga automática da pl
 | Campo | O que faz |
 |---|---|
 | **Enviar e-mail a cada nova oportunidade** | Liga e desliga o módulo. Vem **desligado**. |
+| **Avisar também o pré-vendas da oportunidade** | Além da lista, o aviso vai ao e-mail do pré-vendas escolhido naquela oportunidade. Só se ele estiver ativo e tiver e-mail em *Usuários e perfis*; quem já está na lista (Para ou Cc) não recebe duas vezes. Com esta opção ligada, a lista de destinatários pode ficar vazia. O e-mail de teste nunca vai ao pré-vendas. |
 | **Status** | Marque os status que disparam o aviso (ex.: só *Go*, ou *Go* e *On going*). Precisa de ao menos um para ligar. |
 | **Destinatários** | Lista de e-mails, cada um **Para** ou **Cópia (Cc)**, com ativo/inativo e remover. Até 30. Precisa de ao menos um ativo para ligar. |
 | **Enviar e-mail de teste para mim** | Envia uma mensagem de teste **só para quem clicou** (nunca para a lista). |
