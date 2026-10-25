@@ -4,6 +4,8 @@ Painel interno de pré-vendas (licitações) **e** cadastro de oportunidades. O 
 
 A operação do dia a dia está em [OPERACAO.md](OPERACAO.md); o que vem a seguir está em [ROADMAP.md](ROADMAP.md).
 
+> **Catálogo completo de diagramas** (contexto, contêineres, implantação, componentes, jornada, perfis, cadastro, carga, Planner, **e-mail**, backup, CI/CD, STRIDE, papéis do banco e ER), em camadas e atualizado: [DIAGRAMAS.md](DIAGRAMAS.md). Esta página traz a narrativa e as decisões.
+
 ## 1. Visão geral
 
 ```mermaid
@@ -95,9 +97,11 @@ Detalhes: [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md), [CARGA-DE-DADOS.md](CARGA-DE
 | `/api/rows`, `/api/status` | GET | qualquer usuário autenticado | dados do painel (papel `radar_leitor`) |
 | (tela) **Administração** | — | só **administrador** | aba própria, em página inteira, com navegação lateral: *Usuários e perfis*, *Listas de opções* e *Linha → Torre* |
 | `/api/me` | GET | autenticado | e-mail, nome, perfil (administrador, editor ou visualizador) |
-| `/api/cnpj/:cnpj` | GET | autenticado | razão social e matriz/filial na Receita Federal (BrasilAPI; não usa o banco) |
+| `/api/cnpj/:cnpj` | GET | autenticado | razão social e matriz/filial na Receita Federal, com 4 fontes públicas em sequência (BrasilAPI, minhareceita.org, publica.cnpj.ws, receitaws); não usa o banco |
 | `/api/opcoes` | GET / PUT | todos leem; **admin** altera | listas fechadas e pré-vendas |
 | `/api/usuarios` | PUT | **admin** | usuários, papéis e e-mails |
+| `/api/email-config` | GET / PUT | **admin** | regras do e-mail de nova oportunidade: liga/desliga, status, destinatários, aviso ao pré-vendas ([EMAIL-NOVAS-OPORTUNIDADES.md](EMAIL-NOVAS-OPORTUNIDADES.md)) |
+| `/api/email-config/teste` | POST | **admin** | enfileira um e-mail de teste só para o próprio administrador |
 | `/api/oportunidades` | GET / POST | todos leem; **editor e admin** cadastram | grade e cadastro (aviso de duplicata) |
 | `/api/oportunidades/:id` | GET / PUT | todos leem; **editor e admin** editam | leitura e edição com versão otimista (409 em conflito) |
 | `/api/oportunidades/:id/historico` | GET | todos | trilha de alterações |
