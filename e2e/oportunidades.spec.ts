@@ -56,6 +56,28 @@ async function api(page: Page, admin = false, forcarConflito = false, visualizad
     }
     return r.fulfill({ json: admin ? { ...opcoes, usuarios } : opcoes })
   })
+  // E-mails de nova oportunidade (Administração -> E-mails)
+  let emailCfg = {
+    ativo: false,
+    status: [] as string[],
+    destinatarios: [{ email: 'comercial@ctctech.com.br', tipo: 'para', ativo: true }],
+    atualizado_por: null as string | null,
+    atualizado_em: null as string | null,
+    recentes: [{ id: 7, tipo: 'nova', situacao: 'enviado', tentativas: 1, ultimo_erro: null, criado_em: '2026-10-23T12:00:00Z', enviado_em: '2026-10-23T12:05:00Z', codigo: '2026-0007', orgao: 'Órgão Sete' }],
+  }
+  await page.route('**/api/email-config/teste', (r) => {
+    enviados.push({ teste: true } as unknown as Reg)
+    return r.fulfill({ json: { ok: true } })
+  })
+  await page.route('**/api/email-config', (r) => {
+    if (r.request().method() === 'PUT') {
+      const corpo = r.request().postDataJSON() as Reg
+      enviados.push(corpo)
+      emailCfg = { ...emailCfg, ...(corpo as unknown as Partial<typeof emailCfg>), atualizado_por: 'joao.henrique@ctctech.com.br', atualizado_em: '2026-10-24T12:00:00Z' }
+      return r.fulfill({ json: { ok: true } })
+    }
+    return r.fulfill({ json: emailCfg })
+  })
   await page.route('**/api/usuarios', (r) => {
     enviados.push(r.request().postDataJSON() as Reg)
     return r.fulfill({ json: { ok: true } })
@@ -407,4 +429,46 @@ test('acessibilidade da área de administração', async ({ page }) => {
   await expect(page.getByRole('table')).toBeVisible()
   const r = await new AxeBuilder({ page }).include('section[aria-label="Administração"]').analyze()
   expect(r.violations, JSON.stringify(r.violations.map((v) => v.id))).toEqual([])
+})
+
+test('Administração → E-mails: liga o envio, marca status e cadastra destinatários', async ({ page }) => {
+  const { enviados } = await api(page, true)
+  await abrirAba(page)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await page.getByRole('button', { name: 'E-mails' }).click()
+  expect(new URL(page.url()).hash).toBe('#admin/emails')
+  await expect(page.getByRole('heading', { name: 'E-mails de nova oportunidade' })).toBeVisible()
+  await expect(page.getByText('Órgão Sete')).toBeVisible()
+
+  const salvar = page.getByRole('button', { name: 'Salvar configuração' })
+  await expect(salvar).toBeDisabled() // nada alterado ainda
+
+  await page.getByLabel('Enviar e-mail a cada nova oportunidade').check()
+  await page.getByRole('group', { name: /Enviar quando o status/ }).getByLabel('Go', { exact: true }).check()
+  await page.getByLabel('E-mail', { exact: true }).fill('sem-arroba')
+  await page.getByRole('button', { name: 'Adicionar' }).click()
+  await expect(page.getByRole('alert')).toContainText('e-mail válido')
+  await page.getByLabel('E-mail', { exact: true }).fill('Novo@CTCTech.com.br')
+  await page.getByLabel('Tipo do novo destinatário').selectOption('cc')
+  await page.getByRole('button', { name: 'Adicionar' }).click()
+  await expect(page.getByRole('cell', { name: 'novo@ctctech.com.br', exact: true })).toBeVisible()
+  await expect(salvar).toBeEnabled()
+  await salvar.click()
+  await expect(page.getByText('Configuração de e-mails salva.')).toBeVisible()
+  await expect
+    .poll(() => enviados.find((e) => 'destinatarios' in e))
+    .toMatchObject({ ativo: true, status: ['Go'], destinatarios: [{ email: 'comercial@ctctech.com.br', tipo: 'para' }, { email: 'novo@ctctech.com.br', tipo: 'cc', ativo: true }] })
+
+  await page.getByRole('button', { name: 'Enviar e-mail de teste para mim' }).click()
+  await expect.poll(() => enviados.some((e) => (e as Record<string, unknown>).teste === true)).toBe(true)
+})
+
+test('aba E-mails passa na verificação de acessibilidade', async ({ page }) => {
+  await api(page, true)
+  await abrirAba(page)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await page.getByRole('button', { name: 'E-mails' }).click()
+  await expect(page.getByRole('heading', { name: 'E-mails de nova oportunidade' })).toBeVisible()
+  const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+  expect(r.violations).toEqual([])
 })

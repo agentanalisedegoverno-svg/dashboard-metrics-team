@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { EmailConfig, EmailConfigInput } from '@/domain/email'
 import type { ErroCampo, Oportunidade, OportunidadeInput } from '@/domain/oportunidade'
 
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
@@ -110,4 +111,20 @@ export const useSalvarOpcao = () => {
 export const useSalvarUsuario = () => {
   const invalidar = useInvalidar()
   return useMutation({ mutationFn: (u: UsuarioAdmin) => chamar('/usuarios', { method: 'PUT', body: u }), onSuccess: invalidar })
+}
+
+export const useEmailConfig = () =>
+  useQuery({ queryKey: ['email-config'], queryFn: ({ signal }) => chamar<EmailConfig>('/email-config', { signal }), staleTime: 15_000, retry: false })
+
+export const useSalvarEmailConfig = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (c: EmailConfigInput) => chamar('/email-config', { method: 'PUT', body: c }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['email-config'] }),
+  })
+}
+
+export const useEmailTeste = () => {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: () => chamar('/email-config/teste', { method: 'POST' }), onSuccess: () => qc.invalidateQueries({ queryKey: ['email-config'] }) })
 }
