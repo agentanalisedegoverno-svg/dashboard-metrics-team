@@ -49,7 +49,7 @@ export default function OportunidadesTab() {
         (!analista || nomesPreVendas(o.analista).includes(analista)) &&
         noPeriodo(o.data_pregao_dt, periodo) &&
         (!soPendencias || (o.pendencias?.length ?? 0) > 0) &&
-        (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),
+        (!q || fold([o.codigo, o.sigla, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),
     )
   }, [lista.data, buscaAdiada, status, torre, linha, analista, soPendencias, periodo])
 
