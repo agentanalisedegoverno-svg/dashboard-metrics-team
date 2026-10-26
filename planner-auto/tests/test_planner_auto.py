@@ -99,8 +99,12 @@ class Planejamento(unittest.TestCase):
             pa.planeja(evento(rotulos=["Rótulo Fantasma"]), ctx())
         with self.assertRaises(pa.EventoInvalido):
             pa.planeja(evento(), ctx(usuario=None))
-        with self.assertRaises(pa.EventoInvalido):  # chave duplicada no plano: nunca adivinhar
-            pa.planeja(evento(), ctx(tarefas={"RAD-7": [{"id": "a"}, {"id": "b"}]}))
+
+    def test_chave_duplicada_no_plano_atualiza_o_mais_antigo_e_avisa(self):
+        # nunca cria outro: o primeiro cartão (mais antigo) é o correto
+        plano = pa.planeja(evento(), ctx(tarefas={"RAD-7": [{"id": "novo", "createdDateTime": "2026-10-26T17:30:00Z"}, {"id": "primeiro", "createdDateTime": "2026-10-26T17:25:00Z"}]}))
+        self.assertEqual((plano["acao"], plano["tarefa_id"]), ("atualizar", "primeiro"))
+        self.assertIn("ALERTA", plano["aviso"])
 
 
 class GraphFalso:
@@ -252,3 +256,94 @@ class RegraDeAtualizacao(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GraphDoLote:
+    """Planner de mentira com estado: o que se cria passa a existir na listagem do plano."""
+
+    def __init__(self, tarefas_existentes=None):
+        self.tarefas = {t["id"]: dict(t) for t in (tarefas_existentes or [])}
+        self.criadas = 0
+        self.patches = []
+
+    def get(self, caminho, **kw):
+        if caminho.endswith("/details"):
+            return {"@odata.etag": "d1", "description": "", "checklist": {}}
+        tid = caminho.rsplit("/", 1)[-1]
+        return {"@odata.etag": "e1", "assignments": {}, "appliedCategories": {}, **self.tarefas[tid]}
+
+    def post(self, caminho, corpo):
+        self.criadas += 1
+        tid = f"t{self.criadas}"
+        self.tarefas[tid] = {"id": tid, "title": corpo["title"], "createdDateTime": f"2026-10-26T17:{20 + self.criadas}:00Z"}
+        return {"id": tid}
+
+    def patch(self, caminho, corpo, etag):
+        self.patches.append((caminho, corpo))
+        return {}
+
+    def lista(self):
+        return list(self.tarefas.values())
+
+
+class LoteSemDuplicar(unittest.TestCase):
+    """O cartão duplicou quando "nova" e "atualizada" da mesma oportunidade chegaram juntas. Isso nunca pode acontecer."""
+
+    def roda(self, graph, eventos, estado=None, cache_previo=None):
+        import tempfile
+
+        tmp = Path(tempfile.mkdtemp())
+        entrada, erros, processados = tmp / "entrada", tmp / "erros", tmp / "processados"
+        for d in (entrada, erros, processados):
+            d.mkdir()
+        planos = []
+        cache = {}
+
+        def contexto(plan_id):
+            if plan_id not in cache:
+                tarefas = {}
+                for t in graph.lista():
+                    k = pa.chave_do_titulo(t["title"])
+                    if k:
+                        tarefas.setdefault(k, []).append(t)
+                cache[plan_id] = {"buckets": BUCKETS, "categorias": CATS, "tarefas_por_chave": tarefas}
+            return {**cache[plan_id], "ultima_versao": {k: v["versaoOrigem"] for k, v in (estado or {}).items()},
+                    "resolve_usuario": lambda email: "u-" + email.split("@")[0]}
+
+        # o plano de TODOS os eventos é feito antes de gravar qualquer um (como no integrador)
+        for i, ev in enumerate(eventos):
+            arq = entrada / f"{i}.json"
+            arq.write_text("{}", encoding="utf-8")
+            planos.append((arq, ev, pa.planeja(ev, contexto(ev["plano"])), None))
+        with unittest.mock.patch.object(pa, "log_acao"), unittest.mock.patch.object(pa, "salvar_estado"):
+            pa.aplica_eventos(graph, planos, contexto, lambda plan_id: cache.pop(plan_id, None), estado if estado is not None else {}, erros, processados)
+        return [p[0].name for p in planos], list(erros.glob("*.txt"))
+
+    def test_nova_e_atualizada_no_mesmo_lote_criam_um_so_cartao(self):
+        g = GraphDoLote()
+        nova = evento()
+        atual = evento(titulo="[RAD-7] SEDES | Link | outra versao")
+        atual["tipo"], atual["versaoOrigem"] = "oportunidade_atualizada", 2
+        self.roda(g, [nova, atual])
+        self.assertEqual(g.criadas, 1)
+        # detalhes do cartão novo + atualização do cartão + nota da atualização: tudo no MESMO cartão (t1)
+        self.assertEqual({c.split('/planner/tasks/')[1].split('/')[0] for c, _ in g.patches}, {'t1'})
+        self.assertTrue(any(c.endswith("/planner/tasks/t1") and corpo.get("title") == "[RAD-7] SEDES | Link | outra versao" for c, corpo in g.patches))
+        self.assertEqual(len(g.lista()), 1)
+
+    def test_cartao_criado_por_outra_execucao_no_meio_tempo_nao_e_duplicado(self):
+        g = GraphDoLote()
+        original = g.lista
+        chamadas = {"n": 0}
+
+        def lista_com_corrida():
+            chamadas["n"] += 1
+            if chamadas["n"] == 1:  # 1ª leitura (planejamento): ainda não existe
+                return []
+            return original()
+
+        g.lista = lista_com_corrida
+        g.tarefas["externo"] = {"id": "externo", "title": "[RAD-7] criado por outra execução", "createdDateTime": "2026-10-26T17:00:00Z"}
+        self.roda(g, [evento()])
+        self.assertEqual(g.criadas, 0)  # releu o Planner ao vivo, achou o cartão e só atualizou
+        self.assertTrue(any(c.endswith("/planner/tasks/externo") for c, _ in g.patches))

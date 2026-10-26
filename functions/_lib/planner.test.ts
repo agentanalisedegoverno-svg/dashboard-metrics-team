@@ -64,6 +64,32 @@ describe('integração Planner', () => {
   })
 })
 
+describe('anotações do cartão: todas as informações da oportunidade', () => {
+  const dados = {
+    ...base, versao: 3, sigla: 'SEDES', objeto: 'Link dedicado de 1 Gbps', hora_pregao: '15:30:00', data_distribuicao: '2026-10-20', analista: 'Júlio César, Ana',
+    orcamento: 1500000, orcamento_sigiloso: false, valor_ctc: 1200000.5, impostos: 0.0865, mc_ctc: 0.185, pendencias: ['site'], criado_por: 'ana@ctctech.com.br',
+    unidade_fornecimento: 'Serviço (valor fixo)', modo_disputa: 'Aberto',
+  }
+  it('lista todos os campos do formulário, na ordem das seções, formatados', () => {
+    const nota = montarEvento({ ...base, versao: 3, dados }, 'oportunidade_nova', M, email)!.cartao.nota
+    expect(nota.split(/\r?\n/)[0]).toBe('Radar 2026-0077 (v3) — dados da oportunidade')
+    for (const trecho of ['IDENTIFICAÇÃO', 'Sigla: SEDES', 'Objeto: Link dedicado de 1 Gbps', 'Processo/Pregão: 24/2026', 'UASG: 158443', 'Data do pregão: 05/11/2026', 'Hora do pregão: 15:30',
+      'Pré-vendas: Júlio César, Ana', 'Unidade de fornecimento: Serviço (valor fixo)', 'Impostos (%): 8,65%', 'MC CTC (%): 18,50%', 'Pendências: site', 'Cadastrada por: ana@ctctech.com.br']) {
+      expect(nota, trecho).toContain(trecho)
+    }
+    expect(nota).toMatch(/Orçamento \(R\$\): R\$\s1\.500\.000,00/)
+    expect(nota).toContain('Critério: —') // campo em branco aparece, para ficar claro que não há informação
+  })
+  it('orçamento sigiloso não vaza valor; motivos de No Go/Lost só aparecem no status deles', () => {
+    const sig = montarEvento({ ...base, dados: { ...dados, orcamento_sigiloso: true } }, 'oportunidade_nova', M, email)!.cartao.nota
+    expect(sig).toContain('Orçamento (R$): Sigiloso')
+    expect(sig).not.toMatch(/1\.500\.000/)
+    expect(sig).not.toContain('Motivo do No Go')
+    const nogo = montarEvento({ ...base, status: 'No Go', dados: { ...dados, status: 'No Go', motivo_no_go: 'Risco Jurídico' } }, 'oportunidade_nova', M, email)!.cartao.nota
+    expect(nogo).toContain('Motivo do No Go: Risco Jurídico')
+  })
+})
+
 describe('objeto e hora do pregão no Planner', () => {
   it('o título usa o Objeto quando preenchido; em branco, o descritivo, como sempre foi', () => {
     expect(tituloCartao({ ...base, objeto: 'Link dedicado de 1 Gbps' })).toBe('[RADAR 2026-0077] SEDES | Link dedicado de 1 Gbps | PE: 24/2026 Uasg: 158443 | 05/11/2026')
