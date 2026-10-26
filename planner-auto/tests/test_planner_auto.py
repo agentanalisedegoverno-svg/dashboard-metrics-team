@@ -43,6 +43,9 @@ class Funcoes(unittest.TestCase):
         novo = evento(titulo="[2026-0512] SEDES | Link")
         novo["chave"] = "2026-0512"
         pa.valida_evento(novo, PLANOS)
+        radar = evento(titulo="[RADAR 2026-0512] SEDES | Link")  # novo padrão do título
+        radar["chave"] = "2026-0512"
+        pa.valida_evento(radar, PLANOS)
         for mut, msg in [
             (lambda e: e.update(versao="1"), "versão"),
             (lambda e: e.update(chave="X-1"), "chave"),

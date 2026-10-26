@@ -74,8 +74,9 @@ def valida_evento(ev: dict, planos_conhecidos: set[str]) -> None:
         raise EventoInvalido("cartao.titulo e cartao.bucket são obrigatórios")
     if c.get("progresso") not in (0, 50, 100):
         raise EventoInvalido(f"progresso deve ser 0, 50 ou 100 (veio {c.get('progresso')!r})")
-    if not ev["cartao"]["titulo"].startswith(f"[{ev['chave']}]"):
-        raise EventoInvalido("o título deve começar com [chave]")
+    titulo = ev["cartao"]["titulo"]
+    if not (titulo.startswith(f"[{ev['chave']}]") or titulo.startswith(f"[RADAR {ev['chave']}]")):
+        raise EventoInvalido("o título deve começar com [chave] ou [RADAR chave]")
 
 
 def planeja(ev: dict, contexto: dict) -> dict:
