@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Propósito** | Catálogo visual de todos os fluxos da aplicação, do contexto ao detalhe, para quem desenvolve, opera, audita ou aprova mudanças |
-| **Versão / atualização** | 1.0 · 25/10/2026 · cobre as migrações 001 a 011 |
+| **Versão / atualização** | 1.1 · 25/10/2026 · cobre as migrações 001 a 011 |
 | **Fonte** | Mermaid, neste arquivo (o GitHub desenha sozinho). Todo diagrama foi validado no conector do Mermaid antes de entrar. Versões em SVG em [diagramas/](diagramas/), geradas por `npm run diagramas` |
 | **Padrão adotado** | Guia *Architecture design diagrams* da Microsoft (Well-Architected): camadas **contexto → contêiner → componente**, mais implantação, fluxo de dados com fronteiras de confiança (STRIDE), sequência por caso de uso, jornada do usuário, estado, ER e fluxo de identidade; vocabulário do **C4** (contexto/contêiner/componente) e do **UML** (sequência/estado) |
 | **Relacionados** | [ARQUITETURA.md](ARQUITETURA.md) (decisões e narrativa), [OPERACAO.md](OPERACAO.md), [TESTES.md](TESTES.md) |
@@ -453,7 +453,7 @@ flowchart TB
 
 ### D10 · Ciclo de vida (estados)
 
-*Tipo: estado · Escopo: o registro e o status de negócio · Pergunta: **em que estados uma oportunidade pode estar e o que muda isso?***
+*Tipo: estado (registro) e fluxograma (status) · Escopo: o ciclo de vida do registro e as exigências de cada status · Pergunta: **em que estados uma oportunidade pode estar, o que muda isso e o que cada status exige?***
 
 ```mermaid
 stateDiagram-v2
@@ -476,31 +476,24 @@ stateDiagram-v2
 ```
 
 ```mermaid
-stateDiagram-v2
-  direction LR
-  [*] --> Prospect
-  Prospect --> Go: decide participar
-  Prospect --> NoGo: decide não participar
-  Go --> NoGo
-  Go --> OnGoing: em andamento
-  OnGoing --> Win: ganhou
-  OnGoing --> Lost: perdeu
-  Go --> Win
-  Go --> Lost
-  Prospect --> Canceled: certame cancelado
-  Go --> Suspended: certame suspenso
-  Suspended --> Go: retomado
-  Win --> [*]
-  Lost --> [*]
-  NoGo --> [*]
-  Canceled --> [*]
-  note right of Prospect
-    ciclo USUAL (a confirmar com o time de pré-vendas).
-    O sistema não impõe a ordem:
-    qualquer status da lista pode ser escolhido.
-    Exigências por status: D9
-    (No Go e Lost pedem motivo, Win pede Valor CTC)
-  end note
+flowchart LR
+  classDef base fill:#e3f0ff,stroke:#1f5fa8,color:#1a1a1a
+  classDef livre fill:#e6f6e6,stroke:#2d7a2d,color:#1a1a1a
+  classDef exige fill:#fff4d6,stroke:#8a6d00,color:#1a1a1a
+  classDef legado fill:#f2f2f2,stroke:#555555,stroke-dasharray:4 3,color:#1a1a1a
+  classDef efeito fill:#efe7ff,stroke:#5b3fa6,color:#1a1a1a
+
+  L["Status: lista fechada<br/>administrada em Administração, Listas de opções<br/>qualquer status pode ser escolhido a qualquer momento<br/>(o sistema não impõe uma ordem)"]:::base
+  L --> S1["Prospect, Go, On going,<br/>Canceled, Suspended<br/>sem exigência extra"]:::livre
+  L --> S2["No Go<br/>exige o motivo do No Go<br/>(o detalhe é opcional)"]:::exige
+  L --> S3["Lost<br/>exige o motivo do Lost"]:::exige
+  L --> S4["Win<br/>exige o Valor CTC"]:::exige
+  L --> S5["Validar<br/>valor antigo da planilha, inativo<br/>aparece até ser corrigido"]:::legado
+  S1 --> EF
+  S2 --> EF
+  S3 --> EF
+  S4 --> EF
+  EF["O status também define:<br/>o bucket e o progresso do cartão no Planner<br/>se o e-mail de nova oportunidade sai (status marcados em Administração, E-mails)<br/>as cores e as contagens da grade e do painel"]:::efeito
 ```
 
 ### D11 · Consulta de CNPJ
@@ -1005,4 +998,5 @@ Para regenerar depois de mudar um diagrama: `npm run diagramas` (usa o Chromium 
 
 | Versão | Data | Mudança |
 |---|---|---|
+| 1.1 | 25/10/2026 | D10b deixa de sugerir um ciclo de status e passa a mostrar só o que o sistema faz: lista fechada sem ordem imposta, exigências por status e efeitos do status (Planner, e-mail, painel) |
 | 1.0 | 25/10/2026 | Catálogo inicial com 19 diagramas (D1 a D19), cobrindo contexto, contêineres, implantação, componentes, jornada, perfis, cadastro, concorrência, validação, estados, CNPJ, carga, Planner, e-mail, backup, CI/CD, STRIDE, papéis do banco e ER |
