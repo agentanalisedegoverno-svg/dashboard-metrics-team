@@ -6,6 +6,9 @@ export type FormValores = Record<Exclude<Nome, 'orcamento_sigiloso' | 'pendencia
 
 const fmtNum = (n: number) => String(n).replace('.', ',')
 
+/** Dia de hoje (aaaa-mm-dd) em Brasília: padrão da data de distribuição de uma oportunidade nova. */
+export const hojeIso = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+
 export function paraForm(o?: Partial<Oportunidade> | null): FormValores {
   const v = {} as Record<string, string | boolean>
   for (const c of TODOS_CAMPOS) {
@@ -21,6 +24,7 @@ export function paraForm(o?: Partial<Oportunidade> | null): FormValores {
     else v[c.nome] = String(bruto)
   }
   v.orcamento_sigiloso = Boolean(o?.orcamento_sigiloso)
+  if (!o) v.data_distribuicao = hojeIso() // oportunidade nova: a distribuição é hoje (pode ser alterada)
   // Campos derivados da empresa vencedora e o texto antigo (somente leitura): vão e voltam sem aparecer como campos.
   v.empresa_vencedora_razao = o?.empresa_vencedora_razao ?? ''
   v.empresa_vencedora_tipo = o?.empresa_vencedora_tipo ?? ''

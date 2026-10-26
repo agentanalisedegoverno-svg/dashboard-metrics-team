@@ -2,6 +2,7 @@
  * Processa a fila de e-mails (email_fila): lê o que está pendente, aplica as regras atuais do administrador e envia.
  * A rede fica atrás de `enviar` (SMTP no script, simulada nos testes). Nada aqui escreve e-mails nem dados no log.
  */
+import { nomesPreVendas } from '../../src/domain/preVendas.ts'
 import type { Sql } from './cadastro.ts'
 import { montarEmail, montarEmailTeste, type DadosEmail, type Mensagem } from './emailMsg.ts'
 
@@ -48,9 +49,9 @@ export async function processarFila(sql: Sql, enviar: Enviar, opc: { url: string
   for (const it of itens) {
     const ehTeste = it.tipo === 'teste'
     // Regras valem na hora do envio: se foi desligado (ou ficou sem destinatário) depois de entrar na fila, não envia.
-    const doPreVendas = !ehTeste && it.analista ? emailPorNome.get(it.analista) : undefined
-    // O pré-vendas entra em "Para", a menos que já esteja na lista (para ou cópia): ninguém recebe duas vezes.
-    const paraItem = doPreVendas && !para.includes(doPreVendas) && !cc.includes(doPreVendas) ? [...para, doPreVendas] : para
+    const doPreVendas = ehTeste ? [] : nomesPreVendas(it.analista).map((n) => emailPorNome.get(n)).filter((x): x is string => !!x)
+    // Cada pré-vendas entra em "Para", a menos que já esteja na lista (para ou cópia): ninguém recebe duas vezes.
+    const paraItem = [...new Set([...para, ...doPreVendas.filter((x) => !para.includes(x) && !cc.includes(x))])]
     if (!ehTeste && (!cfg?.ativo || paraItem.length === 0)) {
       if (!opc.simular) {
         const motivo = !cfg?.ativo ? 'Envio desligado quando chegou a vez' : 'Sem destinatário "para" ativo'

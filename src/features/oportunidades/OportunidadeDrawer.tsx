@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { formataCnpj, soDigitos, validaCnpj } from '@/domain/cnpj'
+import { juntaPreVendas, nomesPreVendas } from '@/domain/preVendas'
 import { CAMPO_LISTA, regrasNegocio, torreDaLinha, type ErroCampo, type Oportunidade } from '@/domain/oportunidade'
 import { cn } from '@/lib/utils'
 import { ApiError, useArquivar, useAtualizar, useConsultaCnpj, useCriar, useHistorico, type Me, type Opcoes } from './api'
@@ -20,6 +21,8 @@ type Props = {
   me: Me
 }
 
+/** Campos de preenchimento: fundo amarelo (texto escuro, contraste AA) nos temas claro e escuro. */
+const destaqueCls = 'border-[#d9b800] bg-[#fff6a8] text-[#1a1a1a] placeholder:text-[#6b6000] disabled:border-[#d9b800] disabled:bg-[#fff6a8] disabled:text-[#1a1a1a]'
 const inputCls =
   'w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted focus-visible:border-gold focus-visible:ring-2 focus-visible:ring-gold/40 aria-invalid:border-st-critical disabled:cursor-default disabled:border-line-soft disabled:bg-surface-2 disabled:text-ink disabled:opacity-100'
 
@@ -125,14 +128,38 @@ function CampoInput({
   const id = `f-${c.nome}`
   if (c.tipo === 'cnpj') return <CampoCnpj c={c} form={form} erro={erro} desabilitado={desabilitado} />
   const reg = form.register(c.nome as keyof FormValores)
+  const cls = cn(inputCls, c.destaque && destaqueCls)
   const comum = { id, 'aria-invalid': erro ? true : undefined, 'aria-describedby': erro ? `${id}-erro` : c.dica ? `${id}-dica` : undefined, disabled: desabilitado }
   let controle: React.ReactNode
-  if (c.tipo === 'lista' || c.tipo === 'preVendas') {
-    const lista = c.tipo === 'preVendas' ? opcoes.preVendas.map((valor) => ({ valor })) : (opcoes.listas[CAMPO_LISTA[c.nome as keyof typeof CAMPO_LISTA]] ?? []).filter((o) => o.ativo)
+  if (c.tipo === 'preVendas') {
+    const marcados = nomesPreVendas(String(form.watch('analista') ?? valorAtual))
+    // Nome antigo fora da lista (ex.: veio da planilha) continua visível, marcado, até alguém desmarcar.
+    const todos = [...opcoes.preVendas, ...marcados.filter((n) => !opcoes.preVendas.includes(n))]
+    const alterna = (nome: string) =>
+      form.setValue('analista', juntaPreVendas(todos.filter((n) => (n === nome ? !marcados.includes(n) : marcados.includes(n)))), { shouldDirty: true, shouldValidate: true })
+    return (
+      <fieldset className={c.largo ? 'sm:col-span-2 lg:col-span-3' : undefined} disabled={desabilitado} aria-describedby={c.dica ? `${id}-dica` : undefined}>
+        <legend className="mb-1 block text-xs font-semibold text-ink-soft">{c.rotulo}</legend>
+        <input type="hidden" {...reg} />
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {todos.map((n) => (
+            <label key={n} className="flex cursor-pointer items-center gap-1.5 text-[13px] text-ink">
+              <input type="checkbox" className="size-4 accent-[var(--gold)]" checked={marcados.includes(n)} onChange={() => alterna(n)} />
+              {n}
+              {!opcoes.preVendas.includes(n) && <span className="text-xs text-muted">(fora da lista — corrija)</span>}
+            </label>
+          ))}
+        </div>
+        {erro ? <p id={`${id}-erro`} role="alert" className="mt-1 text-xs text-st-critical">{erro}</p> : c.dica ? <p id={`${id}-dica`} className="mt-1 text-xs text-muted">{c.dica}</p> : null}
+      </fieldset>
+    )
+  }
+  if (c.tipo === 'lista') {
+    const lista = (opcoes.listas[CAMPO_LISTA[c.nome as keyof typeof CAMPO_LISTA]] ?? []).filter((o) => o.ativo)
     // Valor antigo fora da lista (ex.: "Validar" vindo da planilha) continua visível até ser corrigido.
     const extra = valorAtual && !lista.some((o) => o.valor === valorAtual) ? [{ valor: valorAtual, fora: true }] : []
     controle = (
-      <select className={inputCls} {...comum} {...reg}>
+      <select className={cls} {...comum} {...reg}>
         <option value="">— selecione —</option>
         {[...lista, ...extra].map((o) => (
           <option key={o.valor} value={o.valor}>
@@ -143,14 +170,14 @@ function CampoInput({
       </select>
     )
   } else if (c.tipo === 'longo') {
-    controle = <textarea rows={c.nome === 'descritivo' ? 3 : 4} className={cn(inputCls, 'resize-y')} {...comum} {...reg} />
+    controle = <textarea rows={c.nome === 'descritivo' ? 3 : 4} className={cn(cls, 'resize-y')} maxLength={c.nome === 'descritivo' ? 50 : undefined} {...comum} {...reg} />
   } else if (c.tipo === 'data') {
-    controle = <input type="date" className={inputCls} {...comum} {...reg} />
+    controle = <input type="date" className={cls} {...comum} {...reg} />
   } else if (c.tipo === 'hora') {
-    controle = <input type="time" className={inputCls} {...comum} {...reg} />
+    controle = <input type="time" className={cls} {...comum} {...reg} />
   } else if (c.tipo === 'bool') {
     return (
-      <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ink">
+      <label className={cn('flex cursor-pointer items-center gap-2 text-[13px] text-ink', c.destaque && 'w-fit rounded-md bg-[#fff6a8] px-2 py-1 text-[#1a1a1a]')}>
         <input type="checkbox" className="size-4 accent-[var(--gold)]" {...reg} {...comum} />
         {c.rotulo}
         {c.dica && <span className="text-xs text-muted">· {c.dica}</span>}
@@ -158,7 +185,7 @@ function CampoInput({
     )
   } else {
     const modo = c.tipo === 'dinheiro' || c.tipo === 'percentual' ? 'decimal' : c.tipo === 'inteiro' ? 'numeric' : undefined
-    controle = <input type="text" inputMode={modo} autoComplete="off" className={inputCls} {...comum} {...reg} />
+    controle = <input type="text" inputMode={modo} autoComplete="off" className={cls} {...comum} {...reg} />
   }
   return (
     <div className={c.largo ? 'sm:col-span-2 lg:col-span-3' : undefined}>

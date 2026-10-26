@@ -10,7 +10,7 @@ const opcoes = {
     uf: ['DF', 'GO', 'SP'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
     motivo_no_go: [{ valor: 'Risco Jurídico', ativo: true, ordem: 1 }],
     linha_servico: ['Service Desk', 'Software Development', 'Lya Gov', 'Governança e gestão da TI', 'Outros'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
-    unidade_fornecimento: ['Serviço', 'Posto de Trabalho', 'Ponto de Função', 'Hora'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
+    unidade_fornecimento: ['Posto de Trabalho', 'Serviço (valor fixo)', 'UST'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
   },
   preVendas: ['Flávio Santanna', 'Marcia'],
   linhasTorre: { 'Software Development': 'DIGITAL', 'Lya Gov': 'HEALTH' },
@@ -149,7 +149,7 @@ test('cadastro: valida obrigatórios no cliente e envia números normalizados', 
   await page.getByLabel(/^Instituição/).fill('Prefeitura X')
   await page.getByLabel(/^Descritivo/).fill('Link de internet')
   await page.getByLabel(/^Torre/).selectOption('ITS')
-  await page.getByLabel(/^Data do pregão/).fill('2026-05-20')
+  await page.getByLabel(/^Data do pregão/).fill('2099-05-20')
   await page.getByLabel(/^Orçamento \(R\$\)/).fill('1.234,50')
   await page.getByLabel(/^MC CTC/).fill('18,5')
   await page.getByLabel(/^Impostos/).fill('8,654')
@@ -235,7 +235,7 @@ test('torre acompanha a linha de serviço (campo calculado) e unidade é lista',
   await expect(torre).toHaveValue('ITS') // qualquer outra linha = ITS
   const unidade = page.getByLabel(/^Unidade de fornecimento/)
   expect(await unidade.evaluate((e) => e.tagName)).toBe('SELECT')
-  await expect(unidade.locator('option')).toHaveText(['— selecione —', 'Serviço', 'Posto de Trabalho', 'Ponto de Função', 'Hora'])
+  await expect(unidade.locator('option')).toHaveText(['— selecione —', 'Posto de Trabalho', 'Serviço (valor fixo)', 'UST'])
 })
 
 test('empresa vencedora: só o CNPJ; razão social e matriz/filial vêm da Receita', async ({ page }) => {
@@ -258,26 +258,39 @@ test('empresa vencedora: só o CNPJ; razão social e matriz/filial vêm da Recei
   await page.getByLabel(/^Instituição/).fill('Prefeitura X')
   await page.getByLabel(/^Descritivo/).fill('Link')
   await page.getByLabel(/^Torre/).selectOption('ITS')
-  await page.getByLabel(/^Data do pregão/).fill('2026-05-20')
+  await page.getByLabel(/^Data do pregão/).fill('2099-05-20')
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
   expect(enviados[0]).toMatchObject({ empresa_vencedora_cnpj: '00000000000191', empresa_vencedora_razao: 'BANCO DO BRASIL SA', empresa_vencedora_tipo: 'Matriz' })
 })
 
-test('descritivo aceita texto longo, sem limite de 300 caracteres', async ({ page }) => {
+test('descritivo limitado a 50 caracteres; data de distribuição vem com a data do dia', async ({ page }) => {
   const { enviados } = await api(page)
   await abrirAba(page)
   await page.getByRole('button', { name: 'Nova oportunidade' }).click()
-  const longo = 'Objeto detalhado. '.repeat(400) // ~7.200 caracteres
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+  await expect(page.getByLabel(/^Data de distribuição/)).toHaveValue(hoje)
   await page.getByLabel(/^Status/).selectOption('Go')
   await page.getByLabel(/^Instituição/).fill('Prefeitura X')
-  await page.getByLabel(/^Descritivo/).fill(longo)
+  await page.getByLabel(/^Descritivo/).fill('x'.repeat(80)) // o campo corta em 50
+  await expect(page.getByLabel(/^Descritivo/)).toHaveValue('x'.repeat(50))
   await page.getByLabel(/^Torre/).selectOption('ITS')
-  await page.getByLabel(/^Data do pregão/).fill('2026-05-20')
-  await expect(page.getByText(/Até 300 caracteres/)).toHaveCount(0)
+  await page.getByLabel(/^Data do pregão/).fill('2099-05-20')
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
-  expect((enviados[0].descritivo as string).length).toBe(longo.length)
+  expect((enviados[0].descritivo as string).length).toBe(50)
+  expect(enviados[0].data_distribuicao).toBe(hoje)
+})
+
+test('campos de preenchimento em amarelo e rótulo Processo/Pregão', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  const fundo = (rotulo: RegExp) => page.getByLabel(rotulo).evaluate((e) => getComputedStyle(e).backgroundColor)
+  for (const r of [/^Status/, /^Instituição/, /^Descritivo/, /^Objeto/, /^Processo\/Pregão/, /^UASG/, /^UF/, /^Data do pregão/, /^Hora do pregão/, /^Linha de serviço/, /^Unidade de fornecimento/, /^Orçamento \(R\$\)/]) {
+    expect(await fundo(r), String(r)).toBe('rgb(255, 246, 168)')
+  }
+  expect(await fundo(/^Torre/)).not.toBe('rgb(255, 246, 168)') // campo calculado não é de preenchimento
 })
 
 test('abre em tela cheia, travado; Editar libera; Cancelar descarta; Salvar grava', async ({ page }) => {
@@ -493,11 +506,11 @@ test('Objeto fica logo abaixo do Descritivo e a data do pregão ganha hora (opci
   await page.getByLabel(/^Descritivo/).fill('Descrição')
   await page.getByLabel(/^Objeto/).fill('Link dedicado de 1 Gbps')
   await page.getByLabel(/^Torre/).selectOption('ITS')
-  await page.getByLabel(/^Data do pregão/).fill('2026-05-20')
+  await page.getByLabel(/^Data do pregão/).fill('2099-05-20')
   await page.getByLabel(/^Hora do pregão/).fill('15:30')
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
-  expect(enviados[0]).toMatchObject({ objeto: 'Link dedicado de 1 Gbps', hora_pregao: '15:30', data_pregao_dt: '2026-05-20' })
+  expect(enviados[0]).toMatchObject({ objeto: 'Link dedicado de 1 Gbps', hora_pregao: '15:30', data_pregao_dt: '2099-05-20' })
 })
 
 test('sem preencher objeto e hora, vão como nulos; a grade mostra data com hora só quando há hora', async ({ page }) => {
@@ -510,7 +523,7 @@ test('sem preencher objeto e hora, vão como nulos; a grade mostra data com hora
   await page.getByLabel(/^Instituição/).fill('Prefeitura Y')
   await page.getByLabel(/^Descritivo/).fill('Descrição')
   await page.getByLabel(/^Torre/).selectOption('ITS')
-  await page.getByLabel(/^Data do pregão/).fill('2026-05-21')
+  await page.getByLabel(/^Data do pregão/).fill('2099-05-21')
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
   expect(enviados[0]).toMatchObject({ objeto: null, hora_pregao: null })
@@ -549,4 +562,23 @@ test('filtro por linha de serviço traz as linhas novas (Governança e gestão d
   await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible() // nenhuma da amostra tem essa linha
   await linha.selectOption('')
   await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+})
+
+test('pré-vendas aceita mais de um (caixas de marcar) e o filtro acha por qualquer um', async ({ page }) => {
+  const { enviados } = await api(page)
+  await abrirAba(page)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  await page.getByLabel(/^Status/).selectOption('Go')
+  await page.getByLabel(/^Instituição/).fill('Prefeitura Z')
+  await page.getByLabel(/^Descritivo/).fill('Descrição')
+  await page.getByLabel(/^Torre/).selectOption('ITS')
+  await page.getByLabel(/^Data do pregão/).fill('2099-05-22')
+  const grupo = page.getByRole('group', { name: 'Pré-vendas' })
+  await grupo.getByLabel('Flávio Santanna').check()
+  await grupo.getByLabel('Marcia').check()
+  await grupo.getByLabel('Flávio Santanna').uncheck()
+  await grupo.getByLabel('Flávio Santanna').check()
+  await page.getByRole('button', { name: 'Cadastrar' }).click()
+  await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
+  expect(enviados[0].analista).toBe('Flávio Santanna, Marcia')
 })

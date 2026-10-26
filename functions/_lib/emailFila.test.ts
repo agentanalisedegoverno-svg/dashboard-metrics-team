@@ -26,6 +26,13 @@ function fake(itens: unknown[], opc: { jaPegos?: number[]; ativo?: boolean; avis
 }
 
 describe('processarFila', () => {
+  it('avisa cada pré-vendas da oportunidade (sem repetir quem já é destinatário)', async () => {
+    const usuarios = [{ nome: 'Ana', email: 'ana@x.com' }, { nome: 'Bia', email: 'bia@x.com' }, { nome: 'Caio', email: 'p@x.com' }]
+    const { sql } = fake([item({ analista: 'Ana, Bia, Caio' })], { avisar: true, usuarios })
+    const enviar = vi.fn().mockResolvedValue(undefined)
+    await processarFila(sql, enviar, { url: 'https://radar.test' })
+    expect(enviar.mock.calls[0][0].to).toEqual(['p@x.com', 'ana@x.com', 'bia@x.com'])
+  })
   it('envia para os destinatários ativos e marca como enviado', async () => {
     const { sql, updates } = fake([item()])
     const enviar = vi.fn().mockResolvedValue(undefined)

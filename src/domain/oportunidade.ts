@@ -70,7 +70,7 @@ export const oportunidadeInput = z.object({
   tipo: texto(80),
   modo_disputa: texto(80),
   origem_oportunidade: texto(60),
-  analista: texto(120),
+  analista: texto(300), // vários pré-vendas, separados por vírgula
   site: texto(120),
   vistoria: texto(60),
   linha_servico: texto(120),

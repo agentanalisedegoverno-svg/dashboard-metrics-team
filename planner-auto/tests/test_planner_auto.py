@@ -34,6 +34,8 @@ class Funcoes(unittest.TestCase):
     def test_chave_do_titulo(self):
         self.assertEqual(pa.chave_do_titulo("[RAD-12] X | Y"), "RAD-12")
         self.assertEqual(pa.chave_do_titulo("[2026-0512] Órgão | Objeto"), "2026-0512")
+        self.assertEqual(pa.chave_do_titulo("[RADAR 2026-3156] IBGE | Objeto"), "2026-3156")  # novo padrão do título
+        self.assertEqual(pa.chave_do_titulo("[RADAR RAD-12] X | Y"), "RAD-12")
         self.assertIsNone(pa.chave_do_titulo("Nova oportunidade"))
 
     def test_valida_evento(self):

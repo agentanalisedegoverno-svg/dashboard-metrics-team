@@ -56,6 +56,12 @@ export const fold = (s: unknown) =>
     .toLowerCase()
 
 /** Texto curto: sem NBSP, espaços colapsados e aparado. Vazio vira null. */
+/** A planilha escreve "Serviço"; o cadastro passou a chamar "Serviço (valor fixo)" (e acrescentou UST). */
+const unidadeFornecimento = (v: string | null): string | null => {
+  const k = (v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+  return k === 'servico' ? 'Serviço (valor fixo)' : k === 'ust' ? 'UST' : v
+}
+
 const curto = (v: Cell): string | null => {
   if (v === null || v === undefined) return null
   const s = String(v).replace(/ /g, ' ').replace(/\s+/g, ' ').trim()
@@ -270,7 +276,7 @@ export function mapPlanilha(values: readonly (readonly Cell[])[]): Resultado {
       vistoria: curto(get(r, 'vistoria')),
       linha_servico: lista('linha_servico', get(r, 'linha_servico')),
       torre,
-      unidade_fornecimento: curto(get(r, 'unidade_fornecimento')),
+      unidade_fornecimento: unidadeFornecimento(curto(get(r, 'unidade_fornecimento'))),
       conta_vinculada: lista('conta_vinculada', get(r, 'conta_vinculada')),
       mc_ctc: pct(get(r, 'mc_ctc')),
       simulacao_mc_arrematante: pct(get(r, 'simulacao_mc')),

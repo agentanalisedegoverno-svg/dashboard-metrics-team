@@ -71,9 +71,16 @@ describe('validação (espelho das regras de negócio)', () => {
   it('status fora da lista é recusado', async () => {
     expect(camposComErro(await falha(criar(db, opp({ status: 'Inventado' }))))).toContain('status')
   })
-  it('descritivo longo é aceito (regressão: limite de 300 caracteres removido)', async () => {
-    const o = await criar(db, opp({ descritivo: 'x'.repeat(5000) }))
-    expect(String(o.descritivo).length).toBe(5000)
+  it('descritivo: até 50 caracteres ao criar ou alterar; registro antigo mais longo segue salvando se o texto não mudar', async () => {
+    expect(String((await criar(db, opp({ descritivo: 'x'.repeat(50) }))).descritivo)).toHaveLength(50)
+    expect(camposComErro(await falha(criar(db, opp({ descritivo: 'x'.repeat(51) }))))).toContain('descritivo')
+    // Registro vindo da planilha (carga não passa pela validação) com descritivo longo:
+    const velho = await criar(db, opp({ descritivo: 'curto' }))
+    await db.query(`update oportunidades set descritivo = $1 where id = $2`, ['y'.repeat(900), velho.id])
+    const lido = (await db.query<{ versao: number }>(`select versao from oportunidades where id = $1`, [velho.id])).rows[0]
+    const ok = await atualizar(db, velho.id, lido.versao, opp({ descritivo: 'y'.repeat(900), observacoes: 'só isto' }))
+    expect(String(ok.descritivo)).toHaveLength(900)
+    expect(camposComErro(await falha(atualizar(db, velho.id, ok.versao, opp({ descritivo: 'z'.repeat(60) }))))).toContain('descritivo')
   })
   it('No Go exige motivo; Lost exige motivo; Win exige Valor CTC', async () => {
     expect(camposComErro(await falha(criar(db, opp({ status: 'No Go' }))))).toContain('motivo_no_go')
@@ -113,11 +120,17 @@ describe('validação (espelho das regras de negócio)', () => {
   })
   it('unidade de fornecimento é lista fechada', async () => {
     expect(camposComErro(await falha(criar(db, opp({ unidade_fornecimento: 'Inventada' }))))).toContain('unidade_fornecimento')
-    expect((await criar(db, opp({ unidade_fornecimento: 'Serviço' }))).unidade_fornecimento).toBe('Serviço')
+    expect((await criar(db, opp({ unidade_fornecimento: 'Serviço (valor fixo)' }))).unidade_fornecimento).toBe('Serviço (valor fixo)')
+    expect(camposComErro(await falha(criar(db, opp({ unidade_fornecimento: 'Hora' }))))).toContain('unidade_fornecimento') // inativa
   })
   it('pré-vendas precisa estar na lista de pré-vendas ativos', async () => {
     expect(camposComErro(await falha(criar(db, opp({ analista: 'Fulano Qualquer' }))))).toContain('analista')
     expect((await criar(db, opp({ analista: 'Editor' }))).analista).toBe('Editor')
+  })
+  it('aceita mais de um pré-vendas (separados por vírgula); um nome fora da lista recusa o conjunto', async () => {
+    await db.exec("INSERT INTO usuarios (nome, email, admin, pre_vendas, ativo, somente_leitura) VALUES ('Segundo PV', 'segundo@x.test', false, true, true, false) ON CONFLICT (nome) DO NOTHING")
+    expect((await criar(db, opp({ analista: 'Editor, Segundo PV' }))).analista).toBe('Editor, Segundo PV')
+    expect(camposComErro(await falha(criar(db, opp({ analista: 'Editor, Fulano Qualquer' }))))).toContain('analista')
   })
 })
 
