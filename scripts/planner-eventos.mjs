@@ -40,6 +40,19 @@ if (!marco) {
   process.exit(1)
 }
 
+// Interruptor de modo (migração 012): no modo "nuvem" a própria API atualiza o Planner no instante do Salvar e esta máquina
+// NÃO deve gerar eventos (senão os dois criariam o mesmo cartão). Se a migração ainda não foi aplicada, segue como sempre: máquina.
+let modo = 'maquina'
+try {
+  ;[{ modo }] = await sql`select modo from planner_marco where id = 1`
+} catch {
+  /* coluna inexistente: modo máquina */
+}
+if (modo === 'nuvem') {
+  console.log('Modo nuvem: o Planner é atualizado em tempo real pela API. Nada a fazer nesta máquina.')
+  process.exit(0)
+}
+
 const emails = new Map(
   (await sql`select nome, email from usuarios where email is not null and ativo`).map((u) => [u.nome, u.email]),
 )

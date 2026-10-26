@@ -1,0 +1,59 @@
+name: Planner em tempo real (rotina de segurança)
+
+# A atualização do Planner acontece na própria API, no instante do Salvar (modo nuvem). Esta rotina só refaz o que falhou
+# e avisa (o workflow falha, o GitHub manda e-mail) quando uma oportunidade esgota as tentativas. Em modo "maquina" ou sem
+# as variáveis, não faz nada. O agendamento do GitHub é "melhor esforço" (pode atrasar ou pular), por isso NÃO é ele que dá o
+# tempo real. Ver docs/TEMPO-REAL.md.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      simular:
+        description: 'Só contar o que está pendente (não chama o Planner)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: planner-sincronizar
+  cancel-in-progress: false
+
+jobs:
+  sincronizar:
+    name: Refazer o que falhou
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL_PLANNER: ${{ secrets.DATABASE_URL_PLANNER }}
+      PLANNER_TENANT_ID: ${{ secrets.PLANNER_TENANT_ID }}
+      PLANNER_CLIENT_ID: ${{ secrets.PLANNER_CLIENT_ID }}
+      PLANNER_CLIENT_SECRET: ${{ secrets.PLANNER_CLIENT_SECRET }}
+      PLANNER_RESPONSAVEIS_EXTRAS: ${{ secrets.PLANNER_RESPONSAVEIS_EXTRAS }}
+      SIMULAR: ${{ inputs.simular }}
+    steps:
+      - name: Conferir configuração
+        id: cfg
+        run: |
+          if [ -z "$DATABASE_URL_PLANNER" ] || [ -z "$PLANNER_TENANT_ID" ] || [ -z "$PLANNER_CLIENT_ID" ] || [ -z "$PLANNER_CLIENT_SECRET" ]; then
+            echo "::notice::Modo nuvem do Planner não configurado (faltam secrets): nada a fazer."
+            echo "pronto=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "pronto=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.cfg.outputs.pronto == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.cfg.outputs.pronto == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Instalar dependências
+        if: steps.cfg.outputs.pronto == 'true'
+        run: npm ci --ignore-scripts
+      - name: Sincronizar
+        if: steps.cfg.outputs.pronto == 'true'
+        run: |
+          if [ "$SIMULAR" = "true" ]; then node scripts/planner-sincronizar.mjs --simular; else node scripts/planner-sincronizar.mjs; fi
