@@ -18,6 +18,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `DATABASE_URL_BACKUP` (papel `radar_backup`) | GitHub → Settings → Secrets and variables → Actions | **Secret** | Administrador |
 | `DATABASE_URL_RESTORE` (papel `radar_restore`, só no branch `teste-restauracao`) | GitHub (Actions) | **Secret** | Administrador |
 | `DATABASE_URL_EMAIL` (papel `radar_email`), `SMTP_USER`, `SMTP_PASS` (senha de app do Gmail), `SMTP_FROM` (opcional) e variável `APP_URL` | GitHub (Actions) | **Secret** (`APP_URL` é variável) | Administrador |
+| `GITHUB_DISPATCH_TOKEN` (token do GitHub só com permissão Actions do repositório) e, opcional, `GITHUB_REPO` | Cloudflare Pages → Settings → Variables and Secrets | **Secret** | Administrador |
 | `BACKUP_PASSPHRASE` | GitHub (Actions) **e** cofre de senhas da empresa | **Secret** | Administrador |
 | `RCLONE_DRIVE_TOKEN` | GitHub (Actions) | **Secret** | Administrador |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub (Actions) | **Secret** | Administrador |
@@ -57,7 +58,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 ### 2.3 Integração com o Planner e e-mails (a cada 5 minutos)
 - Tarefa do Windows **`Radar-Planner integracao`**: seg–sex, 08h–19h, **de 5 em 5 minutos**, executa `planner-auto\rodar-integracao.cmd` (exportador → `processar-eventos --sim` → envio de e-mails, se configurado). Se uma rodada demorar, a seguinte não se sobrepõe (`IgnoreNew`).
 - **Mudar o intervalo:** `$t = Get-ScheduledTask -TaskName "Radar-Planner integracao"; $t.Triggers[0].Repetition.Interval = 'PT5M'; Set-ScheduledTask -InputObject $t` (`PT5M` = 5 minutos). **Antes de encurtar mais, leia a conta da cota do banco na seção 5.**
-- **E-mails de nova oportunidade (mesma rotina):** a etapa de e-mail só roda se estas variáveis de **usuário** existirem nesta máquina (fora do Git; a tarefa as enxerga no próximo login): `DATABASE_URL_EMAIL` (papel `radar_email`), `SMTP_USER` e `SMTP_PASS` (senha de app do Gmail) e, opcionalmente, `SMTP_FROM` e `APP_URL`. Defina cada uma com `[Environment]::SetEnvironmentVariable("SMTP_PASS", "<valor>", "User")`. Sem elas, a etapa é pulada e o e-mail depende só do GitHub (noites e fins de semana, de hora em hora). Quando a máquina e o GitHub rodam ao mesmo tempo, o banco garante que cada e-mail sai **uma vez só**.
+- **E-mails de nova oportunidade (mesma rotina):** a etapa de e-mail só roda se estas variáveis de **usuário** existirem nesta máquina (fora do Git; a tarefa as enxerga no próximo login): `DATABASE_URL_EMAIL` (papel `radar_email`), `SMTP_USER` e `SMTP_PASS` (senha de app do Gmail) e, opcionalmente, `SMTP_FROM` e `APP_URL`. Defina cada uma com `[Environment]::SetEnvironmentVariable("SMTP_PASS", "<valor>", "User")`. Elas são **opcionais**: o envio não depende desta máquina, porque o GitHub dispara o envio ao cadastrar a oportunidade (segredo `GITHUB_DISPATCH_TOKEN` no Cloudflare Pages) e roda de 15 em 15 minutos no horário comercial. Sem elas, a etapa é pulada aqui. Quando a máquina e o GitHub rodam ao mesmo tempo, o banco garante que cada e-mail sai **uma vez só**.
 - **Log:** `C:\Users\CTC\planner-auto\logs\integracao.log` (procure `[ERRO]`). Eventos com problema ficam em `eventos\erros\` com um `.erro.txt`.
 - **Rodar agora:** `Start-ScheduledTask -TaskName "Radar-Planner integracao"`.
 - **Pausar:** `Disable-ScheduledTask -TaskName "Radar-Planner integracao"` (reativar com `Enable-ScheduledTask`).
@@ -176,11 +177,11 @@ O Neon gratuito desliga o banco depois de **5 minutos sem uso** e só cobra comp
 | Origem | Horas ligado por mês | CU-horas (× 0,25) |
 |---|---|---|
 | Rotina de 5 em 5 min, seg–sex, 08h–19h (≈ 22 dias × 11 h) | ≈ 242 h | ≈ 61 |
-| GitHub (e-mail), noites e fins de semana, de hora em hora | ≈ 45 h | ≈ 11 |
+| GitHub (e-mail): de 15 em 15 min no horário comercial (mesma janela da rotina: o banco já está ligado, não soma), de hora em hora à noite e nos fins de semana | ≈ 45 h | ≈ 11 |
 | Carga, backup, vigia, uso das pessoas | ≈ 40 h | ≈ 10 |
 | **Total estimado** |  | **≈ 82 de 100** |
 
-Folga de ~18%. Por isso: **não encurte o intervalo abaixo de 5 minutos nem amplie a janela** sem refazer esta conta, e não deixe nenhum agendamento de GitHub frequente em horário comercial (o do e-mail é de hora em hora, só fora do horário). Se a cota acabar, o Neon suspende o banco até o mês seguinte e **o Radar inteiro sai do ar**.
+Folga de ~18%. Por isso: **não encurte o intervalo abaixo de 5 minutos nem amplie a janela** sem refazer esta conta, e não estenda o agendamento de 15 minutos do e-mail para fora de seg–sex, 08h–19h (dentro da janela o banco já fica ligado pela rotina; se a rotina do Windows for desligada, o GitHub passa a ser quem o mantém ligado nessa mesma janela, com o mesmo custo). Se a cota acabar, o Neon suspende o banco até o mês seguinte e **o Radar inteiro sai do ar**.
 
 **Como acompanhar:** no console do Neon (*Billing → Usage*) ou pelo CLI/API, o campo `compute_time_seconds` do projeto (em CU-segundos; divida por 3.600). No dia 20 do mês, o consumo deveria estar abaixo de ~60 CU-h; acima disso, aumente o intervalo (ex.: `PT10M`) até virar o mês. Antes da rotina de 5 minutos, o consumo era de ~6 CU-h por mês.
 

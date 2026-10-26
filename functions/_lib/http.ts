@@ -11,6 +11,9 @@ export type Env = {
   CF_ACCESS_TEAM_DOMAIN?: string
   CF_ACCESS_AUD?: string
   ACESSO_PUBLICO?: string
+  /** Token do GitHub (permissão só de Actions) que aciona o envio de e-mails ao cadastrar. Opcional. */
+  GITHUB_DISPATCH_TOKEN?: string
+  GITHUB_REPO?: string
 }
 
 const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'private, no-store' }
