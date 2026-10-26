@@ -78,7 +78,7 @@ Pontos que costumam surpreender:
 
 | Campo do cartão | Vem de (no Radar) | Na **criação** | Na **atualização** | O que o time pode fazer à mão |
 |---|---|---|---|---|
-| **Título** | `[RADAR código] Órgão \| Objeto \| PE: processo Uasg: uasg \| dd/mm/aaaa - hh:mm` (até 255 caracteres). O Objeto é o campo **Objeto** da oportunidade; em branco, usa o descritivo (cortado em 100 caracteres). A hora só aparece se foi informada. Cartões antigos, com título `[código] ...`, continuam sendo reconhecidos e ganham o novo título na próxima atualização | define | **sobrescreve** | pode editar, mas é reescrito no próximo salvamento. **Nunca remova o `[código]` do início** (ver cenários) |
+| **Título** | `[RADAR código] SIGLA \| Descritivo` (até 255 caracteres). A **Sigla** é o campo Sigla da oportunidade (sem sigla, só o descritivo) e o assunto é o **Descritivo** (cortado em 150 caracteres). Órgão, objeto, processo, Uasg e data **não** vão no título: estão nas anotações. O `[RADAR código]` é a chave que o integrador usa para achar o cartão. Cartões antigos, com outro formato de título, continuam sendo reconhecidos e ganham o título novo na próxima atualização | define | **sobrescreve** | pode editar, mas é reescrito no próximo salvamento. **Nunca remova o `[código]` do início** (ver cenários) |
 | **Coluna (bucket)** | status → mapa abaixo | define | **move** para a coluna do status atual | mover à mão vale só até o próximo salvamento no Radar |
 | **Progresso** | status: 0%, 50% ou 100% | define | **sobrescreve** | idem. Win, Lost, No Go e Canceled marcam 100% (cartão concluído) |
 | **Prazo** | data do pregão. **Com hora informada**, o instante do pregão (Brasília = UTC-3); sem hora, 12:00 UTC como sempre | define | **sobrescreve**, mas se a data estiver vazia no Radar o prazo do cartão **não é limpo** | idem |
@@ -194,7 +194,7 @@ Arquivo `AAAAMMDD-HHMM_<código>_<tipo>.json` em `eventos\entrada\`:
   "plano": "<planId>",
   "planoNome": "ITS Oportunidades",
   "cartao": {
-    "titulo": "[RADAR 2026-0077] SEDES | Link dedicado | PE: 24/2026 Uasg: 158443 | 05/11/2026 - 09:00",
+    "titulo": "[RADAR 2026-0077] SEDES | Link dedicado",
     "status": "Go",
     "bucket": "GO",                        // nome EXATO do bucket no plano
     "progresso": 50,                       // 0, 50 ou 100

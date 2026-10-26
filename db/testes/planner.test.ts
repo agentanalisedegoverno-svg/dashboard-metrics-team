@@ -141,8 +141,8 @@ describe('a consulta do exportador leva o objeto e a hora do pregão', () => {
     const com = await criar(db, opp({ orgao: 'SEDES', objeto: 'Link dedicado', hora_pregao: '12:00', data_pregao_dt: '2026-11-05', analista: 'Editor' }))
     const linha = (await db.query<Record<string, unknown>>(SQL_PENDENTES, [marco])).rows.find((l) => l.id === com.id)!
     const e = montarEvento(linha as unknown as OportunidadePlanner, 'oportunidade_nova', mapa, () => null)!
-    expect(e.cartao.titulo).toContain('| Link dedicado |')
-    expect(e.cartao.titulo.endsWith('05/11/2026 - 12:00')).toBe(true)
+    expect(e.cartao.titulo).toMatch(/^\[RADAR [^\]]+\] .*$/)
+    expect(e.cartao.titulo).not.toContain('Link dedicado') // título = sigla + descritivo; o objeto vai nas anotações
     expect(e.cartao.prazo).toBe('2026-11-05T15:00:00Z')
   })
 })
