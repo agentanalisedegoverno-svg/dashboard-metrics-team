@@ -25,6 +25,9 @@ As regras ficam no banco; a validação vale mesmo para quem chamar a API direto
 
 ## O que vai no e-mail
 
+
+**Assunto** (formato fixo): `[Radar] Status | código | órgão | torre | linha de serviço | descrição | PE: processo UASG: uasg | data/hora do pregão`. Campo em branco vira `—`; a descrição é cortada em 90 caracteres para o assunto não ficar enorme.
+
 Código, órgão, objeto, status, torre, linha de serviço, UF, data e hora do pregão, pré-vendas, orçamento (ou "Sigiloso"), quem cadastrou e um link para o Radar. O descritivo **não** vai. Todo texto vindo do cadastro é escapado (sem HTML nem injeção de cabeçalho).
 
 ## Ativação (uma vez)

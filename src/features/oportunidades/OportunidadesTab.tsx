@@ -4,6 +4,7 @@ import type { Oportunidade } from '@/domain/oportunidade'
 import { useMe, useOpcoes, useOportunidades } from './api'
 import { OportunidadeDrawer } from './OportunidadeDrawer'
 import { OportunidadesGrid } from './OportunidadesGrid'
+import { anosDisponiveis, MESES, mesesDoQuarter, noPeriodo, QUARTERS } from './periodo'
 
 const fold = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
@@ -30,8 +31,10 @@ export default function OportunidadesTab() {
   const buscaAdiada = useDeferredValue(busca)
   const [status, setStatus] = useState('')
   const [torre, setTorre] = useState('')
+  const [linha, setLinha] = useState('')
   const [analista, setAnalista] = useState('')
   const [soPendencias, setSoPendencias] = useState(false)
+  const [periodo, setPeriodo] = useState({ ano: '', quarter: '', mes: '' })
   const [editando, setEditando] = useState<Oportunidade | null | undefined>(undefined)
   const compacto = useMenorQue(768)
 
@@ -41,11 +44,13 @@ export default function OportunidadesTab() {
       (o) =>
         (!status || o.status === status) &&
         (!torre || o.torre === torre) &&
+        (!linha || o.linha_servico === linha) &&
         (!analista || o.analista === analista) &&
+        noPeriodo(o.data_pregao_dt, periodo) &&
         (!soPendencias || (o.pendencias?.length ?? 0) > 0) &&
         (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),
     )
-  }, [lista.data, buscaAdiada, status, torre, analista, soPendencias])
+  }, [lista.data, buscaAdiada, status, torre, linha, analista, soPendencias, periodo])
 
   if (me.error || opcoes.error || lista.error) {
     const e = (me.error ?? opcoes.error ?? lista.error) as Error
@@ -79,9 +84,30 @@ export default function OportunidadesTab() {
           <option value="">Todas as torres</option>
           {valores('torre').map((v) => <option key={v}>{v}</option>)}
         </select>
+        <select aria-label="Filtrar por linha de serviço" className={selectCls} value={linha} onChange={(e) => setLinha(e.target.value)}>
+          <option value="">Todas as linhas de serviço</option>
+          {valores('linha_servico').map((v) => <option key={v}>{v}</option>)}
+        </select>
         <select aria-label="Filtrar por pré-vendas" className={selectCls} value={analista} onChange={(e) => setAnalista(e.target.value)}>
           <option value="">Todos os pré-vendas</option>
           {opcoes.data.preVendas.map((v) => <option key={v}>{v}</option>)}
+        </select>
+        <select aria-label="Filtrar por ano do pregão" className={selectCls} value={periodo.ano} onChange={(e) => setPeriodo((p) => ({ ...p, ano: e.target.value }))}>
+          <option value="">Todos os anos</option>
+          {anosDisponiveis(lista.data.map((o) => o.data_pregao_dt)).map((a) => <option key={a}>{a}</option>)}
+        </select>
+        <select
+          aria-label="Filtrar por quarter do pregão"
+          className={selectCls}
+          value={periodo.quarter}
+          onChange={(e) => setPeriodo((p) => ({ ...p, quarter: e.target.value, mes: '' }))}
+        >
+          <option value="">Todos os quarters</option>
+          {QUARTERS.map((q) => <option key={q} value={q}>{q} ({mesesDoQuarter(q).map((m) => MESES[m - 1].slice(0, 3)).join('/')})</option>)}
+        </select>
+        <select aria-label="Filtrar por mês do pregão" className={selectCls} value={periodo.mes} onChange={(e) => setPeriodo((p) => ({ ...p, mes: e.target.value }))}>
+          <option value="">Todos os meses</option>
+          {mesesDoQuarter(periodo.quarter).map((m) => <option key={m} value={m}>{MESES[m - 1]}</option>)}
         </select>
         <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-ink-soft">
           <input type="checkbox" className="size-4 accent-[var(--gold)]" checked={soPendencias} onChange={(e) => setSoPendencias(e.target.checked)} />
