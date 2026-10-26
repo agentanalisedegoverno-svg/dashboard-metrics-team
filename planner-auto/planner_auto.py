@@ -116,8 +116,11 @@ def planeja(ev: dict, contexto: dict) -> dict:
         responsaveis_ids.append(uid)
 
     existentes = contexto["tarefas_por_chave"].get(chave, [])
+    aviso = None
     if len(existentes) > 1:
-        raise EventoInvalido(f"mais de um cartão com a chave {chave}: {[t['id'] for t in existentes]}")
+        # Cartão duplicado (não deveria existir): o PRIMEIRO (mais antigo) é o correto e é o único que se atualiza.
+        existentes = sorted(existentes, key=lambda t: t.get("createdDateTime") or "")
+        aviso = f"ALERTA: {len(existentes)} cartões com a chave {chave} ({', '.join(t['id'] for t in existentes)}); só o mais antigo é atualizado. Apague os demais no Planner."
 
     base = {
         "chave": chave, "versaoOrigem": ev["versaoOrigem"], "bucket_id": bucket_id, "bucket_nome": c["bucket"],
@@ -126,7 +129,7 @@ def planeja(ev: dict, contexto: dict) -> dict:
         "nota": c.get("nota", ""), "checklist": c.get("checklist", []),
     }
     if existentes:
-        return {"acao": "atualizar", "tarefa_id": existentes[0]["id"], **base}
+        return {"acao": "atualizar", "tarefa_id": existentes[0]["id"], "aviso": aviso, **base}
     return {"acao": "criar", **base}
 
 
@@ -144,6 +147,8 @@ def descricao_acao(p: dict) -> str:
     if p["acao"] == "criar" and p["checklist"]:
         linhas.append(f"   checklist: {len(p['checklist'])} itens")
     linhas.append("   nota: acrescentada em Anotações" if p["nota"] else "   nota: —")
+    if p.get("aviso"):
+        linhas.append("   " + p["aviso"])
     return "\n".join(linhas)
 
 
@@ -331,7 +336,58 @@ def aplica(g: Graph, p: dict, plano_id: str, ev: dict):
     return tarefa_id
 
 
+def aplica_eventos(g, planos, contexto, recarrega, estado, erros: Path, processados: Path):
+    """Grava os eventos em ordem. REGRA DE OURO: um cartão por oportunidade; só se atualiza, nunca se cria outro.
+
+    O plano de cada evento foi feito ANTES de qualquer gravação do lote; por isso, na hora de gravar, ele é refeito com o que os
+    eventos anteriores já gravaram (senão "nova" + "atualizada" da mesma oportunidade no mesmo lote criariam dois cartões) e, antes
+    de qualquer criação, o Planner é relido ao vivo (outra execução pode ter criado o cartão nesse meio tempo).
+    """
+    for arq, ev, p, erro in planos:
+        if erro:
+            (erros / (arq.name + ".erro.txt")).write_text(erro, encoding="utf-8")
+            shutil.move(str(arq), str(erros / arq.name))
+            continue
+        if p["acao"] != "ignorar":
+            try:
+                if p["acao"] == "criar":
+                    recarrega(ev["plano"])
+                p = planeja(ev, contexto(ev["plano"]))
+                if p["acao"] != "ignorar":
+                    tarefa_id = aplica(g, p, ev["plano"], ev)
+                    if p["acao"] == "criar":
+                        contexto(ev["plano"])["tarefas_por_chave"].setdefault(ev["chave"], []).append(
+                            {"id": tarefa_id, "title": p["titulo"], "createdDateTime": datetime.now(timezone.utc).isoformat()})
+                        recarrega(ev["plano"])
+                        if len(contexto(ev["plano"])["tarefas_por_chave"].get(ev["chave"], [])) > 1:
+                            print(f"   ALERTA: a chave {ev['chave']} ficou com mais de um cartão no Planner")
+                    estado[ev["chave"]] = {"versaoOrigem": ev["versaoOrigem"], "tarefa": tarefa_id}
+                    salvar_estado(estado)
+            except (EventoInvalido, RuntimeError) as e:
+                (erros / (arq.name + ".erro.txt")).write_text(str(e), encoding="utf-8")
+                shutil.move(str(arq), str(erros / arq.name))
+                print(f"   ✗ {arq.name}: {e}")
+                continue
+        shutil.move(str(arq), str(processados / arq.name))
+
+
 def cmd_processar(args):
+    """Uma execução por vez: duas execuções ao mesmo tempo poderiam criar o mesmo cartão duas vezes."""
+    trava = HOME_DIR / "processar.lock"
+    if not args.dry_run:
+        HOME_DIR.mkdir(exist_ok=True)
+        if trava.exists() and time.time() - trava.stat().st_mtime < 20 * 60:
+            print("Outra execução do processar-eventos está em andamento; nada foi feito nesta rodada.")
+            return
+        trava.write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
+    try:
+        _processar(args)
+    finally:
+        if not args.dry_run:
+            trava.unlink(missing_ok=True)
+
+
+def _processar(args):
     cfg = carregar_config()
     pasta = Path(cfg["eventos_dir"])
     entrada, processados, erros = pasta / "entrada", pasta / "processados", pasta / "erros"
@@ -374,6 +430,9 @@ def cmd_processar(args):
         return {**cache_plano[plan_id], "ultima_versao": {k: v["versaoOrigem"] for k, v in estado.items()}, "resolve_usuario": resolve_usuario,
                 "responsaveis_extras": cfg.get("responsaveis_extras", [])}
 
+    def recarrega(plan_id):
+        cache_plano.pop(plan_id, None)  # relê buckets, rótulos e cartões do Planner ao vivo
+
     planos = []
     for arq in arquivos:
         try:
@@ -396,22 +455,7 @@ def cmd_processar(args):
         if input(f"Gravar {len(pendentes)} alteração(ões) no Planner? [s/N] ").strip().lower() not in ("s", "sim", "y"):
             print("Cancelado; nada foi gravado.")
             return
-    for arq, ev, p, erro in planos:
-        if erro:
-            (erros / (arq.name + ".erro.txt")).write_text(erro, encoding="utf-8")
-            shutil.move(str(arq), str(erros / arq.name))
-            continue
-        if p["acao"] != "ignorar":
-            try:
-                tarefa_id = aplica(g, p, ev["plano"], ev)
-                estado[ev["chave"]] = {"versaoOrigem": ev["versaoOrigem"], "tarefa": tarefa_id}
-                salvar_estado(estado)
-            except RuntimeError as e:
-                (erros / (arq.name + ".erro.txt")).write_text(str(e), encoding="utf-8")
-                shutil.move(str(arq), str(erros / arq.name))
-                print(f"   ✗ {arq.name}: {e}")
-                continue
-        shutil.move(str(arq), str(processados / arq.name))
+    aplica_eventos(g, planos, contexto, recarrega, estado, erros, processados)
     print("✓ Concluído.")
 
 

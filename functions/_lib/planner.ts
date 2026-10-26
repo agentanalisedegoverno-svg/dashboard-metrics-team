@@ -3,6 +3,7 @@
  * `processar-eventos` do planner-auto). Função pura e testável; nada aqui fala com a rede.
  */
 import { nomesPreVendas } from '../../src/domain/preVendas.ts'
+import { notaCompleta } from './plannerNota.ts'
 
 export type MapaPlanner = {
   planos: Record<
@@ -40,6 +41,8 @@ export type OportunidadePlanner = {
   observacoes: string | null
   orcamento: number | null
   orcamento_sigiloso: boolean
+  /** Linha completa da oportunidade (to_jsonb): quando vem, a anotação do cartão leva todas as informações. */
+  dados?: Record<string, unknown>
 }
 
 export type EventoPlanner = {
@@ -115,7 +118,8 @@ export function montarEvento(
   const status = o.status ?? '_sem_status'
   const bucket = plano.buckets[status] ?? plano.buckets._sem_status
   const rotulos = [...plano.rotulos, ...(plano.rotulosPorTorre?.[o.torre!.trim().toUpperCase()] ?? [])]
-  const nota = [
+  // Com a linha completa da oportunidade (caminho normal do exportador), a anotação leva TODAS as informações.
+  const nota = o.dados ? notaCompleta({ ...o.dados, versao: o.versao }, chaveDe(o)) : [
     `Radar ${chaveDe(o)} (v${o.versao}) — status: ${o.status ?? 'sem status'}.`,
     o.linha_servico ? `Linha de serviço: ${limpa(o.linha_servico)}.` : '',
     o.orcamento_sigiloso ? 'Orçamento sigiloso.' : o.orcamento ? `Orçamento: R$ ${o.orcamento.toLocaleString('pt-BR')}.` : '',
