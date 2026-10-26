@@ -5,10 +5,14 @@ name: Enviar e-mails
 # (Administração → E-mails). Ver docs/EMAIL-NOVAS-OPORTUNIDADES.md.
 # O log deste repositório é público: o script só imprime contagens, nunca endereços nem dados de oportunidades.
 on:
-  # Caminho principal: a tarefa do Windows roda o envio de 5 em 5 minutos, seg a sex, 08h as 19h (ver docs/OPERACAO.md).
-  # Aqui fica a rede de seguranca para noites e fins de semana, de hora em hora (UTC; Brasilia = UTC-3). O agendamento do
-  # GitHub e "melhor esforco" (atrasa ou pula) e cada execucao acorda o banco gratuito, por isso nao e mais frequente.
+  # Nao depende de nenhuma maquina do time. Tres gatilhos (UTC; Brasilia = UTC-3):
+  #  1) Ao cadastrar uma oportunidade, o Radar aciona este workflow na hora (workflow_dispatch, via API do GitHub).
+  #  2) Seg a sex, 08h as 19h: de 15 em 15 minutos (rede de seguranca; o agendamento do GitHub e "melhor esforco": atrasa ou pula).
+  #  3) Noites e fins de semana: de hora em hora.
+  # A tarefa do Windows de 5 em 5 minutos continua podendo enviar tambem; o banco garante que cada e-mail sai uma vez so.
+  # Cada execucao acorda o banco gratuito, por isso a janela de 15 em 15 minutos coincide com a ja contada na cota (OPERACAO.md).
   schedule:
+    - cron: '*/15 11-21 * * 1-5'
     - cron: '0 22,23,0-10 * * 1-5'
     - cron: '0 * * * 0,6'
   workflow_dispatch:
