@@ -1,6 +1,6 @@
 # Integração Radar → Microsoft Planner
 
-> **Status (26/10/2026): em produção.** Exportador, `planner-auto` e agendamento estão ativos; o ciclo completo (oportunidade criada ou salva na web → cartão criado ou atualizado no Planner) roda a cada 30 minutos em dias úteis. Esteve pausado de 22/10 a 26/10 às 08:00 e foi retomado nessa data.
+> **Status (26/10/2026): em produção.** Exportador, `planner-auto` e agendamento estão ativos; o ciclo completo (oportunidade criada ou salva na web → cartão criado ou atualizado no Planner) roda **de 5 em 5 minutos**, em dias úteis, das 08h às 19h (desde 26/10/2026; antes era de 30 em 30). Esteve pausado de 22/10 a 26/10 às 08:00 e foi retomado nessa data.
 >
 > **O que muda no cartão a cada salvamento no Radar: veja [Regra de atualização](#regra-de-atualização-o-que-acontece-no-cartão).**
 
@@ -16,7 +16,7 @@ Sentido único: **Radar → Planner**. O Radar é a fonte da verdade; o Planner 
 
 ## Regra de atualização: o que acontece no cartão
 
-**Em uma frase:** toda vez que alguém **salva** uma oportunidade da web no Radar, em até 30 minutos (em dia útil, das 07h às 19h) o cartão dela no Planner é **criado**, se ainda não existe, ou **atualizado**, se já existe. O Radar **sobrescreve** só quatro campos do cartão (título, coluna, progresso e prazo), **acrescenta** rótulos, responsáveis e anotações, e **não toca** no resto. **Nada do que se faz no Planner volta para o Radar.**
+**Em uma frase:** toda vez que alguém **salva** uma oportunidade da web no Radar, em até 5 minutos (em dia útil, das 08h às 19h) o cartão dela no Planner é **criado**, se ainda não existe, ou **atualizado**, se já existe. O Radar **sobrescreve** só quatro campos do cartão (título, coluna, progresso e prazo), **acrescenta** rótulos, responsáveis e anotações, e **não toca** no resto. **Nada do que se faz no Planner volta para o Radar.**
 
 ### Os cinco princípios
 
@@ -42,7 +42,7 @@ flowchart TB
   C -->|"não"| X2["Nada vai (aviso sem plano no log do exportador)"]:::nada
   C -->|"sim"| D{"Versão maior que a<br/>última exportada?"}:::decisao
   D -->|"não"| X3["Nada a enviar"]:::nada
-  D -->|"sim"| E["A cada 30 min o exportador gera 1 evento por oportunidade<br/>com o estado final (nova se nunca exportada, senão atualizada)"]:::passo
+  D -->|"sim"| E["A cada 5 min o exportador gera 1 evento por oportunidade<br/>com o estado final (nova se nunca exportada, senão atualizada)"]:::passo
   E --> V{"Versão do evento maior que a<br/>última aplicada para esse código?"}:::decisao
   V -->|"não"| IG["Ignorado: nunca sobrescreve algo mais novo"]:::nada
   V -->|"sim"| R{"Bucket, rótulos e responsáveis existem<br/>no Planner e no Entra?"}:::decisao
@@ -72,7 +72,7 @@ Pontos que costumam surpreender:
 - **"Nova" ou "atualizada" depende de o Radar já ter exportado**, não de o cartão existir. Se o cartão foi apagado, o próximo evento "atualizada" cria um cartão novo (ver cenários).
 - **Arquivar não atualiza o cartão** (ele fica como está, sem apagar nem marcar). **Restaurar** a oportunidade volta a enviá-la.
 - **O envio é marcado no momento em que o evento é gerado**, não quando o Planner o aplica. Um evento que cai em `erros\` **não é reenviado sozinho** (ver "Quando algo dá errado").
-- O integrador só roda **seg–sex, 07h–19h, a cada 30 minutos**, com o computador ligado. Mudanças feitas fora dessa janela esperam a próxima rodada.
+- O integrador só roda **seg–sex, 08h–19h, a cada 5 minutos**, com o computador ligado. Mudanças feitas fora dessa janela esperam a próxima rodada.
 
 ### 2. O que acontece em cada campo do cartão
 
@@ -92,7 +92,7 @@ Pontos que costumam surpreender:
 
 **No Radar**
 
-| Alguém... | Resultado no Planner (na próxima rodada, em até 30 min) |
+| Alguém... | Resultado no Planner (na próxima rodada, em até 5 min) |
 |---|---|
 | **cria** a oportunidade (torre ITS, status Go, pré-vendas Júlio) | cartão criado no plano *ITS Oportunidades*, coluna GO, 50%, com checklist e Júlio como responsável |
 | **muda o status** (Go → Win) | o cartão **vai** para a coluna do novo status (*Ganhos!* ou *WIN*), progresso 100%, e ganha uma nota nova |
@@ -160,7 +160,7 @@ Para rodar: `npm test` (parte TypeScript e banco) e `python -m unittest discover
 | Exportador `scripts/planner-eventos.mjs` | este repositório | lê o banco (`radar_planner`) e grava eventos JSON v2 |
 | `planner-auto` ([`planner-auto/`](../planner-auto/)) | este repositório; roda em `C:\Users\CTC\planner-auto` | login no Graph, `inspecionar`, `processar-eventos` |
 | `rodar-integracao.cmd` | `planner-auto/` | roda as duas etapas em sequência, com log |
-| Tarefa `Radar-Planner integracao` | Agendador do Windows | seg–sex, 07h–19h, a cada 30 min |
+| Tarefa `Radar-Planner integracao` | Agendador do Windows | seg–sex, 08h–19h, a cada 5 min (também envia os e-mails de nova oportunidade) |
 | Mapa `config/planner-mapa.json` | este repositório | planos, buckets, rótulos, progresso, checklist padrão |
 | Tabelas `planner_marco` e `planner_exportacao` | Neon (migração 003) | marco de ativação e versão já exportada por oportunidade |
 
@@ -169,7 +169,7 @@ flowchart LR
   W["Aba Oportunidades<br/>cadastro/edição"] --> DB[("Neon")]
   DB -->|"radar_planner<br/>somente leitura"| EX["planner-eventos.mjs"]
   EX -->|"JSON v2"| PE[("eventos\entrada")]
-  AG["Agendador<br/>30 em 30 min"] --> RUN["rodar-integracao.cmd"]
+  AG["Agendador<br/>5 em 5 min"] --> RUN["rodar-integracao.cmd"]
   RUN --> EX
   RUN --> PA["planner_auto.py<br/>processar-eventos --sim"]
   PE --> PA

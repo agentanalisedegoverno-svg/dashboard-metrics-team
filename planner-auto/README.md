@@ -27,7 +27,7 @@ Opcional: `"responsaveis_extras": ["a@x.com", ...]` acrescenta essas pessoas com
 
 ## Agendamento
 
-`rodar-integracao.cmd` roda o exportador do Radar e depois `processar-eventos --sim`, com log em `logs\integracao.log`. Tarefa do Windows: `Radar-Planner integracao` (seg–sex, 07h–19h, a cada 30 min). Ajuste os caminhos do `.cmd` se a pasta do Radar mudar.
+`rodar-integracao.cmd` roda o exportador do Radar, depois `processar-eventos --sim` e, se as variáveis do e-mail existirem na máquina, o envio dos e-mails de nova oportunidade, com log em `logs\integracao.log`. Tarefa do Windows: `Radar-Planner integracao` (seg–sex, 08h–19h, **a cada 5 min**). Ajuste os caminhos do `.cmd` se a pasta do Radar mudar. Detalhes e a conta da cota do banco: [OPERACAO.md](../docs/OPERACAO.md) §2.3 e §5.
 
 ## Testes
 
