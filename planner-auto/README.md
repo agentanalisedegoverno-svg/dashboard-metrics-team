@@ -1,6 +1,6 @@
 # planner-auto
 
-Aplica no Microsoft Planner os eventos gerados pelo Radar (`scripts/planner-eventos.mjs`). Contrato, regras e operação: [`docs/INTEGRACAO-PLANNER.md`](../docs/INTEGRACAO-PLANNER.md).
+Aplica no Microsoft Planner os eventos gerados pelo Radar (`scripts/planner-eventos.mjs`). Contrato, regras e operação: [`docs/INTEGRACAO-PLANNER.md`](../docs/INTEGRACAO-PLANNER.md). **O que acontece no cartão a cada atualização** (sobrescreve, acrescenta, nunca remove): seção [Regra de atualização](../docs/INTEGRACAO-PLANNER.md#regra-de-atualização-o-que-acontece-no-cartão).
 
 ## Instalação (uma vez, na máquina que roda a integração)
 
@@ -35,4 +35,4 @@ Opcional: `"responsaveis_extras": ["a@x.com", ...]` acrescenta essas pessoas com
 python -m unittest discover -s tests
 ```
 
-Cobrem validação do evento, resolução de bucket/rótulo por nome, versionamento, responsáveis e erros que vão para `erros\`. Não acessam a rede.
+Cobrem validação do evento, resolução de bucket/rótulo por nome, versionamento, responsáveis, erros que vão para `erros\` e a **regra de atualização** (classe `RegraDeAtualizacao`: um Graph simulado registra o que seria gravado em cada cenário). Não acessam a rede. Rodam também no CI.
