@@ -127,6 +127,14 @@ describe('validação (espelho das regras de negócio)', () => {
     expect(camposComErro(await falha(criar(db, opp({ analista: 'Fulano Qualquer' }))))).toContain('analista')
     expect((await criar(db, opp({ analista: 'Editor' }))).analista).toBe('Editor')
   })
+  it('sigla: até 8 caracteres, opcional, em branco por padrão; some espaços das pontas', async () => {
+    expect((await criar(db, opp({ sigla: ' IBGE ' }))).sigla).toBe('IBGE')
+    expect((await criar(db, opp({ sigla: '12345678' }))).sigla).toBe('12345678')
+    expect((await criar(db, opp())).sigla).toBeNull()
+    expect(camposComErro(await falha(criar(db, opp({ sigla: '123456789' }))))).toContain('sigla')
+    const a = await criar(db, opp({ sigla: 'ABC' }))
+    expect((await atualizar(db, a.id, a.versao, opp({ sigla: 'XYZ' }))).sigla).toBe('XYZ')
+  })
   it('aceita mais de um pré-vendas (separados por vírgula); um nome fora da lista recusa o conjunto', async () => {
     await db.exec("INSERT INTO usuarios (nome, email, admin, pre_vendas, ativo, somente_leitura) VALUES ('Segundo PV', 'segundo@x.test', false, true, true, false) ON CONFLICT (nome) DO NOTHING")
     expect((await criar(db, opp({ analista: 'Editor, Segundo PV' }))).analista).toBe('Editor, Segundo PV')

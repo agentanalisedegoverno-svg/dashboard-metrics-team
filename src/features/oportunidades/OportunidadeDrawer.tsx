@@ -185,7 +185,7 @@ function CampoInput({
     )
   } else {
     const modo = c.tipo === 'dinheiro' || c.tipo === 'percentual' ? 'decimal' : c.tipo === 'inteiro' ? 'numeric' : undefined
-    controle = <input type="text" inputMode={modo} autoComplete="off" className={cls} {...comum} {...reg} />
+    controle = <input type="text" inputMode={modo} autoComplete="off" maxLength={c.nome === 'sigla' ? 8 : undefined} className={cls} {...comum} {...reg} />
   }
   return (
     <div className={c.largo ? 'sm:col-span-2 lg:col-span-3' : undefined}>

@@ -31,6 +31,7 @@ const semente = (n: number): Reg[] =>
     data_pregao_dt: '2026-03-10',
     hora_pregao: i === 0 ? '15:30:00' : null,
     objeto: null,
+    sigla: null,
     orcamento: 1_000_000 + i,
     orcamento_sigiloso: false,
     valor_ctc: null,
@@ -581,4 +582,25 @@ test('pré-vendas aceita mais de um (caixas de marcar) e o filtro acha por qualq
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
   expect(enviados[0].analista).toBe('Flávio Santanna, Marcia')
+})
+
+test('Sigla (até 8 caracteres) vem antes de Instituição / Órgão e é destacada em amarelo', async ({ page }) => {
+  const { enviados } = await api(page)
+  await abrirAba(page)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  const rotulos = await page.locator('label').allInnerTexts()
+  const pos = (re: RegExp) => rotulos.findIndex((t) => re.test(t))
+  expect(pos(/^Sigla/), 'Sigla vem logo antes da Instituição').toBe(pos(/^Instituição/) - 1)
+  const sigla = page.getByLabel(/^Sigla/)
+  expect(await sigla.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 246, 168)')
+  await sigla.fill('ABCDEFGHIJ')
+  await expect(sigla).toHaveValue('ABCDEFGH')
+  await page.getByLabel(/^Status/).selectOption('Go')
+  await page.getByLabel(/^Instituição/).fill('Prefeitura S')
+  await page.getByLabel(/^Descritivo/).fill('Descrição')
+  await page.getByLabel(/^Torre/).selectOption('ITS')
+  await page.getByLabel(/^Data do pregão/).fill('2099-06-01')
+  await page.getByRole('button', { name: 'Cadastrar' }).click()
+  await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
+  expect(enviados[0].sigla).toBe('ABCDEFGH')
 })
