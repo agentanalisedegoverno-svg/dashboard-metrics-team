@@ -78,12 +78,12 @@ Pontos que costumam surpreender:
 
 | Campo do cartão | Vem de (no Radar) | Na **criação** | Na **atualização** | O que o time pode fazer à mão |
 |---|---|---|---|---|
-| **Título** | `[código] Órgão \| Objeto \| PE: processo UASG: uasg \| DATA: dd/mm/aaaa hh:mm` (até 255 caracteres). O Objeto é o campo **Objeto** da oportunidade; em branco, usa o descritivo. A hora só aparece se foi informada | define | **sobrescreve** | pode editar, mas é reescrito no próximo salvamento. **Nunca remova o `[código]` do início** (ver cenários) |
+| **Título** | `[RADAR código] Órgão \| Objeto \| PE: processo Uasg: uasg \| dd/mm/aaaa - hh:mm` (até 255 caracteres). O Objeto é o campo **Objeto** da oportunidade; em branco, usa o descritivo (cortado em 100 caracteres). A hora só aparece se foi informada. Cartões antigos, com título `[código] ...`, continuam sendo reconhecidos e ganham o novo título na próxima atualização | define | **sobrescreve** | pode editar, mas é reescrito no próximo salvamento. **Nunca remova o `[código]` do início** (ver cenários) |
 | **Coluna (bucket)** | status → mapa abaixo | define | **move** para a coluna do status atual | mover à mão vale só até o próximo salvamento no Radar |
 | **Progresso** | status: 0%, 50% ou 100% | define | **sobrescreve** | idem. Win, Lost, No Go e Canceled marcam 100% (cartão concluído) |
 | **Prazo** | data do pregão. **Com hora informada**, o instante do pregão (Brasília = UTC-3); sem hora, 12:00 UTC como sempre | define | **sobrescreve**, mas se a data estiver vazia no Radar o prazo do cartão **não é limpo** | idem |
 | **Rótulos** | *Licitação* e *Público*, mais *DIGITAL* ou *Health* conforme a torre | define | **acrescenta** os do Radar e mantém os do time | pode adicionar e remover os seus |
-| **Responsáveis** | Pré-vendas da oportunidade (e-mail cadastrado) **mais** os `responsaveis_extras` da configuração do integrador | define | **só acrescenta** quem ainda não está; nunca remove. Sem pré-vendas/e-mail e sem extras, não altera a atribuição | pode acrescentar pessoas. Se remover à mão o pré-vendas ou um extra, a próxima atualização o atribui de novo |
+| **Responsáveis** | **Todos** os pré-vendas da oportunidade que têm e-mail cadastrado (a oportunidade aceita mais de um). Não há responsáveis fixos: o `responsaveis_extras` da configuração do integrador existe, mas está **vazio** | define | **só acrescenta** quem ainda não está; nunca remove. Oportunidade sem pré-vendas (ou sem e-mail) cria o cartão **sem responsável** e não altera a atribuição | pode acrescentar pessoas. Se remover à mão um pré-vendas da oportunidade, a próxima atualização o atribui de novo |
 | **Anotações** (descrição) | nota do Radar: código, versão, status, linha de serviço, orçamento (ou "sigiloso"), observações (até 600 caracteres) | define | **acrescenta ao final**, com o carimbo `--- Radar dd/mm/aaaa hh:mm ---`; não apaga o que o time escreveu | pode escrever livremente. O limite do Planner é 30.000 caracteres: passando disso, o **fim** é cortado e a nota nova se perde |
 | **Checklist** | 7 itens padrão (`checklistPadrao` do mapa) | **só aqui** | **não toca** | marcar, incluir e remover itens é livre |
 | Comentários, anexos, prioridade, data de início | — | não toca | não toca | livre |
@@ -120,7 +120,7 @@ Pontos que costumam surpreender:
 
 | Quando | Quem | O que faz | O que o Planner mostra depois da rodada seguinte |
 |---|---|---|---|
-| 26/10, 09:10 | Ana, no Radar | cadastra a oportunidade `2026-0600` (ITS, Prospect, pré-vendas Júlio) | cartão `[2026-0600] ...` criado em **Prospect**, 0%, checklist de 7 itens, Júlio responsável |
+| 26/10, 09:10 | Ana, no Radar | cadastra a oportunidade `2026-0600` (ITS, Prospect, pré-vendas Júlio) | cartão `[RADAR 2026-0600] ...` criado em **Prospect**, 0%, checklist de 7 itens, Júlio responsável |
 | 09:40 | Júlio, no Planner | marca 2 itens do checklist e comenta | (nada muda no Radar) |
 | 11:00 | João, no Radar | muda o status para **Go** | cartão vai para **GO**, 50%; checklist marcado e comentário **preservados**; anotação ganha `--- Radar 26/10/2026 11:30 ---` e a nota nova |
 | 14:00 | Júlio, no Planner | arrasta o cartão para *Em andamento* | (nada muda no Radar) |
@@ -194,7 +194,7 @@ Arquivo `AAAAMMDD-HHMM_<código>_<tipo>.json` em `eventos\entrada\`:
   "plano": "<planId>",
   "planoNome": "ITS Oportunidades",
   "cartao": {
-    "titulo": "[2026-0077] SEDES | Link dedicado | PE: 24/2026 UASG: 158443 | DATA: 05/11/2026",
+    "titulo": "[RADAR 2026-0077] SEDES | Link dedicado | PE: 24/2026 Uasg: 158443 | 05/11/2026 - 09:00",
     "status": "Go",
     "bucket": "GO",                        // nome EXATO do bucket no plano
     "progresso": 50,                       // 0, 50 ou 100

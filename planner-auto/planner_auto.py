@@ -30,7 +30,7 @@ ESCOPOS = ["Tasks.ReadWrite", "Group.Read.All", "User.ReadBasic.All"]
 BASE = Path(__file__).resolve().parent
 HOME_DIR = Path.home() / ".planner_auto"
 CHAVE_PADRAO = r"(?:\d{4}-\d{4,}|RAD-\d+)"  # código AAAA-NNNN do Radar; RAD-<id> é o formato antigo
-CHAVE_RE = re.compile(r"\[(" + CHAVE_PADRAO + r")\]")
+CHAVE_RE = re.compile(r"\[(?:RADAR\s+)?(" + CHAVE_PADRAO + r")\]")  # aceita "[2026-0512]" (antigo) e "[RADAR 2026-0512]"
 ASSIGN = {"@odata.type": "#microsoft.graph.plannerAssignment", "orderHint": " !"}
 
 

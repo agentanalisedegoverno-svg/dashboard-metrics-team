@@ -16,6 +16,8 @@ export type Campo = {
   calculado?: boolean
   /** Percentual: casas decimais mostradas no formulário e aplicadas ao salvar (padrão: as que o usuário digitar). */
   casas?: number
+  /** Campo de preenchimento destacado em amarelo no formulário. */
+  destaque?: boolean
 }
 
 export type Secao = { id: string; titulo: string; campos: Campo[] }
@@ -26,48 +28,48 @@ export const SECOES: Secao[] = [
     id: 'identificacao',
     titulo: 'Identificação',
     campos: [
-      { nome: 'status', rotulo: 'Status', tipo: 'lista', obrigatorio: true },
-      { nome: 'orgao', rotulo: 'Instituição / Órgão', tipo: 'texto', obrigatorio: true, largo: true },
-      { nome: 'descritivo', rotulo: 'Descritivo', tipo: 'longo', obrigatorio: true, largo: true },
-      { nome: 'objeto', rotulo: 'Objeto', tipo: 'longo', largo: true, dica: 'O que está sendo contratado. Não existe na planilha: fica em branco nos registros importados' },
-      { nome: 'processo', rotulo: 'Processo', tipo: 'texto' },
-      { nome: 'uasg', rotulo: 'UASG', tipo: 'texto' },
-      { nome: 'uf', rotulo: 'UF', tipo: 'lista' },
+      { nome: 'status', destaque: true, rotulo: 'Status', tipo: 'lista', obrigatorio: true },
+      { nome: 'orgao', destaque: true, rotulo: 'Instituição / Órgão', tipo: 'texto', obrigatorio: true, largo: true },
+      { nome: 'descritivo', destaque: true, rotulo: 'Descritivo', tipo: 'longo', obrigatorio: true, largo: true, dica: 'Até 50 caracteres (resumo curto); o detalhe vai em Objeto' },
+      { nome: 'objeto', destaque: true, rotulo: 'Objeto', tipo: 'longo', largo: true, dica: 'O que está sendo contratado. Não existe na planilha: fica em branco nos registros importados' },
+      { nome: 'processo', destaque: true, rotulo: 'Processo/Pregão', tipo: 'texto' },
+      { nome: 'uasg', destaque: true, rotulo: 'UASG', tipo: 'texto' },
+      { nome: 'uf', destaque: true, rotulo: 'UF', tipo: 'lista' },
     ],
   },
   {
     id: 'edital',
     titulo: 'Edital e disputa',
     campos: [
-      { nome: 'data_distribuicao', rotulo: 'Data de distribuição (envio do edital)', tipo: 'data' },
-      { nome: 'data_pregao_dt', rotulo: 'Data do pregão', tipo: 'data', obrigatorio: true },
-      { nome: 'hora_pregao', rotulo: 'Hora do pregão', tipo: 'hora', dica: 'Opcional, horário de Brasília. A planilha só tem a data' },
-      { nome: 'criterio', rotulo: 'Critério', tipo: 'lista' },
-      { nome: 'modalidade', rotulo: 'Modalidade', tipo: 'lista' },
+      { nome: 'data_distribuicao', destaque: true, rotulo: 'Data de distribuição (envio do edital)', tipo: 'data' },
+      { nome: 'data_pregao_dt', destaque: true, rotulo: 'Data do pregão', tipo: 'data', obrigatorio: true },
+      { nome: 'hora_pregao', destaque: true, rotulo: 'Hora do pregão', tipo: 'hora', dica: 'Opcional, horário de Brasília. A planilha só tem a data' },
+      { nome: 'criterio', destaque: true, rotulo: 'Critério', tipo: 'lista' },
+      { nome: 'modalidade', destaque: true, rotulo: 'Modalidade', tipo: 'lista' },
       { nome: 'tipo', rotulo: 'Tipo', tipo: 'texto' },
-      { nome: 'modo_disputa', rotulo: 'Modo de disputa', tipo: 'lista' },
-      { nome: 'origem_oportunidade', rotulo: 'Origem', tipo: 'lista' },
-      { nome: 'site', rotulo: 'Site', tipo: 'lista' },
-      { nome: 'vistoria', rotulo: 'Vistoria', tipo: 'lista' },
+      { nome: 'modo_disputa', destaque: true, rotulo: 'Modo de disputa', tipo: 'lista' },
+      { nome: 'origem_oportunidade', destaque: true, rotulo: 'Origem', tipo: 'lista' },
+      { nome: 'site', destaque: true, rotulo: 'Site', tipo: 'lista' },
+      { nome: 'vistoria', destaque: true, rotulo: 'Vistoria', tipo: 'lista' },
     ],
   },
   {
     id: 'escopo',
     titulo: 'Escopo e responsável',
     campos: [
-      { nome: 'linha_servico', rotulo: 'Linha de serviço', tipo: 'lista' },
+      { nome: 'linha_servico', destaque: true, rotulo: 'Linha de serviço', tipo: 'lista' },
       { nome: 'torre', rotulo: 'Torre', tipo: 'lista', obrigatorio: true, calculado: true, dica: 'Preenchida automaticamente pela linha de serviço' },
-      { nome: 'unidade_fornecimento', rotulo: 'Unidade de fornecimento', tipo: 'lista' },
-      { nome: 'conta_vinculada', rotulo: 'Conta vinculada', tipo: 'lista' },
-      { nome: 'analista', rotulo: 'Pré-vendas', tipo: 'preVendas' },
+      { nome: 'unidade_fornecimento', destaque: true, rotulo: 'Unidade de fornecimento', tipo: 'lista' },
+      { nome: 'conta_vinculada', destaque: true, rotulo: 'Conta vinculada', tipo: 'lista' },
+      { nome: 'analista', rotulo: 'Pré-vendas', tipo: 'preVendas', largo: true, dica: 'Marque um ou mais pré-vendas' },
     ],
   },
   {
     id: 'valores',
     titulo: 'Valores e margens',
     campos: [
-      { nome: 'orcamento', rotulo: 'Orçamento (R$)', tipo: 'dinheiro' },
-      { nome: 'orcamento_sigiloso', rotulo: 'Orçamento sigiloso', tipo: 'bool', dica: 'Marque quando o órgão não divulga o valor' },
+      { nome: 'orcamento', destaque: true, rotulo: 'Orçamento (R$)', tipo: 'dinheiro' },
+      { nome: 'orcamento_sigiloso', destaque: true, rotulo: 'Orçamento sigiloso', tipo: 'bool', dica: 'Marque quando o órgão não divulga o valor' },
       { nome: 'valor_ctc', rotulo: 'Valor CTC (R$)', tipo: 'dinheiro' },
       { nome: 'custo_total_ctc', rotulo: 'Custo total CTC (R$)', tipo: 'dinheiro' },
       { nome: 'mc_ctc', rotulo: 'MC CTC (%)', tipo: 'percentual' },

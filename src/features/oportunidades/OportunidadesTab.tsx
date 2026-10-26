@@ -4,6 +4,7 @@ import type { Oportunidade } from '@/domain/oportunidade'
 import { useMe, useOpcoes, useOportunidades } from './api'
 import { OportunidadeDrawer } from './OportunidadeDrawer'
 import { OportunidadesGrid } from './OportunidadesGrid'
+import { nomesPreVendas } from '@/domain/preVendas'
 import { anosDisponiveis, MESES, mesesDoQuarter, noPeriodo, QUARTERS } from './periodo'
 
 const fold = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -45,7 +46,7 @@ export default function OportunidadesTab() {
         (!status || o.status === status) &&
         (!torre || o.torre === torre) &&
         (!linha || o.linha_servico === linha) &&
-        (!analista || o.analista === analista) &&
+        (!analista || nomesPreVendas(o.analista).includes(analista)) &&
         noPeriodo(o.data_pregao_dt, periodo) &&
         (!soPendencias || (o.pendencias?.length ?? 0) > 0) &&
         (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),

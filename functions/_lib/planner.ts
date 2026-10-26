@@ -2,6 +2,8 @@
  * Radar -> Planner: converte uma oportunidade em um evento v2 (arquivo JSON consumido pelo
  * `processar-eventos` do planner-auto). Função pura e testável; nada aqui fala com a rede.
  */
+import { nomesPreVendas } from '../../src/domain/preVendas.ts'
+
 export type MapaPlanner = {
   planos: Record<
     string,
@@ -57,6 +59,8 @@ export type EventoPlanner = {
     progresso: number
     prazo: string | null
     responsavel: string | null
+    /** Todos os pré-vendas com e-mail (o primeiro é o `responsavel`); vazio não altera a atribuição. */
+    responsaveis: string[]
     rotulos: string[]
     nota: string
     checklist: string[]
@@ -69,6 +73,7 @@ export const chaveRadar = (id: number) => `RAD-${id}`
 export const chaveDe = (o: Pick<OportunidadePlanner, 'id' | 'codigo'>) => o.codigo || chaveRadar(o.id)
 
 const limpa = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim()
+const corta = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s)
 const dataBr = (iso: string) => iso.split('-').reverse().join('/')
 const hhmm = (hora: string | null | undefined) => (hora ? hora.slice(0, 5) : '')
 
@@ -79,15 +84,15 @@ export function prazoDoCartao(data: string | null, hora: string | null | undefin
   return h ? new Date(`${data}T${h}:00-03:00`).toISOString().replace('.000Z', 'Z') : `${data}T12:00:00Z`
 }
 
-/** Mesmo padrão dos cartões existentes: "ÓRGÃO | OBJETO | PE: processo UASG: x | DATA: dd/mm/aaaa". */
+/** "[RADAR código] ÓRGÃO | OBJETO | PE: processo Uasg: x | dd/mm/aaaa - hh:mm" (sem hora, só a data). */
 export function tituloCartao(o: OportunidadePlanner): string {
   const partes = [
     limpa(o.orgao) || 'Órgão não informado',
-    limpa(o.objeto) || limpa(o.descritivo) || 'Objeto não informado',
-    [o.processo ? `PE: ${limpa(o.processo)}` : '', o.uasg ? `UASG: ${limpa(o.uasg)}` : ''].filter(Boolean).join(' '),
-    o.data_pregao_dt ? `DATA: ${dataBr(o.data_pregao_dt)}${hhmm(o.hora_pregao) ? ` ${hhmm(o.hora_pregao)}` : ''}` : '',
+    corta(limpa(o.objeto) || limpa(o.descritivo) || 'Objeto não informado', 100),
+    [o.processo ? `PE: ${limpa(o.processo)}` : '', o.uasg ? `Uasg: ${limpa(o.uasg)}` : ''].filter(Boolean).join(' '),
+    o.data_pregao_dt ? `${dataBr(o.data_pregao_dt)}${hhmm(o.hora_pregao) ? ` - ${hhmm(o.hora_pregao)}` : ''}` : '',
   ].filter(Boolean)
-  return `[${chaveDe(o)}] ${partes.join(' | ')}`.slice(0, 255)
+  return `[RADAR ${chaveDe(o)}] ${partes.join(' | ')}`.slice(0, 255)
 }
 
 export function planoDaTorre(mapa: MapaPlanner, torre: string | null) {
@@ -106,6 +111,7 @@ export function montarEvento(
 ): EventoPlanner | null {
   const plano = planoDaTorre(mapa, o.torre)
   if (!plano) return null
+  const responsaveis = [...new Set(nomesPreVendas(o.analista).map((n) => emailDoAnalista(n)).filter((x): x is string => !!x))]
   const status = o.status ?? '_sem_status'
   const bucket = plano.buckets[status] ?? plano.buckets._sem_status
   const rotulos = [...plano.rotulos, ...(plano.rotulosPorTorre?.[o.torre!.trim().toUpperCase()] ?? [])]
@@ -132,7 +138,8 @@ export function montarEvento(
       bucket,
       progresso: mapa.progresso[status] ?? 0,
       prazo: prazoDoCartao(o.data_pregao_dt, o.hora_pregao),
-      responsavel: o.analista ? emailDoAnalista(o.analista) : null,
+      responsavel: responsaveis[0] ?? null,
+      responsaveis,
       rotulos,
       nota,
       // O checklist padrão só vai na criação; depois o time o conduz no Planner.

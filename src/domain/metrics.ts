@@ -1,3 +1,4 @@
+import { nomesPreVendas } from './preVendas'
 import { groupCount, type Count } from './filters'
 import { NV, type Row } from './types'
 
@@ -76,7 +77,7 @@ export function computeMetrics(rows: readonly Row[]) {
   const linhaServico = withPct(groupCount(rows, 'linhaServico'), total)
 
   const atribCount = rows.filter((r) => r.analista).length
-  const analistas: Analista[] = groupCount(rows, 'analista').map((a) => ({
+  const analistas: Analista[] = groupCount(rows.flatMap((r) => { const n = nomesPreVendas(r.analista); return n.length > 1 ? n.map((x) => ({ ...r, analista: x })) : [r] }), 'analista').map((a) => ({
     ...a,
     pctBase: total ? (a.count / total) * 100 : 0,
     pctAtrib: a.label !== NV && atribCount ? (a.count / atribCount) * 100 : null,
