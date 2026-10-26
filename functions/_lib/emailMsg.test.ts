@@ -3,13 +3,24 @@ import { montarEmail, montarEmailTeste, type DadosEmail } from './emailMsg.ts'
 
 const base: DadosEmail = {
   codigo: '2026-0123', orgao: 'Prefeitura de X', status: 'Go', torre: 'ITS', linha_servico: 'Infraestrutura', uf: 'SP',
-  data_pregao_dt: '2026-11-05', analista: 'Ana', orcamento: 1234567, orcamento_sigiloso: false, criado_por: 'joao@ctctech.com.br',
+  data_pregao_dt: '2026-11-05', descritivo: 'Link dedicado de 1 Gbps', processo: '90012/2026', uasg: '925003', analista: 'Ana', orcamento: 1234567, orcamento_sigiloso: false, criado_por: 'joao@ctctech.com.br',
 }
+
+describe('assunto', () => {
+  it('leva a hora do pregão quando existe e trunca descrição longa sem perder processo e data', () => {
+    const m = montarEmail({ ...base, hora_pregao: '15:30:00', descritivo: 'x'.repeat(500) }, 'https://radar.test')
+    expect(m.assunto).toMatch(/ \| x{89}… \| PE: 90012\/2026 UASG: 925003 \| 05\/11\/2026 15:30$/)
+  })
+  it('campos em branco viram traço', () => {
+    const m = montarEmail({ ...base, descritivo: null, processo: null, uasg: null, torre: null }, 'https://radar.test')
+    expect(m.assunto).toBe('[Radar] Go | 2026-0123 | Prefeitura de X | — | Infraestrutura | — | PE: — UASG: — | 05/11/2026')
+  })
+})
 
 describe('montarEmail', () => {
   it('monta assunto, texto e html com os campos principais', () => {
     const m = montarEmail(base, 'https://radar.test')
-    expect(m.assunto).toBe('[Radar] Nova oportunidade 2026-0123 — Prefeitura de X (Go)')
+    expect(m.assunto).toBe('[Radar] Go | 2026-0123 | Prefeitura de X | ITS | Infraestrutura | Link dedicado de 1 Gbps | PE: 90012/2026 UASG: 925003 | 05/11/2026')
     expect(m.texto).toContain('Data do pregão: 05/11/2026')
     expect(m.texto).toContain('Orçamento: R$')
     expect(m.html).toContain('href="https://radar.test"')

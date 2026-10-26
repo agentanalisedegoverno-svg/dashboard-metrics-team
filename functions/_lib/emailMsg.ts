@@ -5,7 +5,10 @@
 export type DadosEmail = {
   codigo: string | null
   orgao: string | null
+  descritivo?: string | null
   objeto?: string | null
+  processo?: string | null
+  uasg?: string | null
   status: string | null
   torre: string | null
   linha_servico: string | null
@@ -26,6 +29,23 @@ const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const dataBr = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—')
 const brl = (n: number | null) => (n === null || n === undefined ? '—' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }))
 
+/** Assunto: [Radar] Status | código | órgão | torre | linha de serviço | descrição | PE: processo UASG: uasg | data/hora do pregão. */
+export function montarAssunto(o: DadosEmail) {
+  const descricao = limpa(o.descritivo, 400)
+  const pregao = o.data_pregao_dt && o.hora_pregao ? `${dataBr(o.data_pregao_dt)} ${String(o.hora_pregao).slice(0, 5)}` : dataBr(o.data_pregao_dt)
+  const partes = [
+    limpa(o.status) || 'sem status',
+    limpa(o.codigo) || 'sem código',
+    limpa(o.orgao, 80) || 'sem órgão',
+    limpa(o.torre, 40) || '—',
+    limpa(o.linha_servico, 60) || '—',
+    descricao.length > 90 ? `${descricao.slice(0, 89).trimEnd()}…` : descricao || '—',
+    `PE: ${limpa(o.processo, 40) || '—'} UASG: ${limpa(o.uasg, 20) || '—'}`,
+    pregao,
+  ]
+  return `[Radar] ${partes.join(' | ')}`
+}
+
 export function montarEmail(o: DadosEmail, url: string): Mensagem {
   const linhas: [string, string][] = [
     ['Código', limpa(o.codigo) || '—'],
@@ -40,7 +60,7 @@ export function montarEmail(o: DadosEmail, url: string): Mensagem {
     ['Orçamento', o.orcamento_sigiloso ? 'Sigiloso' : brl(o.orcamento)],
     ['Cadastrada por', limpa(o.criado_por) || '—'],
   ]
-  const assunto = limpa(`[Radar] Nova oportunidade ${o.codigo ?? ''} — ${o.orgao ?? 'sem órgão'} (${o.status ?? 'sem status'})`, 180)
+  const assunto = montarAssunto(o)
   const texto = [`Nova oportunidade cadastrada no Radar Pré-Vendas.`, '', ...linhas.map(([k, v]) => `${k}: ${v}`), '', `Abrir o Radar: ${url}`].join('\n')
   const html = `<!doctype html><html lang="pt-BR"><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:14px">
 <p><strong>Nova oportunidade cadastrada no Radar Pré-Vendas.</strong></p>

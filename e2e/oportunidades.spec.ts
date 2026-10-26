@@ -9,7 +9,7 @@ const opcoes = {
     torre: ['ITS', 'DIGITAL', 'HEALTH'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
     uf: ['DF', 'GO', 'SP'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
     motivo_no_go: [{ valor: 'Risco Jurídico', ativo: true, ordem: 1 }],
-    linha_servico: ['Service Desk', 'Software Development', 'Lya Gov'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
+    linha_servico: ['Service Desk', 'Software Development', 'Lya Gov', 'Governança e gestão da TI', 'Outros'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
     unidade_fornecimento: ['Serviço', 'Posto de Trabalho', 'Ponto de Função', 'Hora'].map((valor, i) => ({ valor, ativo: true, ordem: i })),
   },
   preVendas: ['Flávio Santanna', 'Marcia'],
@@ -514,4 +514,39 @@ test('sem preencher objeto e hora, vão como nulos; a grade mostra data com hora
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
   expect(enviados[0]).toMatchObject({ objeto: null, hora_pregao: null })
+})
+test('filtro de período: Ano, Quarter e Mês (mês acompanha o quarter)', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  const ano = page.getByLabel('Filtrar por ano do pregão')
+  const quarter = page.getByLabel('Filtrar por quarter do pregão')
+  const mes = page.getByLabel('Filtrar por mês do pregão')
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+  expect(await ano.locator('option').allInnerTexts()).toEqual(['Todos os anos', '2026']) // só anos que existem nos dados
+  await ano.selectOption('2026')
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+  await quarter.selectOption('Q2')
+  await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible() // as datas são de março (Q1)
+  expect(await mes.locator('option').allInnerTexts()).toEqual(['Todos os meses', 'Abril', 'Maio', 'Junho'])
+  await quarter.selectOption('Q1')
+  expect(await mes.locator('option').allInnerTexts()).toEqual(['Todos os meses', 'Janeiro', 'Fevereiro', 'Março'])
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+  await mes.selectOption({ label: 'Fevereiro' })
+  await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible()
+  await mes.selectOption({ label: 'Março' })
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+  await quarter.selectOption('Q3') // trocar o quarter limpa o mês escolhido
+  await expect(mes).toHaveValue('')
+})
+
+test('filtro por linha de serviço traz as linhas novas (Governança e gestão da TI, Outros)', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  const linha = page.getByLabel('Filtrar por linha de serviço')
+  const opcoesLinha = await linha.locator('option').allInnerTexts()
+  expect(opcoesLinha).toEqual(expect.arrayContaining(['Todas as linhas de serviço', 'Governança e gestão da TI', 'Outros']))
+  await linha.selectOption('Outros')
+  await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible() // nenhuma da amostra tem essa linha
+  await linha.selectOption('')
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
 })
