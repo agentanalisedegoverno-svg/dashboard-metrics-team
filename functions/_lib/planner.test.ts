@@ -10,14 +10,17 @@ const base: OportunidadePlanner = {
 const email = (n: string) => (n === 'Júlio César' ? 'julio.silva@ctctech.com.br' : null)
 
 describe('integração Planner', () => {
-  it('descritivo longo (sem Objeto) é cortado para não engolir processo, Uasg e data', () => {
-    const t = tituloCartao({ ...base, descritivo: 'x'.repeat(900) })
+  it('título: só a chave, a Sigla e o Descritivo (assunto); descritivo longo é cortado', () => {
+    expect(tituloCartao({ ...base, sigla: 'SEDES' })).toBe('[RADAR 2026-0077] SEDES | Link dedicado')
+    expect(tituloCartao({ ...base, sigla: null })).toBe('[RADAR 2026-0077] Link dedicado') // sem sigla: só o descritivo
+    expect(tituloCartao({ ...base, sigla: '  ' })).toBe('[RADAR 2026-0077] Link dedicado')
+    const t = tituloCartao({ ...base, sigla: 'SEDES', descritivo: 'x'.repeat(900) })
     expect(t.length).toBeLessThanOrEqual(255)
-    expect(t.endsWith('PE: 24/2026 Uasg: 158443 | 05/11/2026')).toBe(true)
+    expect(t.startsWith('[RADAR 2026-0077] SEDES | xxx')).toBe(true)
+    expect(t.endsWith('…')).toBe(true)
   })
-  it('título no padrão dos cartões existentes, com a chave entre colchetes', () => {
-    expect(tituloCartao(base)).toBe('[RADAR 2026-0077] SEDES | Link dedicado | PE: 24/2026 Uasg: 158443 | 05/11/2026')
-    expect(tituloCartao({ ...base, processo: null, uasg: null, data_pregao_dt: null, orgao: null })).toBe('[RADAR 2026-0077] Órgão não informado | Link dedicado')
+  it('título sem processo, Uasg, órgão, objeto nem data (isso fica nas anotações) e com a chave entre colchetes', () => {
+    expect(tituloCartao({ ...base, sigla: 'SEDES', objeto: 'Outro assunto', hora_pregao: '15:30:00' })).toBe('[RADAR 2026-0077] SEDES | Link dedicado')
     // sem código (legado): reserva RAD-<id>
     expect(tituloCartao({ ...base, codigo: null }).startsWith('[RADAR RAD-77] ')).toBe(true)
     expect(chaveRadar(5)).toBe('RAD-5')
@@ -91,20 +94,16 @@ describe('anotações do cartão: todas as informações da oportunidade', () =>
 })
 
 describe('objeto e hora do pregão no Planner', () => {
-  it('o título usa o Objeto quando preenchido; em branco, o descritivo, como sempre foi', () => {
-    expect(tituloCartao({ ...base, objeto: 'Link dedicado de 1 Gbps' })).toBe('[RADAR 2026-0077] SEDES | Link dedicado de 1 Gbps | PE: 24/2026 Uasg: 158443 | 05/11/2026')
-    expect(tituloCartao({ ...base, objeto: '   ' })).toBe(tituloCartao(base))
-    expect(tituloCartao({ ...base, objeto: null })).toBe(tituloCartao(base))
+  it('o Objeto não entra no título (o assunto é o descritivo); está nas anotações', () => {
+    expect(tituloCartao({ ...base, objeto: 'Link dedicado de 1 Gbps' })).toBe(tituloCartao(base))
   })
-  it('com hora, o título e o prazo levam a hora (Brasília = UTC-3); sem hora, tudo como antes', () => {
-    expect(tituloCartao({ ...base, hora_pregao: '15:30:00' })).toBe('[RADAR 2026-0077] SEDES | Link dedicado | PE: 24/2026 Uasg: 158443 | 05/11/2026 - 15:30')
+  it('com hora, o prazo leva a hora (Brasília = UTC-3); sem hora, tudo como antes', () => {
     expect(prazoDoCartao('2026-11-05', '12:00:00')).toBe('2026-11-05T15:00:00Z')
     expect(prazoDoCartao('2026-11-05', '22:30')).toBe('2026-11-06T01:30:00Z') // vira o dia em UTC
     expect(prazoDoCartao('2026-11-05', null)).toBe('2026-11-05T12:00:00Z')
     expect(prazoDoCartao(null, '10:00')).toBeNull()
     const ev = montarEvento({ ...base, hora_pregao: '12:00:00' }, 'oportunidade_atualizada', M, email)!
     expect(ev.cartao.prazo).toBe('2026-11-05T15:00:00Z')
-    expect(ev.cartao.titulo.endsWith('05/11/2026 - 12:00')).toBe(true)
     expect(montarEvento(base, 'oportunidade_nova', M, email)!.cartao.prazo).toBe('2026-11-05T12:00:00Z')
   })
 })

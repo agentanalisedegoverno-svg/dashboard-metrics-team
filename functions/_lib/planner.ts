@@ -28,6 +28,8 @@ export type OportunidadePlanner = {
   status: string | null
   torre: string | null
   orgao: string | null
+  /** Sigla do órgão (até 8 caracteres): vai no título do cartão. */
+  sigla?: string | null
   descritivo: string | null
   /** O que está sendo contratado (campo Objeto); em branco, o título usa o descritivo como sempre usou. */
   objeto?: string | null
@@ -77,7 +79,6 @@ export const chaveDe = (o: Pick<OportunidadePlanner, 'id' | 'codigo'>) => o.codi
 
 const limpa = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim()
 const corta = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s)
-const dataBr = (iso: string) => iso.split('-').reverse().join('/')
 const hhmm = (hora: string | null | undefined) => (hora ? hora.slice(0, 5) : '')
 
 /** Prazo do cartão: com hora, o instante do pregão (Brasília é UTC-3, sem horário de verão); sem hora, o meio-dia UTC de sempre. */
@@ -87,14 +88,9 @@ export function prazoDoCartao(data: string | null, hora: string | null | undefin
   return h ? new Date(`${data}T${h}:00-03:00`).toISOString().replace('.000Z', 'Z') : `${data}T12:00:00Z`
 }
 
-/** "[RADAR código] ÓRGÃO | OBJETO | PE: processo Uasg: x | dd/mm/aaaa - hh:mm" (sem hora, só a data). */
+/** "[RADAR código] SIGLA | Descritivo". O [RADAR código] é a chave que o integrador usa para achar o cartão (nunca remover). */
 export function tituloCartao(o: OportunidadePlanner): string {
-  const partes = [
-    limpa(o.orgao) || 'Órgão não informado',
-    corta(limpa(o.objeto) || limpa(o.descritivo) || 'Objeto não informado', 100),
-    [o.processo ? `PE: ${limpa(o.processo)}` : '', o.uasg ? `Uasg: ${limpa(o.uasg)}` : ''].filter(Boolean).join(' '),
-    o.data_pregao_dt ? `${dataBr(o.data_pregao_dt)}${hhmm(o.hora_pregao) ? ` - ${hhmm(o.hora_pregao)}` : ''}` : '',
-  ].filter(Boolean)
+  const partes = [limpa(o.sigla), corta(limpa(o.descritivo) || 'Sem descritivo', 150)].filter(Boolean)
   return `[RADAR ${chaveDe(o)}] ${partes.join(' | ')}`.slice(0, 255)
 }
 
