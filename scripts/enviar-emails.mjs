@@ -43,7 +43,7 @@ if (!simular) {
 }
 
 const r = await processarFila(neon(url), enviar, { url: process.env.APP_URL || 'https://radar-prevendas.pages.dev', simular })
-console.log(`${simular ? '[simulação] ' : ''}pendentes ${r.pendentes} | enviados ${r.enviados} | ignorados ${r.ignorados} | nova tentativa ${r.novaTentativa} | falha definitiva ${r.falhaDefinitiva}`)
+console.log(`${simular ? '[simulação] ' : ''}pendentes ${r.pendentes} | enviados ${r.enviados} | ignorados ${r.ignorados} | nova tentativa ${r.novaTentativa} | falha definitiva ${r.falhaDefinitiva} | em outro processo ${r.emOutroProcesso}`)
 // Só falha o workflow (e dispara o e-mail de alerta do GitHub) quando uma mensagem esgotou as tentativas.
 if (r.falhaDefinitiva > 0) {
   console.error('::error::Há e-mail(s) que esgotaram as tentativas de envio. Veja a aba E-mails na Administração do Radar.')

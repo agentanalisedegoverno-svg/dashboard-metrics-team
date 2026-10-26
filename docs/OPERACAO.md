@@ -54,8 +54,10 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 - **Consulta de CNPJ fora do ar:** o cadastro segue; a tela avisa e a razão social é consultada de novo ao salvar.
 - **Pendências da migração:** a grade tem o filtro "Só com pendências"; corrigir o registro e salvar remove a pendência.
 
-### 2.3 Integração com o Planner (a cada 30 minutos)
-- Tarefa do Windows **`Radar-Planner integracao`**: seg–sex, 07h–19h, de 30 em 30 minutos, executa `planner-auto\rodar-integracao.cmd` (exportador → `processar-eventos --sim`).
+### 2.3 Integração com o Planner e e-mails (a cada 5 minutos)
+- Tarefa do Windows **`Radar-Planner integracao`**: seg–sex, 08h–19h, **de 5 em 5 minutos**, executa `planner-auto\rodar-integracao.cmd` (exportador → `processar-eventos --sim` → envio de e-mails, se configurado). Se uma rodada demorar, a seguinte não se sobrepõe (`IgnoreNew`).
+- **Mudar o intervalo:** `$t = Get-ScheduledTask -TaskName "Radar-Planner integracao"; $t.Triggers[0].Repetition.Interval = 'PT5M'; Set-ScheduledTask -InputObject $t` (`PT5M` = 5 minutos). **Antes de encurtar mais, leia a conta da cota do banco na seção 5.**
+- **E-mails de nova oportunidade (mesma rotina):** a etapa de e-mail só roda se estas variáveis de **usuário** existirem nesta máquina (fora do Git; a tarefa as enxerga no próximo login): `DATABASE_URL_EMAIL` (papel `radar_email`), `SMTP_USER` e `SMTP_PASS` (senha de app do Gmail) e, opcionalmente, `SMTP_FROM` e `APP_URL`. Defina cada uma com `[Environment]::SetEnvironmentVariable("SMTP_PASS", "<valor>", "User")`. Sem elas, a etapa é pulada e o e-mail depende só do GitHub (noites e fins de semana, de hora em hora). Quando a máquina e o GitHub rodam ao mesmo tempo, o banco garante que cada e-mail sai **uma vez só**.
 - **Log:** `C:\Users\CTC\planner-auto\logs\integracao.log` (procure `[ERRO]`). Eventos com problema ficam em `eventos\erros\` com um `.erro.txt`.
 - **Rodar agora:** `Start-ScheduledTask -TaskName "Radar-Planner integracao"`.
 - **Pausar:** `Disable-ScheduledTask -TaskName "Radar-Planner integracao"` (reativar com `Enable-ScheduledTask`).
@@ -161,11 +163,26 @@ Trocar `BACKUP_PASSPHRASE` vale **só para backups novos**: guarde as senhas ant
 
 | Serviço | Limite relevante | Situação |
 |---|---|---|
-| Neon | armazenamento e horas de computação; histórico de 6 h | ~610 linhas: folgado |
+| Neon | **100 CU-horas de computação por mês** (o banco usa 0,25 CU, ou seja, ~400 h ligado); armazenamento; histórico de 6 h | armazenamento folgado. **Computação: ver a conta abaixo (~82 de 100)** |
 | Cloudflare Pages | builds e requisições da Function | uso interno: folgado |
 | Cloudflare Zero Trust (Free) | até 50 usuários | confirmar se o time cabe |
 | GitHub Actions | minutos mensais (repositório público: ilimitado) | folgado |
 | Google Drive | cota da conta do backup | dumps de ~130 KB: irrelevante |
+
+### A conta da computação do Neon (por que o intervalo é de 5 minutos e não menos)
+
+O Neon gratuito desliga o banco depois de **5 minutos sem uso** e só cobra computação enquanto ele está ligado. Cada rodada da rotina consulta o banco; com rodadas de 5 em 5 minutos o banco fica **ligado o tempo todo na janela da rotina**:
+
+| Origem | Horas ligado por mês | CU-horas (× 0,25) |
+|---|---|---|
+| Rotina de 5 em 5 min, seg–sex, 08h–19h (≈ 22 dias × 11 h) | ≈ 242 h | ≈ 61 |
+| GitHub (e-mail), noites e fins de semana, de hora em hora | ≈ 45 h | ≈ 11 |
+| Carga, backup, vigia, uso das pessoas | ≈ 40 h | ≈ 10 |
+| **Total estimado** |  | **≈ 82 de 100** |
+
+Folga de ~18%. Por isso: **não encurte o intervalo abaixo de 5 minutos nem amplie a janela** sem refazer esta conta, e não deixe nenhum agendamento de GitHub frequente em horário comercial (o do e-mail é de hora em hora, só fora do horário). Se a cota acabar, o Neon suspende o banco até o mês seguinte e **o Radar inteiro sai do ar**.
+
+**Como acompanhar:** no console do Neon (*Billing → Usage*) ou pelo CLI/API, o campo `compute_time_seconds` do projeto (em CU-segundos; divida por 3.600). No dia 20 do mês, o consumo deveria estar abaixo de ~60 CU-h; acima disso, aumente o intervalo (ex.: `PT10M`) até virar o mês. Antes da rotina de 5 minutos, o consumo era de ~6 CU-h por mês.
 
 ## 6. Referências
 - [ARQUITETURA.md](ARQUITETURA.md): diagramas e decisões

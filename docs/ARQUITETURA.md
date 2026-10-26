@@ -149,7 +149,7 @@ flowchart LR
   W["Oportunidade criada ou<br/>alterada na web<br/>(depois do marco)"] --> DB[("Neon")]
   DB -->|"radar_planner<br/>somente leitura"| EXP["planner-eventos.mjs"]
   EXP -->|"evento v2 (JSON)"| EV[("eventos/entrada")]
-  AGD["Agendador do Windows<br/>seg–sex, 07h–19h, a cada 30 min"] --> RUN["rodar-integracao.cmd"]
+  AGD["Agendador do Windows<br/>seg–sex, 08h–19h, a cada 5 min"] --> RUN["rodar-integracao.cmd"]
   RUN --> EXP
   RUN --> PA["planner_auto.py<br/>processar-eventos --sim"]
   EV --> PA
@@ -299,7 +299,7 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 |---|---|---|
 | Planilha | SharePoint GOVERNO2 | `BaseLicitacao.xlsx`, aba *Base Governo* (~610 linhas, 39 colunas; as 6 "(Pivot)" são auxiliares e ignoradas) |
 | Carga da planilha | máquina local do João | tarefa `Radar-Carga-Planilha` (dias úteis 07:30; sem IA) |
-| Integração Planner | máquina local do João | tarefa `Radar-Planner integracao` (seg–sex, 07h–19h, a cada 30 min); código em [`planner-auto/`](../planner-auto/) |
+| Integração Planner | máquina local do João | tarefa `Radar-Planner integracao` (seg–sex, 08h–19h, a cada 5 min; também envia os e-mails); código em [`planner-auto/`](../planner-auto/) |
 | Banco | Neon, `aws-sa-east-1` | projeto `radar-prevendas`, branch `main`, banco `neondb` |
 | Hospedagem | Cloudflare Pages | `https://radar-prevendas.pages.dev` |
 | Autenticação | Cloudflare Zero Trust (Free) | time `ctctech-radar`, *One-time PIN*, política `@ctctech.com.br` |
