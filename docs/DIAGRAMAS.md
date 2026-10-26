@@ -609,7 +609,7 @@ sequenceDiagram
   PA->>FS: move para processados, ou para erros com o motivo
 ```
 
-*Sentido único (Radar → Planner). Nunca apaga cartão nem arquivo. As oportunidades vindas da planilha nunca são enviadas.*
+*Sentido único (Radar → Planner). Nunca apaga cartão nem arquivo. As oportunidades vindas da planilha nunca são enviadas. **O que muda em cada campo do cartão a cada salvamento** (e o desenho da decisão) está em [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md#regra-de-atualização-o-que-acontece-no-cartão).*
 
 ### D14 · E-mail de nova oportunidade
 

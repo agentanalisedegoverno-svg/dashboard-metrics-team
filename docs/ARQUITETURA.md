@@ -163,7 +163,7 @@ flowchart LR
 - **Status → bucket e progresso**; **Pré-vendas → responsável** (e-mail cadastrado em *Administração → Usuários e perfis*); título `[AAAA-NNNN] Órgão | Objeto | PE | UASG | DATA` (o **código da oportunidade**).
 - **Idempotente e conservador:** a chave (o código `AAAA-NNNN`) evita duplicar; versão antiga é ignorada; responsável vazio não mexe; nunca apaga cartão nem arquivo; erro vai para `erros\` com o motivo.
 
-Contrato completo e mapeamentos: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md).
+Contrato completo e mapeamentos: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md). **Regra de atualização** (o que o Radar sobrescreve, acrescenta e nunca toca no cartão, com cenários e exemplo): [INTEGRACAO-PLANNER.md#regra-de-atualização-o-que-acontece-no-cartão](INTEGRACAO-PLANNER.md#regra-de-atualização-o-que-acontece-no-cartão).
 
 ## 6. Backup e restauração
 

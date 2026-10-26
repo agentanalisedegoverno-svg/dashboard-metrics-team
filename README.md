@@ -10,7 +10,7 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 | [docs/OPERACAO.md](docs/OPERACAO.md) | Configurações e segredos, rotinas, solução de problemas, troca de senhas e tokens |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Estado atual e melhorias futuras (curto, médio e longo prazo) |
 | [docs/CADASTRO-OPORTUNIDADES.md](docs/CADASTRO-OPORTUNIDADES.md) | Especificação do cadastro de oportunidades na web (34 colunas, validações, UX) |
-| [docs/INTEGRACAO-PLANNER.md](docs/INTEGRACAO-PLANNER.md) | Radar → Microsoft Planner: contrato do evento, regras, operação |
+| [docs/INTEGRACAO-PLANNER.md](docs/INTEGRACAO-PLANNER.md) | Radar → Microsoft Planner: **regra de atualização do cartão**, contrato do evento, operação |
 | [docs/EMAIL-NOVAS-OPORTUNIDADES.md](docs/EMAIL-NOVAS-OPORTUNIDADES.md) | E-mail a cada nova oportunidade: regras na Administração, envio por SMTP do Gmail |
 | [docs/DIAGRAMAS.md](docs/DIAGRAMAS.md) | Catálogo de diagramas (19, em camadas, com SVG): contexto, fluxos, segurança e dados |
 | [docs/TESTES.md](docs/TESTES.md) | Bateria de testes: regressão, segurança, carga e desempenho; como rodar e achados |

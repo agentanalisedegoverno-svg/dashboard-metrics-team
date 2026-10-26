@@ -102,16 +102,15 @@ describe('segredos e dados reais no repositório', () => {
     ['token de API da Cloudflare', /\b(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN)\s*[=:]\s*["']?[A-Za-z0-9_-]{30,}/],
   ]
   const IGNORAR = new Set(['package-lock.json', 'src/seguranca-estatica.test.ts'])
-  const texto = (f: string) => !/\.(png|jpg|jpeg|gif|ico|woff2?|ttf|xlsx?|pdf|zip)$/i.test(f) && !IGNORAR.has(f)
+  // SVG dos diagramas são gerados a partir do Mermaid de docs/DIAGRAMAS.md (que é varrido): ficam de fora para a varredura ser rápida.
+  const texto = (f: string) => !/\.(png|jpg|jpeg|gif|ico|woff2?|ttf|xlsx?|pdf|zip)$/i.test(f) && !IGNORAR.has(f) && !/^docs\/diagramas\/.*\.svg$/.test(f)
+  let conteudos: [string, string][] | null = null
+  const todos = () => (conteudos ??= arquivosVersionados().filter(texto).map((f): [string, string] => [f, ler(f)])) // lê cada arquivo uma vez só
 
   it.each(PADROES)('nenhum arquivo versionado contém %s', (_nome, re) => {
-    const achados: string[] = []
-    for (const f of arquivosVersionados().filter(texto)) {
-      const t = ler(f)
-      if (re.test(t)) achados.push(f)
-    }
+    const achados = todos().filter(([, t]) => re.test(t)).map(([f]) => f)
     expect(achados).toEqual([])
-  })
+  }, 30_000)
   it('planilhas e arquivos de segredos locais não são versionados', () => {
     const proibidos = arquivosVersionados().filter((f) => /\.(xlsx|xlsm|xls|csv|pem|key|p12|pfx)$/i.test(f) || /(^|\/)\.(env|dev\.vars)(\.|$)/.test(f) && !/\.example$|\.e2e$|\.demo$/.test(f))
     expect(proibidos).toEqual([])
