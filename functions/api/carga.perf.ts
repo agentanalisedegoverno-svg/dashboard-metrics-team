@@ -116,6 +116,7 @@ describe('fila de e-mail sob carga', () => {
         return itens.slice(0, limiteRecebido)
       }
       if (q.includes('from email_config')) return [{ ativo: true, avisar_pre_vendas: true }]
+      if (q.startsWith('update email_fila set tentativas')) return [{ id: 1 }] // pedido reservado (claim atômico)
       if (q.includes('from email_destinatarios')) return [{ email: 'p@x.com', tipo: 'para' }]
       if (q.includes('from usuarios')) return [{ nome: 'Ana', email: 'ana@x.com' }]
       return []
@@ -136,6 +137,7 @@ describe('fila de e-mail sob carga', () => {
       const q = s.join('?').replace(/\s+/g, ' ')
       if (q.includes('from email_fila f')) return itens
       if (q.includes('from email_config')) return [{ ativo: true, avisar_pre_vendas: false }]
+      if (q.startsWith('update email_fila set tentativas')) return [{ id: 1 }] // pedido reservado (claim atômico)
       if (q.includes('from email_destinatarios')) return [{ email: 'p@x.com', tipo: 'para' }]
       if (q.startsWith('update email_fila set situacao')) atualizacoes.push(String(v[0]))
       return []
