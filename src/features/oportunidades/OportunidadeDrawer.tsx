@@ -146,6 +146,8 @@ function CampoInput({
     controle = <textarea rows={c.nome === 'descritivo' ? 3 : 4} className={cn(inputCls, 'resize-y')} {...comum} {...reg} />
   } else if (c.tipo === 'data') {
     controle = <input type="date" className={inputCls} {...comum} {...reg} />
+  } else if (c.tipo === 'hora') {
+    controle = <input type="time" className={inputCls} {...comum} {...reg} />
   } else if (c.tipo === 'bool') {
     return (
       <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ink">

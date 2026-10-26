@@ -45,7 +45,7 @@ const emails = new Map(
 )
 
 const pendentes = await sql`
-  select o.id, o.codigo, o.versao, o.status, o.torre, o.orgao, o.descritivo, o.processo, o.uasg, o.data_pregao_dt::text as data_pregao_dt,
+  select o.id, o.codigo, o.versao, o.status, o.torre, o.orgao, o.descritivo, o.objeto, o.processo, o.uasg, o.data_pregao_dt::text as data_pregao_dt, o.hora_pregao::text as hora_pregao,
          o.analista, o.linha_servico, o.observacoes, o.orcamento::float8 as orcamento, o.orcamento_sigiloso,
          e.versao_exportada
   from oportunidades o

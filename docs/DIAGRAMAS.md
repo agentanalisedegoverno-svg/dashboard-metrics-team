@@ -115,13 +115,13 @@ flowchart LR
 
   subgraph win["Máquina Windows (Agendador de Tarefas)"]
     CARGA{{"Radar-Carga-Planilha<br/>dias úteis 07:30<br/>Python + Node"}}:::agenda
-    PLN{{"Integração Planner<br/>a cada 30 min<br/>Node + Python"}}:::agenda
+    PLN{{"Rotina de 5 em 5 min<br/>Planner e e-mails<br/>Node + Python"}}:::agenda
   end
 
   subgraph gh["GitHub Actions (runners Ubuntu)"]
     WF{{"Pipeline CI/CD"}}:::agenda
     BKP{{"Backup diário, restauração mensal e vigia"}}:::agenda
-    MAIL{{"Enviar e-mails<br/>a cada 5 min, nodemailer"}}:::agenda
+    MAIL{{"Enviar e-mails (rede de segurança)<br/>de hora em hora, à noite e nos fins de semana<br/>nodemailer"}}:::agenda
     NF{{"Testes de carga e segurança<br/>semanal"}}:::agenda
   end
 
@@ -139,6 +139,8 @@ flowchart LR
   CARGA -->|"radar_escritor: sincronizar_planilha"| DB
   PLN -->|"radar_planner (leitura)"| DB
   PLN -->|"MS Graph (delegado)"| PL
+  PLN -->|"radar_email (fila de e-mails)"| DB
+  PLN -->|"SMTP TLS"| GM
   MAIL -->|"radar_email (lê + atualiza a fila)"| DB
   MAIL -->|"SMTP TLS"| GM
   BKP -->|"radar_backup (pg_dump)"| DB
@@ -174,7 +176,7 @@ flowchart TB
   subgraph ghr["GitHub (runners efêmeros)"]
     S1{{"Backup diário 03:00 BRT<br/>(na prática ~08:30)"}}:::agenda
     S2{{"Vigia 12:00 BRT"}}:::agenda
-    S3{{"Enviar e-mails a cada 5 min"}}:::agenda
+    S3{{"Enviar e-mails: hora em hora,<br/>só à noite e nos fins de semana"}}:::agenda
     S4{{"Restauração: dia 1 do mês"}}:::agenda
     S5{{"Carga e segurança: segunda 06:00 BRT"}}:::agenda
     S6{{"CodeQL: segunda"}}:::agenda
@@ -182,7 +184,7 @@ flowchart TB
 
   subgraph pc["Máquina Windows do time"]
     T1{{"Radar-Carga-Planilha<br/>dias úteis 07:30<br/>(ou assim que ligar)"}}:::agenda
-    T2{{"Integração Planner<br/>seg a sex 07h às 19h, 30 min"}}:::agenda
+    T2{{"Planner e e-mails<br/>seg a sex 08h às 19h, de 5 em 5 min"}}:::agenda
     FS[("eventos/ entrada, processados, erros<br/>logs")]:::dados
   end
 
@@ -577,7 +579,7 @@ sequenceDiagram
   autonumber
   actor U as Usuário
   participant DB as Banco
-  participant AG as Agendador (30 min, seg a sex)
+  participant AG as Agendador (5 min, seg a sex, 08h às 19h)
   participant EX as planner-eventos.mjs
   participant FS as eventos/entrada
   participant PA as planner_auto.py
@@ -615,7 +617,7 @@ sequenceDiagram
   actor U as Usuário
   participant S as SPA e API
   participant DB as Banco
-  participant GA as GitHub Actions (a cada 5 min)
+  participant GA as Rotina de envio (máquina do time a cada 5 min, GitHub à noite)
   participant SMTP as Gmail SMTP
 
   Note over ADM,DB: Configuração (Administração, aba E-mails)
@@ -635,13 +637,13 @@ sequenceDiagram
   GA->>DB: lê até 50 pedidos pendentes (radar_email)
   GA->>GA: regras valem agora: módulo ligado? tem destinatário Para?
   GA->>GA: destinatários = lista Para e Cc, mais o pré-vendas da oportunidade se a opção estiver ligada e ele tiver e-mail
-  GA->>DB: conta a tentativa antes de enviar
+  GA->>DB: pega o pedido e conta a tentativa (se outro processo já pegou, pula)
   GA->>SMTP: envia (TLS, porta 465)
   alt enviado
     GA->>DB: situação enviado
   else erro
     GA->>DB: volta a pendente com o motivo, até 5 tentativas
-    GA->>GA: na 5ª falha: situação erro e o workflow falha, o GitHub avisa
+    GA->>GA: na 5ª falha: situação erro (aparece na aba E-mails), e pelo GitHub o workflow também falha e o GitHub avisa
   end
 ```
 
@@ -864,7 +866,9 @@ erDiagram
     text linha_servico
     text orgao
     text descritivo "sem limite"
+    text objeto "o que se contrata, fora da planilha"
     date data_pregao_dt
+    time hora_pregao "opcional, horário de Brasília, fora da planilha"
     text analista "pré-vendas"
     numeric orcamento
     bool orcamento_sigiloso

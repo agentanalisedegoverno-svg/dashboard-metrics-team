@@ -7,7 +7,7 @@ import { montarEmail, montarEmailTeste, type DadosEmail, type Mensagem } from '.
 
 export type Envio = Mensagem & { to: string[]; cc: string[] }
 export type Enviar = (e: Envio) => Promise<void>
-export type Resumo = { pendentes: number; enviados: number; ignorados: number; novaTentativa: number; falhaDefinitiva: number }
+export type Resumo = { pendentes: number; enviados: number; ignorados: number; novaTentativa: number; falhaDefinitiva: number; emOutroProcesso: number }
 
 type Item = DadosEmail & { id: number; tipo: 'nova' | 'teste'; tentativas: number; destino_teste: string | null }
 
@@ -22,11 +22,11 @@ export const resumoErro = (e: unknown) => {
 export async function processarFila(sql: Sql, enviar: Enviar, opc: { url: string; max?: number; tentativasMax?: number; simular?: boolean }): Promise<Resumo> {
   const max = opc.max ?? 50
   const tentativasMax = opc.tentativasMax ?? 5
-  const r: Resumo = { pendentes: 0, enviados: 0, ignorados: 0, novaTentativa: 0, falhaDefinitiva: 0 }
+  const r: Resumo = { pendentes: 0, enviados: 0, ignorados: 0, novaTentativa: 0, falhaDefinitiva: 0, emOutroProcesso: 0 }
 
   const itens = (await sql`
     select f.id, f.tipo, f.tentativas, f.destino_teste,
-           o.codigo, o.orgao, o.status, o.torre, o.linha_servico, o.uf, o.data_pregao_dt::text as data_pregao_dt, o.analista,
+           o.codigo, o.orgao, o.objeto, o.status, o.torre, o.linha_servico, o.uf, o.data_pregao_dt::text as data_pregao_dt, o.hora_pregao::text as hora_pregao, o.analista,
            o.orcamento::float8 as orcamento, coalesce(o.orcamento_sigiloso, false) as orcamento_sigiloso, o.criado_por
     from email_fila f left join oportunidades o on o.id = f.oportunidade_id
     where f.situacao = 'pendente' and f.tentativas < ${tentativasMax}::int
@@ -65,8 +65,14 @@ export async function processarFila(sql: Sql, enviar: Enviar, opc: { url: string
       r.enviados++
       continue
     }
-    // Conta a tentativa ANTES de enviar: se o processo morrer no meio, o limite de tentativas ainda vale.
-    await sql`update email_fila set tentativas = tentativas + 1 where id = ${it.id}::bigint`
+    // Conta a tentativa ANTES de enviar (se o processo morrer no meio, o limite de tentativas ainda vale) e, no mesmo passo,
+    // "pega" o pedido: se a máquina do time e o GitHub rodarem ao mesmo tempo, só um deles consegue e o outro pula (nada sai em dobro).
+    const pegou = await sql`update email_fila set tentativas = tentativas + 1
+      where id = ${it.id}::bigint and situacao = 'pendente' and tentativas = ${it.tentativas}::int returning id`
+    if (!pegou.length) {
+      r.emOutroProcesso++
+      continue
+    }
     try {
       await enviar(envio)
       await sql`update email_fila set situacao = 'enviado', enviado_em = now(), ultimo_erro = null where id = ${it.id}::bigint`

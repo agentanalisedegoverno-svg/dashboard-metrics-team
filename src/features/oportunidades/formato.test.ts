@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { regrasNegocio, type OportunidadeInput } from '@/domain/oportunidade'
-import { deForm, paraForm, pct } from './formato'
+import { deForm, paraForm, pct, pregaoBr } from './formato'
 
 const base = paraForm({ status: 'Go', orgao: 'SEDES', descritivo: 'Link', torre: 'ITS', data_pregao_dt: '2026-03-10' })
 
@@ -58,5 +58,28 @@ describe('regrasNegocio (espelho do banco)', () => {
     expect(regrasNegocio(ok({ data_distribuicao: '2026-04-01' })).map((e) => e.campo)).toContain('data_pregao_dt')
     expect(regrasNegocio(ok({ orcamento_sigiloso: true, orcamento: 10 })).map((e) => e.campo)).toContain('orcamento')
     expect(regrasNegocio(ok())).toEqual([])
+  })
+})
+
+describe('objeto e hora do pregão no formulário', () => {
+  it('o banco devolve HH:MM:SS e o campo mostra HH:MM; vazio fica vazio', () => {
+    expect(paraForm({ hora_pregao: '15:30:00', objeto: 'Link dedicado' })).toMatchObject({ hora_pregao: '15:30', objeto: 'Link dedicado' })
+    expect(paraForm({})).toMatchObject({ hora_pregao: '', objeto: '' })
+    expect(paraForm({ hora_pregao: null, objeto: null })).toMatchObject({ hora_pregao: '', objeto: '' })
+  })
+  it('vai e volta: hora e objeto digitados chegam à API como o contrato espera', () => {
+    const r = deForm({ ...base, hora_pregao: '15:30', objeto: 'Link dedicado' })
+    expect(r.success && r.data).toMatchObject({ hora_pregao: '15:30', objeto: 'Link dedicado' })
+    const vazio = deForm(base)
+    expect(vazio.success && vazio.data).toMatchObject({ hora_pregao: null, objeto: null })
+  })
+  it('hora inválida aponta o campo', () => {
+    const r = deForm({ ...base, hora_pregao: '25:00' })
+    expect(!r.success && r.error.issues[0].path[0]).toBe('hora_pregao')
+  })
+  it('data e hora do pregão na grade: com hora mostra as duas; sem hora (planilha), só a data', () => {
+    expect(pregaoBr('2026-11-05', '15:30:00')).toBe('05/11/2026 15:30')
+    expect(pregaoBr('2026-11-05', null)).toBe('05/11/2026')
+    expect(pregaoBr(null, '15:30:00')).toBe('—')
   })
 })

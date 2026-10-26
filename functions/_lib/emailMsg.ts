@@ -5,11 +5,13 @@
 export type DadosEmail = {
   codigo: string | null
   orgao: string | null
+  objeto?: string | null
   status: string | null
   torre: string | null
   linha_servico: string | null
   uf: string | null
   data_pregao_dt: string | null
+  hora_pregao?: string | null
   analista: string | null
   orcamento: number | null
   orcamento_sigiloso: boolean
@@ -28,11 +30,12 @@ export function montarEmail(o: DadosEmail, url: string): Mensagem {
   const linhas: [string, string][] = [
     ['Código', limpa(o.codigo) || '—'],
     ['Órgão', limpa(o.orgao) || '—'],
+    ['Objeto', limpa(o.objeto, 300) || '—'],
     ['Status', limpa(o.status) || '—'],
     ['Torre', limpa(o.torre) || '—'],
     ['Linha de serviço', limpa(o.linha_servico) || '—'],
     ['UF', limpa(o.uf) || '—'],
-    ['Data do pregão', dataBr(o.data_pregao_dt)],
+    ['Data do pregão', o.data_pregao_dt && o.hora_pregao ? `${dataBr(o.data_pregao_dt)} ${String(o.hora_pregao).slice(0, 5)}` : dataBr(o.data_pregao_dt)],
     ['Pré-vendas', limpa(o.analista) || '—'],
     ['Orçamento', o.orcamento_sigiloso ? 'Sigiloso' : brl(o.orcamento)],
     ['Cadastrada por', limpa(o.criado_por) || '—'],

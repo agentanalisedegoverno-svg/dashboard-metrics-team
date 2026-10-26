@@ -294,3 +294,50 @@ describe('e-mail de nova oportunidade', () => {
     }
   })
 })
+
+describe('objeto e hora do pregão', () => {
+  it('guardam e devolvem; em branco ficam nulos (nada muda para quem não preencher)', async () => {
+    const com = await criar(db, opp({ objeto: 'Link dedicado de 1 Gbps', hora_pregao: '15:30' }))
+    expect(com).toMatchObject({ objeto: 'Link dedicado de 1 Gbps', hora_pregao: '15:30:00' })
+    const sem = await criar(db, opp())
+    expect(sem.objeto).toBeNull()
+    expect(sem.hora_pregao).toBeNull()
+  })
+  it('a data continua sendo a data (código por ano e SLA intactos) e a hora é só um complemento', async () => {
+    const o = await criar(db, opp({ data_pregao_dt: '2061-02-03', hora_pregao: '23:59' }))
+    expect(o.codigo).toMatch(/^2061-/)
+    expect(o.data_pregao).toBe('03/02/2061')
+    expect(o.hora_pregao).toBe('23:59:00')
+  })
+  it('hora inválida é recusada pelo banco (formato inválido) e 00:00 vale', async () => {
+    const f = await falha(criar(db, opp({ hora_pregao: '25:00' })))
+    expect(f?.code).toBe('22008') // hora fora da faixa; a API traduz este código em 422
+    expect((await falha(criar(db, opp({ hora_pregao: 'abc' }))))?.code).toBe('22007') // formato inválido; idem
+    expect((await criar(db, opp({ hora_pregao: '00:00' }))).hora_pregao).toBe('00:00:00')
+  })
+  it('objeto acima de 5000 caracteres é recusado, apontando o campo', async () => {
+    expect(camposComErro(await falha(criar(db, opp({ objeto: 'x'.repeat(5001) }))))).toContain('objeto')
+    expect((await criar(db, opp({ objeto: 'x'.repeat(5000) }))).objeto).toHaveLength(5000)
+  })
+  it('editar registra no histórico (de → para) e sem mexer mantém o valor', async () => {
+    const a = await criar(db, opp({ objeto: 'Antes', hora_pregao: '09:00' }))
+    const b = await atualizar(db, a.id, a.versao, opp({ objeto: 'Depois', hora_pregao: '10:15' }))
+    expect(b).toMatchObject({ objeto: 'Depois', hora_pregao: '10:15:00' })
+    const h = await db.query<{ alteracoes: Record<string, [unknown, unknown]> }>(`select alteracoes from oportunidades_historico where oportunidade_id = $1 and acao = 'editou'`, [a.id])
+    expect(h.rows[0].alteracoes.objeto).toEqual(['Antes', 'Depois'])
+    expect(h.rows[0].alteracoes.hora_pregao).toEqual(['09:00:00', '10:15:00'])
+    const c = await atualizar(db, b.id, b.versao, opp({ objeto: 'Depois', hora_pregao: '10:15', observacoes: 'só isto' }))
+    expect(c).toMatchObject({ objeto: 'Depois', hora_pregao: '10:15:00' })
+  })
+  it('o que vem da planilha fica em branco e a carga por merge NÃO apaga o que alguém preencheu depois', async () => {
+    const linha = (extra: Record<string, unknown> = {}) => ({ chave_planilha: 'obj-1', status: 'Go', orgao: 'Da planilha', descritivo: 'x', torre: 'ITS', data_pregao_dt: '2026-04-01', ...extra })
+    const sync = (rows: unknown[]) => db.query(`select sincronizar_planilha($1::jsonb, 't', false)`, [JSON.stringify(rows)])
+    const ler = async () => (await db.query<{ objeto: string | null; hora_pregao: string | null }>(`select objeto, hora_pregao from oportunidades where chave_planilha = 'obj-1'`)).rows[0]
+    await sync([linha()])
+    expect(await ler()).toEqual({ objeto: null, hora_pregao: null })
+    await db.query(`update oportunidades set objeto = 'Preenchido', hora_pregao = '10:00' where chave_planilha = 'obj-1'`)
+    await sync([linha({ orgao: 'Mudou na planilha' })])
+    expect(await ler()).toEqual({ objeto: 'Preenchido', hora_pregao: '10:00:00' })
+    expect((await db.query<{ orgao: string }>(`select orgao from oportunidades where chave_planilha = 'obj-1'`)).rows[0].orgao).toBe('Mudou na planilha') // a carga seguiu atualizando o resto
+  })
+})

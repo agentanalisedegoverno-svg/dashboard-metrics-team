@@ -7,11 +7,15 @@ const item = (extra: Record<string, unknown> = {}) => ({
   data_pregao_dt: '2026-11-05', analista: 'Ana', orcamento: 1000, orcamento_sigiloso: false, criado_por: 'a@ctctech.com.br', ...extra,
 })
 
-function fake(itens: unknown[], opc: { ativo?: boolean; avisar?: boolean; dest?: { email: string; tipo: string }[]; usuarios?: { nome: string; email: string }[] } = {}) {
+function fake(itens: unknown[], opc: { jaPegos?: number[]; ativo?: boolean; avisar?: boolean; dest?: { email: string; tipo: string }[]; usuarios?: { nome: string; email: string }[] } = {}) {
   const updates: { q: string; v: unknown[] }[] = []
   const sql = (async (s: TemplateStringsArray, ...v: unknown[]) => {
     const q = s.join('?').replace(/\s+/g, ' ')
     if (q.includes('from email_fila f')) return itens
+    if (q.includes('returning id')) {
+      updates.push({ q, v })
+      return opc.jaPegos?.includes(Number(v[0])) ? [] : [{ id: v[0] }]
+    }
     if (q.includes('from email_config')) return [{ ativo: opc.ativo ?? true, avisar_pre_vendas: opc.avisar ?? false }]
     if (q.includes('from usuarios')) return opc.usuarios ?? []
     if (q.includes('from email_destinatarios')) return opc.dest ?? [{ email: 'p@x.com', tipo: 'para' }, { email: 'c@x.com', tipo: 'cc' }]
@@ -70,6 +74,24 @@ describe('processarFila', () => {
   it('fila vazia não consulta regras', async () => {
     const { sql } = fake([])
     expect(await processarFila(sql, vi.fn(), { url: 'u' })).toMatchObject({ pendentes: 0 })
+  })
+})
+
+describe('dois processos ao mesmo tempo (máquina do time e GitHub)', () => {
+  it('quem não consegue "pegar" o pedido pula: o e-mail nunca sai em dobro', async () => {
+    const { sql } = fake([item({ id: 1 }), item({ id: 2 })], { jaPegos: [1] }) // o pedido 1 já foi pego por outro processo
+    const enviar = vi.fn().mockResolvedValue(undefined)
+    const r = await processarFila(sql, enviar, { url: 'u' })
+    expect(enviar).toHaveBeenCalledTimes(1)
+    expect(r).toMatchObject({ enviados: 1, emOutroProcesso: 1 })
+  })
+  it('a "pegada" confere a situação e o número de tentativas lido (só ganha quem viu o mesmo estado)', async () => {
+    const { sql, updates } = fake([item({ id: 5, tentativas: 2 })])
+    await processarFila(sql, vi.fn().mockResolvedValue(undefined), { url: 'u' })
+    const pegada = updates.find((u) => u.q.includes('returning id'))!
+    expect(pegada.q).toContain("situacao = 'pendente'")
+    expect(pegada.q).toContain('tentativas = ')
+    expect(pegada.v).toEqual([5, 2])
   })
 })
 

@@ -27,6 +27,14 @@ const tipoEmpresa = z
   .preprocess(vazioParaNull, z.enum(['Matriz', 'Filial']).nullable().optional())
   .transform((v) => v ?? null)
 
+/** Hora local de Brasília "HH:MM" (00:00 a 23:59). Aceita "HH:MM:SS" (como o banco devolve) e normaliza; vazio vira null. */
+const hora = z
+  .preprocess((v) => {
+    const s = vazioParaNull(v)
+    return typeof s === 'string' && /^\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s.trim()) ? s.trim().slice(0, 5) : typeof s === 'string' ? s.trim() : s
+  }, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use o formato hh:mm (de 00:00 a 23:59)').nullable().optional())
+  .transform((v) => v ?? null)
+
 const inteiro = z
   .preprocess((v) => {
     const s = vazioParaNull(v)
@@ -49,9 +57,11 @@ const data = z
 export const oportunidadeInput = z.object({
   data_distribuicao: data,
   data_pregao_dt: data,
+  hora_pregao: hora,
   status: texto(60),
   orgao: texto(200),
   descritivo: texto(100_000), // sem limite prático de caracteres
+  objeto: texto(5000), // o que está sendo contratado (não existe na planilha)
   criterio: texto(60),
   uf: texto(2),
   processo: texto(100),

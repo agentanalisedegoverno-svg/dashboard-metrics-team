@@ -128,3 +128,21 @@ describe('o que o evento leva (com o mapa real config/planner-mapa.json)', () =>
     expect(its.plano).not.toBe(dig.plano)
   })
 })
+
+describe('a consulta do exportador leva o objeto e a hora do pregão', () => {
+  it('devolve os campos novos (em branco quando não preenchidos) e a hora como texto HH:MM:SS', async () => {
+    const com = await criar(db, opp({ orgao: 'Com objeto', objeto: 'Link dedicado', hora_pregao: '15:30' }))
+    const sem = await criar(db, opp({ orgao: 'Sem objeto' }))
+    const linhas = (await db.query<Record<string, unknown>>(SQL_PENDENTES, [marco])).rows
+    expect(linhas.find((l) => l.id === com.id)).toMatchObject({ objeto: 'Link dedicado', hora_pregao: '15:30:00' })
+    expect(linhas.find((l) => l.id === sem.id)).toMatchObject({ objeto: null, hora_pregao: null })
+  })
+  it('o evento do Planner usa objeto e hora quando existem', async () => {
+    const com = await criar(db, opp({ orgao: 'SEDES', objeto: 'Link dedicado', hora_pregao: '12:00', data_pregao_dt: '2026-11-05', analista: 'Editor' }))
+    const linha = (await db.query<Record<string, unknown>>(SQL_PENDENTES, [marco])).rows.find((l) => l.id === com.id)!
+    const e = montarEvento(linha as unknown as OportunidadePlanner, 'oportunidade_nova', mapa, () => null)!
+    expect(e.cartao.titulo).toContain('| Link dedicado |')
+    expect(e.cartao.titulo.endsWith('DATA: 05/11/2026 12:00')).toBe(true)
+    expect(e.cartao.prazo).toBe('2026-11-05T15:00:00Z')
+  })
+})

@@ -26,9 +26,13 @@ export type OportunidadePlanner = {
   torre: string | null
   orgao: string | null
   descritivo: string | null
+  /** O que está sendo contratado (campo Objeto); em branco, o título usa o descritivo como sempre usou. */
+  objeto?: string | null
   processo: string | null
   uasg: string | null
   data_pregao_dt: string | null
+  /** Hora local de Brasília (HH:MM ou HH:MM:SS); em branco nas oportunidades que vieram da planilha. */
+  hora_pregao?: string | null
   analista: string | null
   linha_servico: string | null
   observacoes: string | null
@@ -66,14 +70,22 @@ export const chaveDe = (o: Pick<OportunidadePlanner, 'id' | 'codigo'>) => o.codi
 
 const limpa = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim()
 const dataBr = (iso: string) => iso.split('-').reverse().join('/')
+const hhmm = (hora: string | null | undefined) => (hora ? hora.slice(0, 5) : '')
+
+/** Prazo do cartão: com hora, o instante do pregão (Brasília é UTC-3, sem horário de verão); sem hora, o meio-dia UTC de sempre. */
+export function prazoDoCartao(data: string | null, hora: string | null | undefined): string | null {
+  if (!data) return null
+  const h = hhmm(hora)
+  return h ? new Date(`${data}T${h}:00-03:00`).toISOString().replace('.000Z', 'Z') : `${data}T12:00:00Z`
+}
 
 /** Mesmo padrão dos cartões existentes: "ÓRGÃO | OBJETO | PE: processo UASG: x | DATA: dd/mm/aaaa". */
 export function tituloCartao(o: OportunidadePlanner): string {
   const partes = [
     limpa(o.orgao) || 'Órgão não informado',
-    limpa(o.descritivo) || 'Objeto não informado',
+    limpa(o.objeto) || limpa(o.descritivo) || 'Objeto não informado',
     [o.processo ? `PE: ${limpa(o.processo)}` : '', o.uasg ? `UASG: ${limpa(o.uasg)}` : ''].filter(Boolean).join(' '),
-    o.data_pregao_dt ? `DATA: ${dataBr(o.data_pregao_dt)}` : '',
+    o.data_pregao_dt ? `DATA: ${dataBr(o.data_pregao_dt)}${hhmm(o.hora_pregao) ? ` ${hhmm(o.hora_pregao)}` : ''}` : '',
   ].filter(Boolean)
   return `[${chaveDe(o)}] ${partes.join(' | ')}`.slice(0, 255)
 }
@@ -119,7 +131,7 @@ export function montarEvento(
       status: o.status ?? 'Sem status',
       bucket,
       progresso: mapa.progresso[status] ?? 0,
-      prazo: o.data_pregao_dt ? `${o.data_pregao_dt}T12:00:00Z` : null,
+      prazo: prazoDoCartao(o.data_pregao_dt, o.hora_pregao),
       responsavel: o.analista ? emailDoAnalista(o.analista) : null,
       rotulos,
       nota,

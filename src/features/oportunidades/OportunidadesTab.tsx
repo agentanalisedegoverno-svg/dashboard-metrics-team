@@ -43,7 +43,7 @@ export default function OportunidadesTab() {
         (!torre || o.torre === torre) &&
         (!analista || o.analista === analista) &&
         (!soPendencias || (o.pendencias?.length ?? 0) > 0) &&
-        (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),
+        (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),
     )
   }, [lista.data, buscaAdiada, status, torre, analista, soPendencias])
 
