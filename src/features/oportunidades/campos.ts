@@ -1,7 +1,7 @@
 import type { OportunidadeInput } from '@/domain/oportunidade'
 
 export type Nome = keyof OportunidadeInput
-export type Tipo = 'texto' | 'longo' | 'data' | 'dinheiro' | 'percentual' | 'inteiro' | 'lista' | 'preVendas' | 'bool' | 'cnpj'
+export type Tipo = 'texto' | 'longo' | 'data' | 'hora' | 'dinheiro' | 'percentual' | 'inteiro' | 'lista' | 'preVendas' | 'bool' | 'cnpj'
 
 export type Campo = {
   nome: Nome
@@ -29,6 +29,7 @@ export const SECOES: Secao[] = [
       { nome: 'status', rotulo: 'Status', tipo: 'lista', obrigatorio: true },
       { nome: 'orgao', rotulo: 'Instituição / Órgão', tipo: 'texto', obrigatorio: true, largo: true },
       { nome: 'descritivo', rotulo: 'Descritivo', tipo: 'longo', obrigatorio: true, largo: true },
+      { nome: 'objeto', rotulo: 'Objeto', tipo: 'longo', largo: true, dica: 'O que está sendo contratado. Não existe na planilha: fica em branco nos registros importados' },
       { nome: 'processo', rotulo: 'Processo', tipo: 'texto' },
       { nome: 'uasg', rotulo: 'UASG', tipo: 'texto' },
       { nome: 'uf', rotulo: 'UF', tipo: 'lista' },
@@ -40,6 +41,7 @@ export const SECOES: Secao[] = [
     campos: [
       { nome: 'data_distribuicao', rotulo: 'Data de distribuição (envio do edital)', tipo: 'data' },
       { nome: 'data_pregao_dt', rotulo: 'Data do pregão', tipo: 'data', obrigatorio: true },
+      { nome: 'hora_pregao', rotulo: 'Hora do pregão', tipo: 'hora', dica: 'Opcional, horário de Brasília. A planilha só tem a data' },
       { nome: 'criterio', rotulo: 'Critério', tipo: 'lista' },
       { nome: 'modalidade', rotulo: 'Modalidade', tipo: 'lista' },
       { nome: 'tipo', rotulo: 'Tipo', tipo: 'texto' },

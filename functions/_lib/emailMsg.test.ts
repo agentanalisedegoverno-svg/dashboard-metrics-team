@@ -40,3 +40,17 @@ describe('montarEmailTeste', () => {
     expect(m.texto).toContain('https://radar.test')
   })
 })
+
+describe('objeto e hora do pregão no e-mail', () => {
+  it('mostra o Objeto e a data com hora; sem hora, só a data; sem objeto, traço', () => {
+    const com = montarEmail({ ...base, objeto: 'Link dedicado', hora_pregao: '15:30:00' }, 'https://radar.test')
+    expect(com.texto).toContain('Objeto: Link dedicado')
+    expect(com.texto).toContain('Data do pregão: 05/11/2026 15:30')
+    const sem = montarEmail(base, 'https://radar.test')
+    expect(sem.texto).toContain('Objeto: —')
+    expect(sem.texto).toContain('Data do pregão: 05/11/2026')
+  })
+  it('o objeto também é escapado no HTML', () => {
+    expect(montarEmail({ ...base, objeto: '<img src=x onerror=1>' }, 'u').html).not.toContain('<img')
+  })
+})

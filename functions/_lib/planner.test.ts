@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import mapa from '../../config/planner-mapa.json'
-import { chaveRadar, montarEvento, nomeArquivo, planoDaTorre, tituloCartao, type MapaPlanner, type OportunidadePlanner } from './planner.ts'
+import { chaveRadar, montarEvento, nomeArquivo, planoDaTorre, prazoDoCartao, tituloCartao, type MapaPlanner, type OportunidadePlanner } from './planner.ts'
 
 const M = mapa as unknown as MapaPlanner
 const base: OportunidadePlanner = {
@@ -49,5 +49,24 @@ describe('integração Planner', () => {
     expect(nomeArquivo(e)).toBe('20261021-1430_2026-0077_oportunidade_nova.json')
     expect(e.cartao.nota).toContain('Orçamento sigiloso.')
     expect(e.cartao.nota).not.toMatch(/1\.500\.000/)
+  })
+})
+
+describe('objeto e hora do pregão no Planner', () => {
+  it('o título usa o Objeto quando preenchido; em branco, o descritivo, como sempre foi', () => {
+    expect(tituloCartao({ ...base, objeto: 'Link dedicado de 1 Gbps' })).toBe('[2026-0077] SEDES | Link dedicado de 1 Gbps | PE: 24/2026 UASG: 158443 | DATA: 05/11/2026')
+    expect(tituloCartao({ ...base, objeto: '   ' })).toBe(tituloCartao(base))
+    expect(tituloCartao({ ...base, objeto: null })).toBe(tituloCartao(base))
+  })
+  it('com hora, o título e o prazo levam a hora (Brasília = UTC-3); sem hora, tudo como antes', () => {
+    expect(tituloCartao({ ...base, hora_pregao: '15:30:00' })).toBe('[2026-0077] SEDES | Link dedicado | PE: 24/2026 UASG: 158443 | DATA: 05/11/2026 15:30')
+    expect(prazoDoCartao('2026-11-05', '12:00:00')).toBe('2026-11-05T15:00:00Z')
+    expect(prazoDoCartao('2026-11-05', '22:30')).toBe('2026-11-06T01:30:00Z') // vira o dia em UTC
+    expect(prazoDoCartao('2026-11-05', null)).toBe('2026-11-05T12:00:00Z')
+    expect(prazoDoCartao(null, '10:00')).toBeNull()
+    const ev = montarEvento({ ...base, hora_pregao: '12:00:00' }, 'oportunidade_atualizada', M, email)!
+    expect(ev.cartao.prazo).toBe('2026-11-05T15:00:00Z')
+    expect(ev.cartao.titulo.endsWith('DATA: 05/11/2026 12:00')).toBe(true)
+    expect(montarEvento(base, 'oportunidade_nova', M, email)!.cartao.prazo).toBe('2026-11-05T12:00:00Z')
   })
 })

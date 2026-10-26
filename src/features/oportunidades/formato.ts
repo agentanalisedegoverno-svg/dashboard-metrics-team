@@ -17,6 +17,7 @@ export function paraForm(o?: Partial<Oportunidade> | null): FormValores {
       v[c.nome] = c.casas === undefined ? fmtNum(p) : p.toFixed(c.casas).replace('.', ',')
     }
     else if (c.tipo === 'dinheiro' || c.tipo === 'inteiro') v[c.nome] = fmtNum(Number(bruto))
+    else if (c.tipo === 'hora') v[c.nome] = String(bruto).slice(0, 5) // o banco devolve HH:MM:SS; o campo mostra HH:MM
     else v[c.nome] = String(bruto)
   }
   v.orcamento_sigiloso = Boolean(o?.orcamento_sigiloso)
@@ -64,6 +65,10 @@ export const dataBr =(iso: string | null | undefined) => {
   const [y, m, d] = iso.slice(0, 10).split('-')
   return `${d}/${m}/${y}`
 }
+
+/** Data e hora do pregão: "05/11/2026 15:30"; sem hora (caso da planilha), só a data. */
+export const pregaoBr = (data: string | null | undefined, hora: string | null | undefined) =>
+  !data ? '—' : hora ? `${dataBr(data)} ${hora.slice(0, 5)}` : dataBr(data)
 
 export const dataHoraBr = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }) : '—'

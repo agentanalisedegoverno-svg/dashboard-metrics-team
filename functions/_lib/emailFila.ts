@@ -26,7 +26,7 @@ export async function processarFila(sql: Sql, enviar: Enviar, opc: { url: string
 
   const itens = (await sql`
     select f.id, f.tipo, f.tentativas, f.destino_teste,
-           o.codigo, o.orgao, o.status, o.torre, o.linha_servico, o.uf, o.data_pregao_dt::text as data_pregao_dt, o.analista,
+           o.codigo, o.orgao, o.objeto, o.status, o.torre, o.linha_servico, o.uf, o.data_pregao_dt::text as data_pregao_dt, o.hora_pregao::text as hora_pregao, o.analista,
            o.orcamento::float8 as orcamento, coalesce(o.orcamento_sigiloso, false) as orcamento_sigiloso, o.criado_por
     from email_fila f left join oportunidades o on o.id = f.oportunidade_id
     where f.situacao = 'pendente' and f.tentativas < ${tentativasMax}::int

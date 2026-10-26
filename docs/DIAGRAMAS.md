@@ -873,7 +873,9 @@ erDiagram
     text linha_servico
     text orgao
     text descritivo "sem limite"
+    text objeto "o que se contrata, fora da planilha"
     date data_pregao_dt
+    time hora_pregao "opcional, horário de Brasília, fora da planilha"
     text analista "pré-vendas"
     numeric orcamento
     bool orcamento_sigiloso

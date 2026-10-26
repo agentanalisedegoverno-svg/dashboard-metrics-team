@@ -78,10 +78,10 @@ Pontos que costumam surpreender:
 
 | Campo do cartão | Vem de (no Radar) | Na **criação** | Na **atualização** | O que o time pode fazer à mão |
 |---|---|---|---|---|
-| **Título** | `[código] Órgão \| Objeto \| PE: processo UASG: uasg \| DATA: dd/mm/aaaa` (até 255 caracteres) | define | **sobrescreve** | pode editar, mas é reescrito no próximo salvamento. **Nunca remova o `[código]` do início** (ver cenários) |
+| **Título** | `[código] Órgão \| Objeto \| PE: processo UASG: uasg \| DATA: dd/mm/aaaa hh:mm` (até 255 caracteres). O Objeto é o campo **Objeto** da oportunidade; em branco, usa o descritivo. A hora só aparece se foi informada | define | **sobrescreve** | pode editar, mas é reescrito no próximo salvamento. **Nunca remova o `[código]` do início** (ver cenários) |
 | **Coluna (bucket)** | status → mapa abaixo | define | **move** para a coluna do status atual | mover à mão vale só até o próximo salvamento no Radar |
 | **Progresso** | status: 0%, 50% ou 100% | define | **sobrescreve** | idem. Win, Lost, No Go e Canceled marcam 100% (cartão concluído) |
-| **Prazo** | data do pregão (12:00 UTC) | define | **sobrescreve**, mas se a data estiver vazia no Radar o prazo do cartão **não é limpo** | idem |
+| **Prazo** | data do pregão. **Com hora informada**, o instante do pregão (Brasília = UTC-3); sem hora, 12:00 UTC como sempre | define | **sobrescreve**, mas se a data estiver vazia no Radar o prazo do cartão **não é limpo** | idem |
 | **Rótulos** | *Licitação* e *Público*, mais *DIGITAL* ou *Health* conforme a torre | define | **acrescenta** os do Radar e mantém os do time | pode adicionar e remover os seus |
 | **Responsáveis** | Pré-vendas da oportunidade (e-mail cadastrado) **mais** os `responsaveis_extras` da configuração do integrador | define | **só acrescenta** quem ainda não está; nunca remove. Sem pré-vendas/e-mail e sem extras, não altera a atribuição | pode acrescentar pessoas. Se remover à mão o pré-vendas ou um extra, a próxima atualização o atribui de novo |
 | **Anotações** (descrição) | nota do Radar: código, versão, status, linha de serviço, orçamento (ou "sigiloso"), observações (até 600 caracteres) | define | **acrescenta ao final**, com o carimbo `--- Radar dd/mm/aaaa hh:mm ---`; não apaga o que o time escreveu | pode escrever livremente. O limite do Planner é 30.000 caracteres: passando disso, o **fim** é cortado e a nota nova se perde |

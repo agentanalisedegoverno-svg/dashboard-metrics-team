@@ -29,6 +29,8 @@ const semente = (n: number): Reg[] =>
     uf: 'DF',
     analista: 'Marcia',
     data_pregao_dt: '2026-03-10',
+    hora_pregao: i === 0 ? '15:30:00' : null,
+    objeto: null,
     orcamento: 1_000_000 + i,
     orcamento_sigiloso: false,
     valor_ctc: null,
@@ -473,4 +475,43 @@ test('aba E-mails passa na verificação de acessibilidade', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'E-mails de nova oportunidade' })).toBeVisible()
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
   expect(r.violations).toEqual([])
+})
+
+test('Objeto fica logo abaixo do Descritivo e a data do pregão ganha hora (opcionais, fora da planilha)', async ({ page }) => {
+  const { enviados } = await api(page)
+  await abrirAba(page)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  const rotulos = await page.locator('label').allInnerTexts()
+  const pos = (re: RegExp) => rotulos.findIndex((t) => re.test(t))
+  expect(pos(/^Objeto/), 'Objeto vem logo depois do Descritivo').toBe(pos(/^Descritivo/) + 1)
+  expect(pos(/^Hora do pregão/), 'Hora vem logo depois da data do pregão').toBe(pos(/^Data do pregão/) + 1)
+  await expect(page.getByLabel(/^Hora do pregão/)).toHaveAttribute('type', 'time')
+  await expect(page.getByLabel(/^Objeto/)).toHaveValue('') // em branco por padrão
+
+  await page.getByLabel(/^Status/).selectOption('Go')
+  await page.getByLabel(/^Instituição/).fill('Prefeitura X')
+  await page.getByLabel(/^Descritivo/).fill('Descrição')
+  await page.getByLabel(/^Objeto/).fill('Link dedicado de 1 Gbps')
+  await page.getByLabel(/^Torre/).selectOption('ITS')
+  await page.getByLabel(/^Data do pregão/).fill('2026-05-20')
+  await page.getByLabel(/^Hora do pregão/).fill('15:30')
+  await page.getByRole('button', { name: 'Cadastrar' }).click()
+  await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
+  expect(enviados[0]).toMatchObject({ objeto: 'Link dedicado de 1 Gbps', hora_pregao: '15:30', data_pregao_dt: '2026-05-20' })
+})
+
+test('sem preencher objeto e hora, vão como nulos; a grade mostra data com hora só quando há hora', async ({ page }) => {
+  const { enviados } = await api(page)
+  await abrirAba(page)
+  await expect(page.getByText('10/03/2026 15:30').first()).toBeVisible() // registro com hora
+  await expect(page.getByText('10/03/2026', { exact: true }).first()).toBeVisible() // registros sem hora (como os da planilha)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  await page.getByLabel(/^Status/).selectOption('Go')
+  await page.getByLabel(/^Instituição/).fill('Prefeitura Y')
+  await page.getByLabel(/^Descritivo/).fill('Descrição')
+  await page.getByLabel(/^Torre/).selectOption('ITS')
+  await page.getByLabel(/^Data do pregão/).fill('2026-05-21')
+  await page.getByRole('button', { name: 'Cadastrar' }).click()
+  await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
+  expect(enviados[0]).toMatchObject({ objeto: null, hora_pregao: null })
 })

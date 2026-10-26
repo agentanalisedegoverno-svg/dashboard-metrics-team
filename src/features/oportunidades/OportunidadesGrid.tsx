@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { Oportunidade } from '@/domain/oportunidade'
 import { cn } from '@/lib/utils'
-import { brl, dataBr, pct } from './formato'
+import { brl, pct, pregaoBr } from './formato'
 
 // Win verde · Go azul · No Go laranja · On going amarela · Lost vermelha · demais cinza
 const STATUS_PONTO: Record<string, string> = {
@@ -28,7 +28,7 @@ const colunas: ColumnDef<Oportunidade>[] = [
   { accessorKey: 'status', header: 'Status', size: 110, cell: (c) => <Selo status={c.getValue<string | null>()} /> },
   { accessorKey: 'orgao', header: 'Órgão', size: 260, cell: (c) => <span className="line-clamp-1" title={c.getValue<string>() ?? ''}>{c.getValue<string>() ?? '—'}</span> },
   { accessorKey: 'processo', header: 'Processo', size: 130 },
-  { accessorKey: 'data_pregao_dt', header: 'Pregão', size: 100, cell: (c) => dataBr(c.getValue<string | null>()) },
+  { accessorKey: 'data_pregao_dt', header: 'Pregão', size: 135, cell: (c) => pregaoBr(c.getValue<string | null>(), c.row.original.hora_pregao) },
   { accessorKey: 'torre', header: 'Torre', size: 90 },
   { accessorKey: 'linha_servico', header: 'Linha de serviço', size: 170 },
   { accessorKey: 'uf', header: 'UF', size: 60 },
@@ -80,7 +80,7 @@ export function OportunidadesGrid({ dados, onAbrir, compacto }: Props) {
                   <div className="flex items-center justify-between gap-2">
                     <Selo status={o.status} />
                     <span className="font-mono text-xs text-muted">{o.codigo ?? ''}</span>
-                    <span className="text-xs text-muted">{dataBr(o.data_pregao_dt)}</span>
+                    <span className="text-xs text-muted">{pregaoBr(o.data_pregao_dt, o.hora_pregao)}</span>
                   </div>
                   <p className="mt-1 line-clamp-1 text-[13px] font-semibold text-ink">{o.orgao ?? '—'}</p>
                   <p className="line-clamp-1 text-xs text-muted">{[o.processo, o.torre, o.uf].filter(Boolean).join(' · ')}</p>

@@ -186,3 +186,27 @@ describe('perfis de acesso', () => {
   })
 })
 
+describe('objeto e hora do pregão (formato)', () => {
+  it('vazio vira null; objeto e hora são opcionais (a planilha não os tem)', () => {
+    const r = oportunidadeInput.parse({ orgao: 'X', objeto: '  ', hora_pregao: '' })
+    expect(r).toMatchObject({ objeto: null, hora_pregao: null })
+    const sem = oportunidadeInput.parse({ orgao: 'X' })
+    expect(sem).toMatchObject({ objeto: null, hora_pregao: null })
+  })
+  it('hora aceita HH:MM e HH:MM:SS (como o banco devolve) e normaliza para HH:MM', () => {
+    expect(oportunidadeInput.parse({ hora_pregao: '09:05' }).hora_pregao).toBe('09:05')
+    expect(oportunidadeInput.parse({ hora_pregao: '15:30:00' }).hora_pregao).toBe('15:30')
+    expect(oportunidadeInput.parse({ hora_pregao: ' 23:59 ' }).hora_pregao).toBe('23:59')
+    expect(oportunidadeInput.parse({ hora_pregao: '00:00' }).hora_pregao).toBe('00:00')
+  })
+  it.each(['24:00', '25:10', '12:60', '9:5', 'abc', '12h30', '12:3', '1230'])('hora inválida (%s) é recusada apontando o campo', (h) => {
+    const r = oportunidadeInput.safeParse({ hora_pregao: h })
+    expect(r.success).toBe(false)
+    expect(!r.success && r.error.issues[0].path[0]).toBe('hora_pregao')
+  })
+  it('objeto aceita até 5000 caracteres e recusa acima', () => {
+    expect(oportunidadeInput.safeParse({ objeto: 'x'.repeat(5000) }).success).toBe(true)
+    const r = oportunidadeInput.safeParse({ objeto: 'x'.repeat(5001) })
+    expect(!r.success && r.error.issues[0].path[0]).toBe('objeto')
+  })
+})

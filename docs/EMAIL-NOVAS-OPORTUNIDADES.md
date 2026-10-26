@@ -25,7 +25,7 @@ As regras ficam no banco; a validação vale mesmo para quem chamar a API direto
 
 ## O que vai no e-mail
 
-Código, órgão, status, torre, linha de serviço, UF, data do pregão, pré-vendas, orçamento (ou "Sigiloso"), quem cadastrou e um link para o Radar. O descritivo **não** vai. Todo texto vindo do cadastro é escapado (sem HTML nem injeção de cabeçalho).
+Código, órgão, objeto, status, torre, linha de serviço, UF, data e hora do pregão, pré-vendas, orçamento (ou "Sigiloso"), quem cadastrou e um link para o Radar. O descritivo **não** vai. Todo texto vindo do cadastro é escapado (sem HTML nem injeção de cabeçalho).
 
 ## Ativação (uma vez)
 

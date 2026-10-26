@@ -119,6 +119,10 @@ describe('segredos e dados reais no repositório', () => {
     const g = ler('.gitignore')
     for (const item of ['.env', '.dev.vars', '*.xlsx', '*.xlsm']) expect(g, item).toContain(item)
   })
+  it('nenhum arquivo de texto versionado contém byte nulo (o Git passaria a tratá-lo como binário e esconderia o diff)', () => {
+    const comNulo = todos().filter(([, t]) => t.includes(String.fromCharCode(0))).map(([f]) => f)
+    expect(comNulo).toEqual([])
+  })
   it('wrangler.toml não carrega segredos (só identificadores públicos do Access)', () => {
     const vars = ler('wrangler.toml').split('[vars]')[1] ?? ''
     for (const l of vars.split('\n').filter((x) => /^\s*\w+\s*=/.test(x))) {
