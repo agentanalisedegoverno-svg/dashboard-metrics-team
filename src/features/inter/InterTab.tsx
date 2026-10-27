@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { BarList, type BarItem } from '@/components/BarList'
+import { CardGrafico } from '@/components/CardGrafico'
 import { DonutCard } from '@/components/Charts'
 import { Card, EmptyNote, KpiGrid, NoteBox, Section, Tag } from '@/components/Primitives'
 import { KpiCard } from '@/components/KpiCard'
@@ -44,7 +45,11 @@ export function InterTab({ m, rows, noYear }: TabProps) {
   return (
     <>
       <Section title="Motivos de No Go" note="Sobre as oportunidades com status No Go no recorte filtrado. Clique em um motivo para ver as oportunidades.">
-        <Card>{nogoN ? <BarList items={nogoItems} onDrill={onNogoDrill} /> : <EmptyNote>Nenhum No Go no recorte selecionado.</EmptyNote>}</Card>
+        {nogoN ? (
+          <CardGrafico titulo="Motivos de No Go"><BarList items={nogoItems} onDrill={onNogoDrill} /></CardGrafico>
+        ) : (
+          <Card><EmptyNote>Nenhum No Go no recorte selecionado.</EmptyNote></Card>
+        )}
       </Section>
 
       <section className="mb-8.5">
@@ -72,24 +77,24 @@ export function InterTab({ m, rows, noYear }: TabProps) {
       </section>
 
       <Section title="Vistoria técnica & complexidade operacional">
-        <Card>
+        <CardGrafico titulo="Vistoria técnica & complexidade operacional">
           <BarList items={vistoria} />
           {omissa && (
             <NoteBox>
               <b>"Omissa" é {omissa.count === Math.max(...m.vistoria.map((v) => v.count)) ? 'a categoria mais frequente' : 'relevante'} ({fmtPct(omissa.pct)})</b> — sinal de leitura não padronizada dessa etapa da triagem. <Tag kind="inferido" />
             </NoteBox>
           )}
-        </Card>
+        </CardGrafico>
       </Section>
 
       <Section title="Linha de serviço">
-        <Card><BarList items={linha} /></Card>
-        <Card className="mt-4"><DonutCard title="Distribuição em pizza — Linha de Serviço (top 5 + Outros)" segments={linhaDonut} /></Card>
+        <CardGrafico titulo="Linha de serviço"><BarList items={linha} /></CardGrafico>
+        <CardGrafico titulo="Linha de serviço — pizza" className="mt-4"><DonutCard title="Distribuição em pizza — Linha de Serviço (top 5 + Outros)" segments={linhaDonut} /></CardGrafico>
       </Section>
 
       <Section title="Torre">
-        <Card><BarList items={torre} /></Card>
-        <Card className="mt-4"><DonutCard title="Distribuição em pizza — Torre" segments={torre.map(({ label, count, color }) => ({ label, count, color }))} /></Card>
+        <CardGrafico titulo="Torre"><BarList items={torre} /></CardGrafico>
+        <CardGrafico titulo="Torre — pizza" className="mt-4"><DonutCard title="Distribuição em pizza — Torre" segments={torre.map(({ label, count, color }) => ({ label, count, color }))} /></CardGrafico>
       </Section>
     </>
   )

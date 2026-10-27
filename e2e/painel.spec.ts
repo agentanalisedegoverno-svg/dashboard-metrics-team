@@ -78,3 +78,37 @@ test('sem rolagem horizontal', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 })
+
+test('clicar em um gráfico amplia numa janela; o X volta para a tela', async ({ page }) => {
+  await pickYear(page, '2026')
+  const ampliar = page.getByRole('button', { name: 'Ampliar gráfico: Distribuição em pizza — status' })
+  const antes = (await page.getByRole('img', { name: 'Gráfico de pizza' }).first().boundingBox())!
+  await ampliar.click() // o botão e o clique no próprio gráfico abrem a mesma janela
+  const janela = page.getByRole('dialog', { name: 'Distribuição em pizza — status' })
+  await expect(janela).toBeVisible()
+  const depois = (await janela.getByRole('img', { name: 'Gráfico de pizza' }).boundingBox())!
+  expect(depois.width).toBeGreaterThan(antes.width * 1.2)
+  await janela.getByRole('button', { name: 'Fechar gráfico' }).click()
+  await expect(janela).toHaveCount(0)
+  // clique direto no desenho do gráfico
+  await page.getByRole('img', { name: 'Gráfico de pizza' }).first().click()
+  await expect(page.getByRole('dialog', { name: 'Distribuição em pizza — status' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+test('gráfico ampliado nas outras abas: linhas que abrem lista continuam abrindo a lista', async ({ page }) => {
+  await pickYear(page, '2026')
+  await page.getByRole('tab', { name: 'Intersetorial & Portfólio' }).click()
+  const linha = page.locator('button[title="Clique para ver as oportunidades"]').first()
+  if (await linha.count()) {
+    await linha.click()
+    await expect(page.getByRole('dialog')).toBeVisible() // lista (drill), não o gráfico ampliado
+    await expect(page.getByRole('button', { name: 'Fechar gráfico' })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+  }
+  await page.getByRole('button', { name: 'Ampliar gráfico: Torre', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Torre', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Fechar gráfico' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})

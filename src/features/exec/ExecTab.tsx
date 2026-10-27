@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Card, DonutTitle, KpiGrid, NoteBox, Section, Tag } from '@/components/Primitives'
+import { CardGrafico } from '@/components/CardGrafico'
+import { DonutTitle, KpiGrid, NoteBox, Section, Tag } from '@/components/Primitives'
 import { Donut, StackBar } from '@/components/Charts'
 import { KpiCard } from '@/components/KpiCard'
 import { statusOf } from '@/domain/metrics'
@@ -39,16 +40,16 @@ export function ExecTab({ m, rows, noYear }: TabProps) {
             onClick={drillStatus('Oportunidades trabalhadas', ['Win', 'Go', 'On going', 'Lost', 'No Go'])}
           />
         </KpiGrid>
-        <Card className="mt-4">
+        <CardGrafico titulo="Funil de triagem — distribuição por status" className="mt-4">
           <StackBar segments={segments} total={m.total} />
           <NoteBox>
             <b>No Go Rate de {fmtPct(nogo.pct)}</b> no recorte atual — maior indicador de eficiência do funil de triagem a acompanhar. <Tag kind="confirmado" className="ml-1" />
           </NoteBox>
-        </Card>
-        <Card className="mt-4">
+        </CardGrafico>
+        <CardGrafico titulo="Distribuição em pizza — status" className="mt-4">
           <DonutTitle>Distribuição em pizza — status (visão rápida do total filtrado)</DonutTitle>
           <Donut segments={segments} />
-        </Card>
+        </CardGrafico>
       </Section>
 
       <Section title="Pipeline financeiro" note="Valores em R$, somados sobre os campos preenchidos da planilha, no recorte filtrado.">

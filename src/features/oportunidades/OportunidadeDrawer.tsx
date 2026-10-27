@@ -301,9 +301,8 @@ export function OportunidadeDrawer({ aberto, onFechar, registro: registroProp, o
       const salvo = nova ? await criar.mutateAsync(parsed.data) : await atualizar.mutateAsync({ id: registro.id, versao: registro.versao, dados: parsed.data })
       toast.success(nova ? 'Oportunidade cadastrada.' : 'Alterações salvas.')
       if ('avisos' in salvo && salvo.avisos?.length) toast.warning('Já existe oportunidade com o mesmo processo, órgão, data e torre. Confira se não é duplicada.')
-      setBase(salvo)
-      form.reset(paraForm(salvo))
-      setEditando(false)
+      // Salvou: fecha o card e volta para a lista de oportunidades (o reset do formulário acontece ao abrir de novo).
+      onFechar()
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && e.atual) setConflito(e.atual)
       else if (e instanceof ApiError && e.erros.length) setErrosServidor(e.erros)
