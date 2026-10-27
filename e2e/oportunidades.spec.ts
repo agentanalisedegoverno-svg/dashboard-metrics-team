@@ -603,3 +603,33 @@ test('Sigla (até 20 caracteres) vem antes de Instituição / Órgão e é desta
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
   expect(enviados[0].sigla).toBe('ABCDEFGHIJKLMNOPQRST')
 })
+
+test('valores em reais com máscara (R$ 1.234,56) e Duração do contrato (meses) em amarelo no lugar do Tipo', async ({ page }) => {
+  const { enviados } = await api(page)
+  await abrirAba(page)
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  await expect(page.getByLabel(/^Tipo$/)).toHaveCount(0)
+  const duracao = page.getByLabel(/^Duração do contrato \(meses\)/)
+  expect(await duracao.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 246, 168)')
+  await duracao.fill('24')
+  for (const [rotulo, digitado, esperado] of [
+    [/^Orçamento \(R\$\)/, '123456', 'R$ 1.234,56'],
+    [/^Valor CTC/, '5', 'R$ 0,05'],
+    [/^Custo total CTC/, '100000000', 'R$ 1.000.000,00'],
+    [/^Valor vencedor/, '9999', 'R$ 99,99'],
+  ] as const) {
+    const campo = page.getByLabel(rotulo)
+    await campo.click()
+    await campo.pressSequentially(digitado)
+    await expect(campo).toHaveValue(esperado)
+  }
+  await page.getByLabel(/^Status/).selectOption('Go')
+  await page.getByLabel(/^Instituição/).fill('Prefeitura R')
+  await page.getByLabel(/^Descritivo/).fill('Descrição')
+  await page.getByLabel(/^Torre/).selectOption('ITS')
+  await page.getByLabel(/^Data do pregão/).fill('2099-06-02')
+  await page.screenshot({ path: 'test-results/zz-moeda.png' })
+  await page.getByRole('button', { name: 'Cadastrar' }).click()
+  await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
+  expect(enviados[0]).toMatchObject({ duracao_contrato_meses: 24, orcamento: 1234.56, valor_ctc: 0.05, custo_total_ctc: 1000000, valor_vencedor: 99.99 })
+})

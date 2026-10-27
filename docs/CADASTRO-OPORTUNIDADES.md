@@ -31,7 +31,7 @@ Perfil feito sobre as 600 linhas de 14/10/2026. "Preench." é o percentual de li
 | 8 | Processo | `processo` | texto ≤ 60 | 98% | Texto sempre (21 linhas vêm como número). Alerta de duplicata com órgão + data. |
 | 9 | UASG | `uasg` | texto | 66% | Texto (preserva zero à esquerda; "-" vira vazio). |
 | 10 | Modalidade | `modalidade` | lista | 98% | 14 valores; normalizar ("Chamamento"/"Chamamento Público"). |
-| 11 | Tipo | `tipo` | lista | 0% | Quase não usada (2 linhas). Campo "Avançado". |
+| 11 | Tipo | `tipo` | lista | 0% | Quase não usada (2 linhas). **Saiu do formulário em 27/10/2026** (substituído por *Duração do contrato (meses)*); a coluna continua no banco e na carga, mas o salvamento não a altera. |
 | 12 | Modo de Disputa | `modo_disputa` | lista | 89% | Aberto, Aberto e Fechado, Fechado, Dispensa com disputa. |
 | 13 | Origem | `origem_oportunidade` | lista | 70% | Reativo, Proativo. |
 | 14 | Pré-Vendas | `analista` | lista | 92% | 7 pessoas hoje. Lista administrável. |
@@ -111,6 +111,8 @@ flowchart LR
 |---|---|
 | **Tela cheia, travada** | Clicar numa oportunidade abre em **tela cheia** com todos os campos **travados** (leitura). O botão **Editar** fica no topo; ao clicar, os campos liberam e aparecem **Cancelar** e **Salvar alterações** embaixo. Cancelar com alterações pede confirmação; depois de salvar, a tela volta ao modo leitura com os dados novos. Oportunidade nova abre direto em edição. |
 | **Descritivo** | Sem limite de caracteres. |
+| **Duração do contrato (meses)** (novo, 27/10/2026) | Número inteiro de **1 a 600**, opcional, **em amarelo**, no lugar do antigo campo *Tipo* (migração 019, coluna `duracao_contrato_meses`). Não existe na planilha. Aparece na anotação do Planner e no e-mail, na seção *Edital e disputa*. |
+| **Campos em reais** (27/10/2026) | **Orçamento, Valor CTC, Custo total CTC e Valor vencedor** usam máscara de **real brasileiro**: ao digitar, só os números contam e os dois últimos são os centavos (`123456` vira `R$ 1.234,56`). Ao salvar, o valor volta a número. Na grade, no Planner e no e-mail já apareciam em reais. |
 | **Sigla** (novo, 26/10/2026) | Texto de **até 20 caracteres**, opcional, logo **antes de Instituição / Órgão** (migração 015; limite ampliado de 8 para 20 na 017). **Não existe na planilha**: fica em branco nos registros importados e a carga não o toca. Aparece como coluna na grade e entra na busca. |
 | **Objeto** (novo, 26/10/2026) | Campo de texto (até 5.000 caracteres) **logo abaixo do Descritivo**: o que está sendo contratado. **Não existe na planilha**: fica em branco nos registros importados e a carga diária não o toca. Quando preenchido, é o que aparece no título do cartão do Planner e no e-mail (em branco, o título usa o descritivo, como sempre). |
 | **Hora do pregão** (novo, 26/10/2026) | Campo opcional **ao lado da Data do pregão**, em horário de Brasília (`hora_pregao`). A data continua sendo a data (código por ano, SLA, painel e planilha não mudam); a hora é um complemento. **Não existe na planilha**: fica em branco nos registros importados e a carga não a toca. A grade mostra `dd/mm/aaaa hh:mm` quando há hora e só a data quando não há; o título do cartão do Planner, o prazo (com a hora) e o e-mail também a usam. |

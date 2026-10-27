@@ -47,7 +47,7 @@ export const SECOES: Secao[] = [
       { nome: 'hora_pregao', destaque: true, rotulo: 'Hora do pregão', tipo: 'hora', dica: 'Opcional, horário de Brasília. A planilha só tem a data' },
       { nome: 'criterio', destaque: true, rotulo: 'Critério', tipo: 'lista' },
       { nome: 'modalidade', destaque: true, rotulo: 'Modalidade', tipo: 'lista' },
-      { nome: 'tipo', rotulo: 'Tipo', tipo: 'texto' },
+      { nome: 'duracao_contrato_meses', destaque: true, rotulo: 'Duração do contrato (meses)', tipo: 'inteiro', dica: 'Em meses, de 1 a 600' },
       { nome: 'modo_disputa', destaque: true, rotulo: 'Modo de disputa', tipo: 'lista' },
       { nome: 'origem_oportunidade', destaque: true, rotulo: 'Origem', tipo: 'lista' },
       { nome: 'site', destaque: true, rotulo: 'Site', tipo: 'lista' },

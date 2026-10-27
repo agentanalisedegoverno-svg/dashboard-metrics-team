@@ -1,15 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import { regrasNegocio, type OportunidadeInput } from '@/domain/oportunidade'
-import { deForm, paraForm, pct, pregaoBr } from './formato'
+import { deForm, mascaraReal, paraForm, pct, pregaoBr } from './formato'
 
 const base = paraForm({ status: 'Go', orgao: 'SEDES', descritivo: 'Link', torre: 'ITS', data_pregao_dt: '2026-03-10' })
 
 describe('formulário <-> API', () => {
   it('mostra margem em % e valores com vírgula, e devolve em fração/número', () => {
     const f = paraForm({ mc_ctc: 0.185, orcamento: 1234.5, posicao_lance: 3, data_pregao_dt: '2026-03-10' })
-    expect(f).toMatchObject({ mc_ctc: '18,5', orcamento: '1234,5', posicao_lance: '3', data_pregao_dt: '2026-03-10', status: '' })
+    expect(f).toMatchObject({ mc_ctc: '18,5', orcamento: 'R$ 1.234,50', posicao_lance: '3', data_pregao_dt: '2026-03-10', status: '' })
     const r = deForm({ ...base, mc_ctc: '18,5', orcamento: '1.234,50', posicao_lance: '3' })
     expect(r.success && r.data).toMatchObject({ mc_ctc: 0.185, orcamento: 1234.5, posicao_lance: 3, status: 'Go' })
+  })
+  it('valores em reais: máscara na digitação, "R$ 1.234,50" volta a número', () => {
+    expect(mascaraReal('123456')).toBe('R$ 1.234,56')
+    expect(mascaraReal('R$ 1.234,56' + '7')).toBe('R$ 12.345,67')
+    expect(mascaraReal('5')).toBe('R$ 0,05')
+    expect(mascaraReal('abc')).toBe('')
+    expect(mascaraReal('')).toBe('')
+    const r = deForm({ ...base, orcamento: 'R$ 1.234.567,89', valor_ctc: 'R$ 0,50', custo_total_ctc: '2.000,00', valor_vencedor: '' })
+    expect(r.success && r.data).toMatchObject({ orcamento: 1234567.89, valor_ctc: 0.5, custo_total_ctc: 2000, valor_vencedor: null })
+  })
+  it('duração do contrato (meses): inteiro de 1 a 600, vazio vale null', () => {
+    expect(paraForm({ duracao_contrato_meses: 36 }).duracao_contrato_meses).toBe('36')
+    const ok = deForm({ ...base, duracao_contrato_meses: '12' })
+    expect(ok.success && ok.data.duracao_contrato_meses).toBe(12)
+    const vazio = deForm({ ...base, duracao_contrato_meses: '' })
+    expect(vazio.success && vazio.data.duracao_contrato_meses).toBeNull()
+    for (const ruim of ['0', '601', '1,5', 'abc']) expect(deForm({ ...base, duracao_contrato_meses: ruim }).success, ruim).toBe(false)
   })
   it('impostos: percentual com duas casas no formulário, arredondado e em fração na API', () => {
     expect(paraForm({ impostos: 0.0865 }).impostos).toBe('8,65')

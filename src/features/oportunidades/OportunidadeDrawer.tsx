@@ -10,7 +10,7 @@ import { CAMPO_LISTA, regrasNegocio, torreDaLinha, type ErroCampo, type Oportuni
 import { cn } from '@/lib/utils'
 import { ApiError, useArquivar, useAtualizar, useConsultaCnpj, useCriar, useHistorico, type Me, type Opcoes } from './api'
 import { SECOES, ROTULO, TIPO_CAMPO, type Campo } from './campos'
-import { dataHoraBr, deForm, paraForm, pct, type FormValores } from './formato'
+import { dataHoraBr, deForm, mascaraReal, paraForm, pct, type FormValores } from './formato'
 
 type Props = {
   aberto: boolean
@@ -183,8 +183,25 @@ function CampoInput({
         {c.dica && <span className="text-xs text-muted">· {c.dica}</span>}
       </label>
     )
+  } else if (c.tipo === 'dinheiro') {
+    // Reais: a máscara formata enquanto digita ("R$ 1.234,56"); ao salvar volta a número.
+    controle = (
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="R$ 0,00"
+        className={cn(cls, 'tabular-nums')}
+        {...comum}
+        {...reg}
+        onChange={(e) => {
+          e.target.value = mascaraReal(e.target.value)
+          return reg.onChange(e)
+        }}
+      />
+    )
   } else {
-    const modo = c.tipo === 'dinheiro' || c.tipo === 'percentual' ? 'decimal' : c.tipo === 'inteiro' ? 'numeric' : undefined
+    const modo = c.tipo === 'percentual' ? 'decimal' : c.tipo === 'inteiro' ? 'numeric' : undefined
     controle = <input type="text" inputMode={modo} autoComplete="off" maxLength={c.nome === 'sigla' ? 20 : undefined} className={cls} {...comum} {...reg} />
   }
   return (

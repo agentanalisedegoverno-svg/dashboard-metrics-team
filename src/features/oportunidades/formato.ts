@@ -6,6 +6,15 @@ export type FormValores = Record<Exclude<Nome, 'orcamento_sigiloso' | 'pendencia
 
 const fmtNum = (n: number) => String(n).replace('.', ',')
 
+/** Valor em reais para o campo do formulário: "R$ 1.234,56". */
+export const fmtReal = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ')
+
+/** Máscara de digitação em reais: só os dígitos contam e os dois últimos são os centavos ("123456" -> "R$ 1.234,56"). */
+export function mascaraReal(texto: string): string {
+  const digitos = texto.replace(/\D/g, '').replace(/^0+/, '')
+  return digitos === '' ? '' : fmtReal(Number(digitos) / 100)
+}
+
 /** Dia de hoje (aaaa-mm-dd) em Brasília: padrão da data de distribuição de uma oportunidade nova. */
 export const hojeIso = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
 
@@ -19,7 +28,8 @@ export function paraForm(o?: Partial<Oportunidade> | null): FormValores {
       const p = Math.round(Number(bruto) * 10000) / 100
       v[c.nome] = c.casas === undefined ? fmtNum(p) : p.toFixed(c.casas).replace('.', ',')
     }
-    else if (c.tipo === 'dinheiro' || c.tipo === 'inteiro') v[c.nome] = fmtNum(Number(bruto))
+    else if (c.tipo === 'dinheiro') v[c.nome] = fmtReal(Number(bruto))
+    else if (c.tipo === 'inteiro') v[c.nome] = fmtNum(Number(bruto))
     else if (c.tipo === 'hora') v[c.nome] = String(bruto).slice(0, 5) // o banco devolve HH:MM:SS; o campo mostra HH:MM
     else v[c.nome] = String(bruto)
   }
@@ -48,9 +58,9 @@ export function deForm(v: FormValores, pendenciasAtuais: string[] = []) {
     const x = bruto[campo]
     return x === undefined || x === null || String(x).trim() === ''
   })
-  // O campo Valor CTC etc. aceita "1.234,50": remove separador de milhar antes de converter.
+  // Campos em reais: "R$ 1.234,50" (ou "1.234,50") vira o texto numérico "1234,50" (sem símbolo nem separador de milhar).
   for (const c of TODOS_CAMPOS) {
-    if (c.tipo === 'dinheiro' && typeof bruto[c.nome] === 'string') bruto[c.nome] = String(bruto[c.nome]).replace(/\.(?=\d{3}(\D|$))/g, '')
+    if (c.tipo === 'dinheiro' && typeof bruto[c.nome] === 'string') bruto[c.nome] = String(bruto[c.nome]).replace(/R\$|\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '')
   }
   return oportunidadeInput.safeParse(bruto)
 }
