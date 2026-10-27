@@ -19,7 +19,7 @@ describe('migrações', () => {
     expect(new Set(f.rows.map((r) => r.proname)).size).toBe(12)
     const t = await db.query<{ tgname: string }>(`select tgname from pg_trigger where not tgisinternal and tgname like 'oportunidades_%'`)
     expect(t.rows.map((r) => r.tgname).sort()).toEqual(
-      ['oportunidades_auditar_tg', 'oportunidades_codigo_tg', 'oportunidades_derivar_tg', 'oportunidades_email_tg', 'oportunidades_torre_tg'],
+      ['oportunidades_auditar_tg', 'oportunidades_codigo_tg', 'oportunidades_derivar_tg', 'oportunidades_email_status_tg', 'oportunidades_email_tg', 'oportunidades_torre_tg'],
     )
   })
   it('reaplicar qualquer migração é inofensivo (idempotência)', async () => {
@@ -286,6 +286,31 @@ describe('e-mail de nova oportunidade', () => {
     await db.query(`select sincronizar_planilha('[{"chave_planilha":"em1","status":"Go","orgao":"P","descritivo":"x","torre":"ITS","data_pregao_dt":"2026-04-01"}]'::jsonb,'t',false)`)
     const p = await um<number>(`select id from oportunidades where chave_planilha = 'em1'`)
     expect(await naFila(p.id as number)).toBe(0)
+  })
+  it('mudança de status entra na fila (qualquer origem); outras edições e a carga da planilha não', async () => {
+    const mudancas = async (id: number) => (await db.query<{ status_anterior: string | null; status_novo: string; alterado_por: string }>(
+      `select status_anterior, status_novo, alterado_por from email_fila where oportunidade_id = $1 and tipo = 'status' order by id`, [id])).rows
+    await config(true, ['Go'])
+    const a = await criar(db, opp({ status: 'Prospect' }))
+    const v2 = await atualizar(db, a.id, a.versao, opp({ status: 'Prospect', observacoes: 'só texto' }))
+    expect(await mudancas(a.id)).toHaveLength(0)
+    await atualizar(db, a.id, v2.versao, opp({ status: 'Go' }))
+    expect(await mudancas(a.id)).toMatchObject([{ status_anterior: 'Prospect', status_novo: 'Go' }])
+
+    // oportunidade que veio da planilha, editada na web
+    await db.query(`select sincronizar_planilha('[{"chave_planilha":"em2","status":"Go","orgao":"P","descritivo":"x","torre":"ITS","data_pregao_dt":"2026-04-01"}]'::jsonb,'t',false)`)
+    const p = await um<number>(`select id from oportunidades where chave_planilha = 'em2'`)
+    const pv = await um<number>(`select versao from oportunidades where id = $1`, [p.id])
+    await atualizar(db, p.id as number, pv.versao as number, opp({ status: 'Prospect' }))
+    expect(await mudancas(p.id as number)).toMatchObject([{ status_anterior: 'Go', status_novo: 'Prospect' }])
+    // a carga mudando o status NÃO envia
+    await db.query(`select sincronizar_planilha('[{"chave_planilha":"em2","status":"Win","orgao":"P","descritivo":"x","torre":"ITS","data_pregao_dt":"2026-04-01"}]'::jsonb,'t',false)`)
+    expect(await mudancas(p.id as number)).toHaveLength(1)
+    // módulo desligado: nada
+    await config(false, ['Go'])
+    const b = await criar(db, opp({ status: 'Prospect' }))
+    await atualizar(db, b.id, b.versao, opp({ status: 'Go' }))
+    expect(await mudancas(b.id)).toHaveLength(0)
   })
   it('regras de configuração: só administrador, status da lista, e-mails válidos, mínimos para ligar', async () => {
     expect((await falha(db.query(`select salvar_email_config(false, '{}', '[]', $1, false)`, [EDITOR])))?.code).toBe('P0403')

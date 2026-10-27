@@ -62,3 +62,11 @@ Enquanto os segredos não existirem, o workflow apenas registra um aviso e não 
 - Só administradores veem e editam as regras (API e funções do banco recusam os demais).
 - O e-mail de teste vai apenas para o administrador que o pediu.
 - A senha de app do Gmail fica só nos segredos do GitHub. Para trocar: gere outra senha de app, atualize `SMTP_PASS` e revogue a antiga.
+
+## Aviso de mudança de status (migração 016)
+
+- Quando o **status** de uma oportunidade muda pela web, entra um pedido `tipo = 'status'` na fila (guarda status anterior, novo e quem alterou). Vale para qualquer oportunidade, da planilha ou criada na web, e para qualquer status novo.
+- **Só status.** Qualquer outra edição não envia e-mail.
+- A carga/sincronização da planilha (`app.origem = 'sync'`) nunca envia.
+- Mesmas regras de sempre: módulo ligado, destinatários e pré-vendas da oportunidade. O assunto vira `[Radar] Status anterior → Status novo | código | …`.
+- O Planner não muda: só recebe o que foi criado na web.
