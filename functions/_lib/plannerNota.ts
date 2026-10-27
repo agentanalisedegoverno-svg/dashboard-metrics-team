@@ -26,22 +26,37 @@ function valor(c: Campo, v: unknown, d: Record<string, unknown>): string {
   }
 }
 
+export type SecaoNota = { titulo: string; itens: [string, string][] }
+
+/** Mesmo conteúdo da anotação, estruturado (seção -> [rótulo, valor]); o Planner junta em texto e o e-mail monta a tabela. */
+export function secoesNota(d: Record<string, unknown>): SecaoNota[] {
+  const secoes: SecaoNota[] = []
+  for (const s of SECOES) {
+    const itens: [string, string][] = []
+    for (const c of s.campos) {
+      if (c.quando && vazio(d[c.nome]) && !c.quando.includes(String(d.status))) continue // motivos só existem em No Go / Lost
+      itens.push([c.rotulo, valor(c, d[c.nome], d)])
+    }
+    if (s.id === 'resultado') {
+      itens.push(['Empresa vencedora (razão social)', vazio(d.empresa_vencedora_razao) ? '—' : limpa(d.empresa_vencedora_razao)])
+      itens.push(['Empresa vencedora (matriz/filial)', vazio(d.empresa_vencedora_tipo) ? '—' : limpa(d.empresa_vencedora_tipo)])
+    }
+    secoes.push({ titulo: s.titulo, itens })
+  }
+  const pend = Array.isArray(d.pendencias) ? (d.pendencias as string[]) : []
+  const fim: [string, string][] = [['Pendências', pend.length ? pend.join(', ') : 'nenhuma']]
+  if (!vazio(d.criado_por)) fim.push(['Cadastrada por', limpa(d.criado_por)])
+  secoes.push({ titulo: '', itens: fim })
+  return secoes
+}
+
 /** `d` é a linha da oportunidade (colunas do banco). `versao` e `codigo` vêm dela. */
 export function notaCompleta(d: Record<string, unknown>, chave: string): string {
   const linhas: string[] = [`Radar ${chave} (v${d.versao}) — dados da oportunidade`]
-  for (const s of SECOES) {
-    linhas.push('', s.titulo.toUpperCase())
-    for (const c of s.campos) {
-      if (c.quando && vazio(d[c.nome]) && !c.quando.includes(String(d.status))) continue // motivos só existem em No Go / Lost
-      linhas.push(`${c.rotulo}: ${valor(c, d[c.nome], d)}`)
-    }
-    if (s.id === 'resultado') {
-      linhas.push(`Empresa vencedora (razão social): ${vazio(d.empresa_vencedora_razao) ? '—' : limpa(d.empresa_vencedora_razao)}`)
-      linhas.push(`Empresa vencedora (matriz/filial): ${vazio(d.empresa_vencedora_tipo) ? '—' : limpa(d.empresa_vencedora_tipo)}`)
-    }
+  for (const s of secoesNota(d)) {
+    if (s.titulo) linhas.push('', s.titulo.toUpperCase())
+    else linhas.push('')
+    for (const [k, v] of s.itens) linhas.push(`${k}: ${v}`)
   }
-  const pend = Array.isArray(d.pendencias) ? (d.pendencias as string[]) : []
-  linhas.push('', `Pendências: ${pend.length ? pend.join(', ') : 'nenhuma'}`)
-  if (!vazio(d.criado_por)) linhas.push(`Cadastrada por: ${limpa(d.criado_por)}`)
   return linhas.join('\n')
 }
