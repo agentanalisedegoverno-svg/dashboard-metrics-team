@@ -14,6 +14,9 @@ export type Env = {
   /** Token do GitHub (permissão só de Actions) que aciona o envio de e-mails ao cadastrar. Opcional. */
   GITHUB_DISPATCH_TOKEN?: string
   GITHUB_REPO?: string
+  /** Chave da API do Render e id do cron job do Planner: acionam o ciclo Radar -> Planner ao salvar. Opcionais. */
+  RENDER_API_KEY?: string
+  RENDER_PLANNER_CRON_ID?: string
 }
 
 const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'private, no-store' }

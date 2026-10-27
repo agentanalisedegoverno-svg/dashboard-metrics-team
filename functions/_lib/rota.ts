@@ -2,13 +2,14 @@
 import { bancoApp, csrfOk, identificar, lerJson, send, type Env } from './http.ts'
 import type { Sql } from './cadastro.ts'
 import { dispararEnvioEmails } from './dispararEmails.ts'
+import { dispararPlanner } from './dispararPlanner.ts'
 
 type Ctx = { request: Request; env: Env; params: Record<string, string | string[] | undefined>; waitUntil?: (p: Promise<unknown>) => void }
 type Args = { sql: Sql; email: string; request: Request; params: Ctx['params']; corpo: () => Promise<unknown> }
 type Handler = (a: Args) => Promise<Response>
 
 export const rota =
-  (metodos: Record<string, Handler>, opcoes: { semBanco?: boolean; aoCriar?: 'enviarEmails' } = {}) =>
+  (metodos: Record<string, Handler>, opcoes: { semBanco?: boolean; aoCriar?: 'enviarEmails'; aoSalvar?: 'integracoes' } = {}) =>
   async ({ request, env, params, waitUntil }: Ctx): Promise<Response> => {
     const handler = metodos[request.method]
     if (!handler) return send(405, { error: 'Método não permitido.' })
@@ -19,9 +20,12 @@ export const rota =
     if (!sql) return send(503, { error: 'Banco de dados do cadastro não configurado.' })
     try {
       const resposta = await handler({ sql, email: id.email, request, params, corpo: () => lerJson(request) })
-      // Cadastro feito (201): acorda o envio de e-mails na hora, em segundo plano (não atrasa nem derruba a resposta).
-      if (opcoes.aoCriar === 'enviarEmails' && request.method === 'POST' && resposta.status === 201) {
-        const disparo = dispararEnvioEmails(env)
+      // Cadastro feito (201) ou salvamento (200): acorda o envio de e-mails e o ciclo do Planner na hora, em segundo plano
+      // (não atrasa nem derruba a resposta).
+      const criou = opcoes.aoCriar === 'enviarEmails' && request.method === 'POST' && resposta.status === 201
+      const salvou = opcoes.aoSalvar === 'integracoes' && request.method === 'PUT' && resposta.status === 200
+      if (criou || salvou) {
+        const disparo = Promise.all([dispararEnvioEmails(env), dispararPlanner(env)])
         if (waitUntil) waitUntil(disparo)
         else void disparo
       }

@@ -8,6 +8,8 @@ vi.mock('./http.ts', async (importOriginal) => ({
 }))
 const disparo = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 vi.mock('./dispararEmails.ts', () => ({ dispararEnvioEmails: disparo }))
+const planner = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+vi.mock('./dispararPlanner.ts', () => ({ dispararPlanner: planner }))
 
 import { rota } from './rota.ts'
 
@@ -21,6 +23,16 @@ describe('rota: aviso de e-mail ao cadastrar', () => {
     expect((await r(c)).status).toBe(201)
     expect(disparo).toHaveBeenCalledTimes(1)
     expect(c.waitUntil).toHaveBeenCalledTimes(1)
+  })
+  it('criar aciona e-mails e Planner; salvar (PUT 200) também, mas só com a opção aoSalvar', async () => {
+    disparo.mockClear(); planner.mockClear()
+    await rota({ POST: async () => new Response('{}', { status: 201 }) }, { aoCriar: 'enviarEmails' })(ctx('POST'))
+    expect([disparo.mock.calls.length, planner.mock.calls.length]).toEqual([1, 1])
+    await rota({ PUT: async () => new Response('{}', { status: 200 }) }, { aoSalvar: 'integracoes' })(ctx('PUT'))
+    expect([disparo.mock.calls.length, planner.mock.calls.length]).toEqual([2, 2])
+    await rota({ PUT: async () => new Response('{}', { status: 200 }) })(ctx('PUT'))
+    await rota({ PUT: async () => new Response('{}', { status: 409 }) }, { aoSalvar: 'integracoes' })(ctx('PUT'))
+    expect([disparo.mock.calls.length, planner.mock.calls.length]).toEqual([2, 2])
   })
   it('não aciona em GET, em erro, nem em rota sem a opção', async () => {
     disparo.mockClear()
