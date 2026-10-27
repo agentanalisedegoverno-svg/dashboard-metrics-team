@@ -143,31 +143,31 @@ exports[`métricas — snapshot da base sintética > computeMetrics 2025 1`] = `
   ],
   "status": [
     {
-      "color": "var(--st-good)",
+      "color": "var(--dot-win)",
       "count": 2,
       "label": "Win",
       "pct": 33.33333333333333,
     },
     {
-      "color": "var(--series-orange)",
+      "color": "var(--dot-lost)",
       "count": 1,
       "label": "Lost",
       "pct": 16.666666666666664,
     },
     {
-      "color": "var(--st-critical)",
+      "color": "var(--dot-nogo)",
       "count": 1,
       "label": "No Go",
       "pct": 16.666666666666664,
     },
     {
-      "color": "var(--muted)",
+      "color": "var(--dot-suspended)",
       "count": 1,
       "label": "Suspended",
       "pct": 16.666666666666664,
     },
     {
-      "color": "var(--muted)",
+      "color": "var(--dot-canceled)",
       "count": 1,
       "label": "Canceled",
       "pct": 16.666666666666664,
@@ -354,31 +354,31 @@ exports[`métricas — snapshot da base sintética > computeMetrics 2026 1`] = `
   ],
   "status": [
     {
-      "color": "var(--series-orange)",
+      "color": "var(--dot-lost)",
       "count": 2,
       "label": "Lost",
       "pct": 33.33333333333333,
     },
     {
-      "color": "var(--st-critical)",
+      "color": "var(--dot-nogo)",
       "count": 1,
       "label": "No Go",
       "pct": 16.666666666666664,
     },
     {
-      "color": "var(--st-good)",
+      "color": "var(--dot-win)",
       "count": 1,
       "label": "Win",
       "pct": 16.666666666666664,
     },
     {
-      "color": "var(--muted)",
+      "color": "var(--dot-suspended)",
       "count": 1,
       "label": "Suspended",
       "pct": 16.666666666666664,
     },
     {
-      "color": "var(--muted)",
+      "color": "var(--dot-canceled)",
       "count": 1,
       "label": "Canceled",
       "pct": 16.666666666666664,

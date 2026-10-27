@@ -214,8 +214,8 @@ test('logo da CTC no cabeçalho e bolinhas de status por cor', async ({ page }) 
   await expect(logo).toBeVisible()
   expect(await logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0)
   // semente: i % 3 === 0 é Win (verde), os demais são Go (azul)
-  await expect(page.locator('.bg-dot-win').first()).toBeVisible()
-  await expect(page.locator('.bg-dot-go').first()).toBeVisible()
+  await expect(page.locator('[data-status="Win"]').first()).toBeVisible()
+  await expect(page.locator('[data-status="Go"]').first()).toBeVisible()
 })
 
 test('torre acompanha a linha de serviço (campo calculado) e unidade é lista', async ({ page }) => {
