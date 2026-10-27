@@ -1,19 +1,28 @@
 /**
- * Aciona o cron job do Render (ciclo Radar -> Planner) assim que uma oportunidade é cadastrada ou salva, para o cartão
- * sair em cerca de um minuto sem esperar os 5 minutos do agendamento. É só um "acorde": quem exporta e grava no Planner
- * é o job de sempre. Sem chave configurada não faz nada; nunca derruba nem atrasa o salvamento (erros só vão para o log).
- * Atenção: o Render cancela uma execução em andamento ao acionar outra; o job é idempotente e relê o Planner antes de criar.
+ * Aciona o workflow "Planner integração" do GitHub assim que uma oportunidade é cadastrada ou salva, para o cartão sair em
+ * cerca de um minuto sem depender de nenhuma máquina do time. É só um "acorde": quem exporta e grava no Planner é o
+ * workflow de sempre. Usa o mesmo token do envio de e-mails; sem token não faz nada; nunca derruba nem atrasa o salvamento
+ * (erros só vão para o log, sem dados). Acionamentos seguidos entram em fila (o workflow nunca roda duas vezes ao mesmo tempo).
  */
-export type EnvPlanner = { RENDER_API_KEY?: string; RENDER_PLANNER_CRON_ID?: string }
+export type EnvPlanner = { GITHUB_DISPATCH_TOKEN?: string; GITHUB_REPO?: string }
+
+const REPO_PADRAO = 'agentanalisedegoverno-svg/dashboard-metrics-team'
 
 export async function dispararPlanner(env: EnvPlanner, buscar: typeof fetch = fetch): Promise<boolean> {
-  const chave = env.RENDER_API_KEY
-  const id = env.RENDER_PLANNER_CRON_ID
-  if (!chave || !id || !/^crn-[\w]+$/.test(id)) return false
+  const token = env.GITHUB_DISPATCH_TOKEN
+  if (!token) return false
+  const repo = /^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPO ?? '') ? (env.GITHUB_REPO as string) : REPO_PADRAO
   try {
-    const r = await buscar(`https://api.render.com/v1/cron-jobs/${id}/runs`, {
+    const r = await buscar(`https://api.github.com/repos/${repo}/actions/workflows/planner-integracao.yml/dispatches`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${chave}`, accept: 'application/json', 'user-agent': 'radar-prevendas' },
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: 'application/vnd.github+json',
+        'x-github-api-version': '2022-11-28',
+        'user-agent': 'radar-prevendas',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main' }),
       signal: AbortSignal.timeout(5000),
     })
     if (!r.ok) console.error('Disparo do Planner recusado: HTTP', r.status)

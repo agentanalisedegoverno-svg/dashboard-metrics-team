@@ -1,0 +1,74 @@
+name: Planner integração
+
+# Cria ou atualiza os cartões do Microsoft Planner a partir das oportunidades salvas na web (Radar -> Planner).
+# Roda na nuvem do GitHub: não depende de nenhum computador do time. Três gatilhos (UTC; Brasília = UTC-3):
+#  1) Ao cadastrar ou salvar uma oportunidade, o Radar (Cloudflare) aciona este workflow na hora (workflow_dispatch): cartão em ~1 min.
+#  2) Seg a sex, 08h às 19h: de 5 em 5 minutos (rede de segurança; o agendamento do GitHub é "melhor esforço" e pode atrasar).
+#  3) Manual, pela aba Actions.
+# O estado (token do login Microsoft e versões já aplicadas) fica no banco, cifrado (planner-auto/estado_db.py, migração 018).
+# O log deste repositório é público: tudo o que os scripts imprimem vai para um arquivo temporário e só contagens são mostradas.
+on:
+  schedule:
+    - cron: '*/5 11-21 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: planner-integracao
+  cancel-in-progress: false
+
+jobs:
+  integrar:
+    name: Radar -> Planner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL_PLANNER: ${{ secrets.DATABASE_URL_PLANNER }}
+      PLANNER_ESTADO_CHAVE: ${{ secrets.PLANNER_ESTADO_CHAVE }}
+      PLANNER_CLIENT_ID: ${{ secrets.PLANNER_CLIENT_ID }}
+      PLANNER_TENANT_ID: ${{ secrets.PLANNER_TENANT_ID }}
+      PYTHONUTF8: '1'
+    steps:
+      - name: Conferir configuração
+        id: cfg
+        run: |
+          if [ -z "$DATABASE_URL_PLANNER" ] || [ -z "$PLANNER_ESTADO_CHAVE" ] || [ -z "$PLANNER_CLIENT_ID" ] || [ -z "$PLANNER_TENANT_ID" ]; then
+            echo "::notice::Secrets do Planner não configurados (DATABASE_URL_PLANNER, PLANNER_ESTADO_CHAVE, PLANNER_CLIENT_ID, PLANNER_TENANT_ID): nada a fazer."
+            echo "pronto=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "pronto=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.cfg.outputs.pronto == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.cfg.outputs.pronto == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Instalar dependências
+        if: steps.cfg.outputs.pronto == 'true'
+        run: |
+          npm ci --ignore-scripts
+          python3 -m pip install --quiet -r planner-auto/requirements.txt
+      - name: Exportar, aplicar no Planner e guardar o estado
+        if: steps.cfg.outputs.pronto == 'true'
+        run: |
+          LOG="$RUNNER_TEMP/planner.log"
+          EVENTOS="$RUNNER_TEMP/eventos"
+          export PLANNER_EVENTOS_DIR="$EVENTOS"
+          : > "$LOG"
+          python3 planner-auto/estado_db.py preparar >> "$LOG" 2>&1 || { echo "::error::Falha ao preparar a configuração."; exit 1; }
+          python3 planner-auto/estado_db.py restaurar >> "$LOG" 2>&1 || { echo "::error::Falha ao restaurar o estado (login Microsoft ou chave de cifra). Rode estado_db.py guardar na máquina com o login."; exit 1; }
+          RC=0
+          node scripts/planner-eventos.mjs --saida "$EVENTOS/entrada" >> "$LOG" 2>&1 || RC=1
+          if [ "$RC" -eq 0 ]; then
+            (cd planner-auto && python3 planner_auto.py processar-eventos --sim) >> "$LOG" 2>&1 || RC=1
+          fi
+          python3 planner-auto/estado_db.py guardar >> "$LOG" 2>&1 || RC=1
+          # Só contagens no log público (nunca códigos, órgãos ou textos das oportunidades).
+          echo "Eventos gerados: $(grep -Eo '^[0-9]+ evento' "$LOG" | head -1 | grep -Eo '^[0-9]+' || echo 0)"
+          echo "Erros: $(grep -c '✗' "$LOG" || true)"
+          if [ "$RC" -ne 0 ]; then echo "::error::O ciclo terminou com erro (detalhes só na máquina, não no log público)."; fi
+          exit "$RC"
