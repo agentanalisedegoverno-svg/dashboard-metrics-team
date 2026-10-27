@@ -95,7 +95,7 @@ Pontos que costumam surpreender:
 | Alguém... | Resultado no Planner (na próxima rodada, em até 5 min) |
 |---|---|
 | **cria** a oportunidade (torre ITS, status Go, pré-vendas Júlio) | cartão criado no plano *ITS Oportunidades*, coluna GO, 50%, com checklist e Júlio como responsável |
-| **muda o status** (Go → Win) | o cartão **vai** para a coluna do novo status (*Ganhos!* ou *WIN*), progresso 100%, e ganha uma nota nova |
+| **muda o status** (Go → Win) | o cartão **vai** para a coluna do novo status (*WIN*), progresso 100%, e ganha uma nota nova |
 | **troca o pré-vendas** | o novo responsável é **acrescentado**; o antigo **continua** atribuído (remover é manual) |
 | **corrige órgão, objeto, processo, UASG ou data do pregão** | título e prazo reescritos; coluna e progresso reafirmados pelo status |
 | **edita qualquer outro campo** (UF, impostos, observações...) | o cartão é "reafirmado": título, coluna, progresso e prazo voltam ao que o Radar diz e uma nota é acrescentada |
@@ -217,7 +217,7 @@ Para cada arquivo de `entrada\`, em ordem de nome, pela `chave`:
 ### Regras do consumidor
 1. **Versão:** guarda a última `versaoOrigem` aplicada por `chave` (`%USERPROFILE%\.planner_auto\estado_radar.json`) e **ignora** eventos com versão menor ou igual. Reprocessar um evento antigo de `erros\` nunca sobrescreve um mais novo.
 2. **Responsável vazio não mexe** na atribuição: o que alguém atribuiu à mão no Planner é preservado.
-3. **Bucket e rótulo:** nome **exato** primeiro; senão, comparação sem caixa e sem espaços (ex.: `Em andamento ( Proposta Entregue)`). Se ainda não achar, o evento vai para `erros\`. **Nunca** cai num bucket qualquer.
+3. **Bucket e rótulo:** nome **exato** primeiro; senão, comparação sem caixa e sem espaços (ex.: `PROSPECT ` com espaço no fim casa com `PROSPECT`). Se ainda não achar, o evento vai para `erros\`. **Nunca** cai num bucket qualquer.
 4. **E-mail → usuário:** converte com `GET /users/{email}` antes de montar `assignments`; e-mail não encontrado vai para `erros\`.
 5. **ETag** (`If-Match`) em toda atualização; retry em 429/503 respeitando `Retry-After`.
 6. **Nunca apaga** cartões nem arquivos; só move entre pastas. Toda escrita vai para `%USERPROFILE%\.planner_auto\acoes.jsonl` (auditoria).
@@ -236,15 +236,15 @@ Comandos do `planner-auto`:
 
 | Radar | ITS Oportunidades | Digital e Health | Progresso |
 |---|---|---|---|
-| Prospect | Prospect | Prospect | 0% |
+| Prospect | PROSPECT | PROSPECT | 0% |
 | Go | GO | GO | 50% |
-| On going | Em andamento ( Proposta Entregue) | On Going (Proposta enviada) | 50% |
-| Suspended | SUSPENSOS | SUSPENSAS | 50% |
-| Win | Ganhos! | WIN | 100% |
-| Lost | Perdidos | Lost | 100% |
+| On going | ON GOING | ON GOING | 50% |
+| Suspended | SUSPENDED | SUSPENDED | 50% |
+| Win | WIN | WIN | 100% |
+| Lost | LOST | LOST | 100% |
 | No Go | NO GO | NO GO | 100% |
-| Canceled | Revogado | Revogado | 100% |
-| Validar / sem status | Preparo | Prospect | 0% |
+| Canceled | CANCELLED | CANCELLED | 100% |
+| Validar / sem status | PROSPECT | PROSPECT | 0% |
 
 Não têm status equivalente no Radar: *Cotação Concluída* (ITS) e *Cotações Enviadas* (Digital e Health).
 
