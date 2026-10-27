@@ -71,16 +71,16 @@ describe('validação (espelho das regras de negócio)', () => {
   it('status fora da lista é recusado', async () => {
     expect(camposComErro(await falha(criar(db, opp({ status: 'Inventado' }))))).toContain('status')
   })
-  it('descritivo: até 50 caracteres ao criar ou alterar; registro antigo mais longo segue salvando se o texto não mudar', async () => {
-    expect(String((await criar(db, opp({ descritivo: 'x'.repeat(50) }))).descritivo)).toHaveLength(50)
-    expect(camposComErro(await falha(criar(db, opp({ descritivo: 'x'.repeat(51) }))))).toContain('descritivo')
+  it('descritivo: até 60 caracteres ao criar ou alterar; registro antigo mais longo segue salvando se o texto não mudar', async () => {
+    expect(String((await criar(db, opp({ descritivo: 'x'.repeat(60) }))).descritivo)).toHaveLength(60)
+    expect(camposComErro(await falha(criar(db, opp({ descritivo: 'x'.repeat(61) }))))).toContain('descritivo')
     // Registro vindo da planilha (carga não passa pela validação) com descritivo longo:
     const velho = await criar(db, opp({ descritivo: 'curto' }))
     await db.query(`update oportunidades set descritivo = $1 where id = $2`, ['y'.repeat(900), velho.id])
     const lido = (await db.query<{ versao: number }>(`select versao from oportunidades where id = $1`, [velho.id])).rows[0]
     const ok = await atualizar(db, velho.id, lido.versao, opp({ descritivo: 'y'.repeat(900), observacoes: 'só isto' }))
     expect(String(ok.descritivo)).toHaveLength(900)
-    expect(camposComErro(await falha(atualizar(db, velho.id, ok.versao, opp({ descritivo: 'z'.repeat(60) }))))).toContain('descritivo')
+    expect(camposComErro(await falha(atualizar(db, velho.id, ok.versao, opp({ descritivo: 'z'.repeat(61) }))))).toContain('descritivo')
   })
   it('No Go exige motivo; Lost exige motivo; Win exige Valor CTC', async () => {
     expect(camposComErro(await falha(criar(db, opp({ status: 'No Go' }))))).toContain('motivo_no_go')
@@ -127,11 +127,11 @@ describe('validação (espelho das regras de negócio)', () => {
     expect(camposComErro(await falha(criar(db, opp({ analista: 'Fulano Qualquer' }))))).toContain('analista')
     expect((await criar(db, opp({ analista: 'Editor' }))).analista).toBe('Editor')
   })
-  it('sigla: até 8 caracteres, opcional, em branco por padrão; some espaços das pontas', async () => {
+  it('sigla: até 20 caracteres, opcional, em branco por padrão; some espaços das pontas', async () => {
     expect((await criar(db, opp({ sigla: ' IBGE ' }))).sigla).toBe('IBGE')
-    expect((await criar(db, opp({ sigla: '12345678' }))).sigla).toBe('12345678')
+    expect((await criar(db, opp({ sigla: '12345678901234567890' }))).sigla).toBe('12345678901234567890')
     expect((await criar(db, opp())).sigla).toBeNull()
-    expect(camposComErro(await falha(criar(db, opp({ sigla: '123456789' }))))).toContain('sigla')
+    expect(camposComErro(await falha(criar(db, opp({ sigla: '123456789012345678901' }))))).toContain('sigla')
     const a = await criar(db, opp({ sigla: 'ABC' }))
     expect((await atualizar(db, a.id, a.versao, opp({ sigla: 'XYZ' }))).sigla).toBe('XYZ')
   })

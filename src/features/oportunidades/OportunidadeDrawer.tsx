@@ -170,7 +170,7 @@ function CampoInput({
       </select>
     )
   } else if (c.tipo === 'longo') {
-    controle = <textarea rows={c.nome === 'descritivo' ? 3 : 4} className={cn(cls, 'resize-y')} maxLength={c.nome === 'descritivo' ? 50 : undefined} {...comum} {...reg} />
+    controle = <textarea rows={c.nome === 'descritivo' ? 3 : 4} className={cn(cls, 'resize-y')} maxLength={c.nome === 'descritivo' ? 60 : undefined} {...comum} {...reg} />
   } else if (c.tipo === 'data') {
     controle = <input type="date" className={cls} {...comum} {...reg} />
   } else if (c.tipo === 'hora') {
@@ -185,7 +185,7 @@ function CampoInput({
     )
   } else {
     const modo = c.tipo === 'dinheiro' || c.tipo === 'percentual' ? 'decimal' : c.tipo === 'inteiro' ? 'numeric' : undefined
-    controle = <input type="text" inputMode={modo} autoComplete="off" maxLength={c.nome === 'sigla' ? 8 : undefined} className={cls} {...comum} {...reg} />
+    controle = <input type="text" inputMode={modo} autoComplete="off" maxLength={c.nome === 'sigla' ? 20 : undefined} className={cls} {...comum} {...reg} />
   }
   return (
     <div className={c.largo ? 'sm:col-span-2 lg:col-span-3' : undefined}>

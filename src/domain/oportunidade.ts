@@ -61,7 +61,7 @@ export const oportunidadeInput = z.object({
   status: texto(60),
   orgao: texto(200),
   descritivo: texto(100_000), // sem limite prático de caracteres
-  sigla: texto(8), // sigla do órgão (não existe na planilha)
+  sigla: texto(20), // sigla do órgão (não existe na planilha)
   objeto: texto(5000), // o que está sendo contratado (não existe na planilha)
   criterio: texto(60),
   uf: texto(2),
