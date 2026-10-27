@@ -1,5 +1,7 @@
 # Integração Radar → Microsoft Planner
 
+> **Atualização (27/10/2026): a integração roda na nuvem, sem depender de nenhum computador.** O Radar (Cloudflare) aciona na hora o workflow `planner-integracao.yml` do GitHub ao cadastrar ou salvar; cartão e e-mail saem em cerca de 1 minuto. Veja [Rodar na nuvem](#rodar-na-nuvem-sem-depender-de-computador-github-actions). A tarefa do Windows descrita abaixo passa a ser só contingência.
+>
 > **Status (26/10/2026): em produção.** Exportador, `planner-auto` e agendamento estão ativos; o ciclo completo (oportunidade criada ou salva na web → cartão criado ou atualizado no Planner) roda **de 5 em 5 minutos**, em dias úteis, das 08h às 19h (desde 26/10/2026; antes era de 30 em 30). Esteve pausado de 22/10 a 26/10 às 08:00 e foi retomado nessa data.
 >
 > **O que muda no cartão a cada salvamento no Radar: veja [Regra de atualização](#regra-de-atualização-o-que-acontece-no-cartão).**
@@ -160,7 +162,8 @@ Para rodar: `npm test` (parte TypeScript e banco) e `python -m unittest discover
 | Exportador `scripts/planner-eventos.mjs` | este repositório | lê o banco (`radar_planner`) e grava eventos JSON v2 |
 | `planner-auto` ([`planner-auto/`](../planner-auto/)) | este repositório; roda em `C:\Users\CTC\planner-auto` | login no Graph, `inspecionar`, `processar-eventos` |
 | `rodar-integracao.cmd` | `planner-auto/` | roda as duas etapas em sequência, com log |
-| Tarefa `Radar-Planner integracao` | Agendador do Windows | seg–sex, 08h–19h, a cada 5 min (também envia os e-mails de nova oportunidade) |
+| Workflow `planner-integracao.yml` | GitHub Actions | **Principal (desde 27/10/2026):** disparo ao salvar + 5 em 5 min, na nuvem. Ver [Rodar na nuvem](#rodar-na-nuvem-sem-depender-de-computador-github-actions) |
+| Tarefa `Radar-Planner integracao` (contingência) | Agendador do Windows | seg–sex, 08h–19h, a cada 5 min (também envia os e-mails de nova oportunidade) |
 | Mapa `config/planner-mapa.json` | este repositório | planos, buckets, rótulos, progresso, checklist padrão |
 | Tabelas `planner_marco` e `planner_exportacao` | Neon (migração 003) | marco de ativação e versão já exportada por oportunidade |
 
@@ -273,6 +276,10 @@ O mesmo ciclo (exportador + `planner-auto`) roda no workflow `.github/workflows/
 - **Log público:** os scripts escrevem num arquivo temporário e o log mostra só contagens (eventos gerados e erros), nunca códigos, órgãos ou textos das oportunidades.
 - **Migrar do Windows sem novo login:** na máquina que já fez o login, com `DATABASE_URL_PLANNER` e `PLANNER_ESTADO_CHAVE` definidos, rode `python planner-auto\estado_db.py guardar`. Depois de um ciclo do workflow com sucesso, **desative a tarefa do Windows** (`Disable-ScheduledTask -TaskName "Radar-Planner integracao"`): duas execuções ao mesmo tempo poderiam duplicar cartões.
 - **Gerar a chave:** `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` (guardar em local seguro; sem ela o estado não é lido).
+- **Conferir sem gravar nada:** Actions → *Planner integração* → *Run workflow* com **verificar** marcado (ou `gh workflow run planner-integracao.yml -f verificar=true`). Faz só leitura: confere o login Microsoft e se as colunas e rótulos do mapa existem nos planos; o log público mostra só `Login Microsoft: OK` e `Divergências com o mapa: N`. Rode depois de qualquer mudança de colunas no Planner.
+- **Colunas do Planner e o mapa:** os nomes em `config/planner-mapa.json` precisam existir nos planos (comparação por nome exato, depois sem caixa e sem espaços). Em 27/10/2026 o time renomeou as colunas para `PROSPECT`, `GO`, `ON GOING`, `WIN`, `LOST`, `NO GO`, `SUSPENDED` e `CANCELLED`; o mapa foi atualizado e a verificação voltou a **0 divergências**. Se renomearem de novo, o status afetado cai em `erros` até o mapa ser ajustado.
+- **Se o login falhar** (`Sem login válido` ou erro ao restaurar o estado): numa máquina com Python e acesso ao repositório, rode `python planner-auto\planner_auto.py login` (código de dispositivo) e depois `python planner-auto\estado_db.py guardar` (com `DATABASE_URL_PLANNER` e `PLANNER_ESTADO_CHAVE` definidos). É a única etapa que precisa de uma pessoa, e só a cada ~90 dias sem uso.
+- **Histórico das decisões (27/10/2026):** a integração dependia do computador do João ligado e logado (o que causou demora no envio ao Planner). Descartados: VM gratuita no GCP (as contas de faturamento estavam fechadas e exigiam cartão) e cron job no Render (cerca de US$ 1/mês e exige cartão). Escolhido: GitHub Actions (gratuito, repositório público) disparado pelo Cloudflare, com o estado no banco cifrado (migração 018). Nada foi criado no GCP nem no Render.
 - O login Microsoft continua sendo o do usuário e expira após ~90 dias sem uso; renovar com `login` e `guardar`. Trocar por permissão de aplicativo do Entra (sem pessoa) segue no [ROADMAP](ROADMAP.md).
 
 ## Limitações conhecidas (comportamento atual)
