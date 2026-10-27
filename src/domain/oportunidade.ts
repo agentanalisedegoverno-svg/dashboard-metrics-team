@@ -42,6 +42,9 @@ const inteiro = z
   }, z.number({ error: 'Número inválido' }).int('Deve ser inteiro').nullable().optional())
   .transform((v) => v ?? null)
 
+/** Duração do contrato em meses: inteiro de 1 a 600 (vazio = não informado). */
+const duracaoMeses = inteiro.refine((v) => v === null || (v >= 1 && v <= 600), 'Informe de 1 a 600 meses')
+
 const data = z
   .preprocess(
     vazioParaNull,
@@ -68,7 +71,7 @@ export const oportunidadeInput = z.object({
   processo: texto(100),
   uasg: texto(60),
   modalidade: texto(80),
-  tipo: texto(80),
+  duracao_contrato_meses: duracaoMeses,
   modo_disputa: texto(80),
   origem_oportunidade: texto(60),
   analista: texto(300), // vários pré-vendas, separados por vírgula

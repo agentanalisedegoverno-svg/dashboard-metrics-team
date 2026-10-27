@@ -82,6 +82,18 @@ describe('validação (espelho das regras de negócio)', () => {
     expect(String(ok.descritivo)).toHaveLength(900)
     expect(camposComErro(await falha(atualizar(db, velho.id, ok.versao, opp({ descritivo: 'z'.repeat(61) }))))).toContain('descritivo')
   })
+  it('duração do contrato (meses): inteiro de 1 a 600, opcional; o antigo campo tipo deixa de ser alterado no salvamento', async () => {
+    expect((await criar(db, opp({ duracao_contrato_meses: 12 }))).duracao_contrato_meses).toBe(12)
+    expect((await criar(db, opp({ duracao_contrato_meses: 600 }))).duracao_contrato_meses).toBe(600)
+    expect((await criar(db, opp())).duracao_contrato_meses).toBeNull()
+    expect(camposComErro(await falha(criar(db, opp({ duracao_contrato_meses: 0 }))))).toContain('duracao_contrato_meses')
+    expect(camposComErro(await falha(criar(db, opp({ duracao_contrato_meses: 601 }))))).toContain('duracao_contrato_meses')
+    const a = await criar(db, opp({ duracao_contrato_meses: 24 }))
+    await db.query(`update oportunidades set tipo = 'Pregão eletrônico' where id = $1`, [a.id])
+    const b = await atualizar(db, a.id, a.versao, opp({ duracao_contrato_meses: 36 }))
+    expect(b.duracao_contrato_meses).toBe(36)
+    expect(b.tipo).toBe('Pregão eletrônico') // a carga da planilha ainda grava `tipo`; o formulário não o mexe mais
+  })
   it('No Go exige motivo; Lost exige motivo; Win exige Valor CTC', async () => {
     expect(camposComErro(await falha(criar(db, opp({ status: 'No Go' }))))).toContain('motivo_no_go')
     expect(camposComErro(await falha(criar(db, opp({ status: 'Lost' }))))).toContain('motivo_lost')
