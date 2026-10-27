@@ -65,3 +65,17 @@ describe('objeto e hora do pregão no e-mail', () => {
     expect(montarEmail({ ...base, objeto: '<img src=x onerror=1>' }, 'u').html).not.toContain('<img')
   })
 })
+describe('aviso de mudança de status', () => {
+  const m = montarEmail({ ...base, status: 'No Go', status_anterior: 'Prospect', alterado_por: 'ana@x.com' }, 'https://radar.example')
+  it('assunto e corpo mostram o status anterior e o novo, e quem alterou', () => {
+    expect(m.assunto.startsWith('[Radar] Prospect → No Go | ')).toBe(true)
+    expect(m.texto).toContain('Status de oportunidade alterado')
+    expect(m.texto).toContain('Status: Prospect → No Go')
+    expect(m.texto).toContain('Alterado por: ana@x.com')
+    expect(m.texto).not.toContain('Cadastrada por')
+  })
+  it('status anterior vazio vira "sem status"; sem o campo, segue o e-mail de nova oportunidade', () => {
+    expect(montarEmail({ ...base, status_anterior: '' }, 'u').texto).toContain('sem status →')
+    expect(montarEmail(base, 'u').texto).toContain('Nova oportunidade cadastrada')
+  })
+})

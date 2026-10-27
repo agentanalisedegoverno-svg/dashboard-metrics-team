@@ -19,6 +19,9 @@ export type DadosEmail = {
   orcamento: number | null
   orcamento_sigiloso: boolean
   criado_por: string | null
+  /** Só no aviso de mudança de status: o que era antes, o que ficou e quem mudou. */
+  status_anterior?: string | null
+  alterado_por?: string | null
 }
 
 export type Mensagem = { assunto: string; texto: string; html: string }
@@ -33,8 +36,9 @@ const brl = (n: number | null) => (n === null || n === undefined ? '—' : n.toL
 export function montarAssunto(o: DadosEmail) {
   const descricao = limpa(o.descritivo, 400)
   const pregao = o.data_pregao_dt && o.hora_pregao ? `${dataBr(o.data_pregao_dt)} ${String(o.hora_pregao).slice(0, 5)}` : dataBr(o.data_pregao_dt)
+  const mudou = o.status_anterior !== undefined && o.status_anterior !== null
   const partes = [
-    limpa(o.status) || 'sem status',
+    mudou ? `${limpa(o.status_anterior) || 'sem status'} → ${limpa(o.status) || 'sem status'}` : limpa(o.status) || 'sem status',
     limpa(o.codigo) || 'sem código',
     limpa(o.orgao, 80) || 'sem órgão',
     limpa(o.torre, 40) || '—',
@@ -47,23 +51,25 @@ export function montarAssunto(o: DadosEmail) {
 }
 
 export function montarEmail(o: DadosEmail, url: string): Mensagem {
+  const mudou = o.status_anterior !== undefined && o.status_anterior !== null
   const linhas: [string, string][] = [
     ['Código', limpa(o.codigo) || '—'],
     ['Órgão', limpa(o.orgao) || '—'],
     ['Objeto', limpa(o.objeto, 300) || '—'],
-    ['Status', limpa(o.status) || '—'],
+    ['Status', mudou ? `${limpa(o.status_anterior) || 'sem status'} → ${limpa(o.status) || '—'}` : limpa(o.status) || '—'],
     ['Torre', limpa(o.torre) || '—'],
     ['Linha de serviço', limpa(o.linha_servico) || '—'],
     ['UF', limpa(o.uf) || '—'],
     ['Data do pregão', o.data_pregao_dt && o.hora_pregao ? `${dataBr(o.data_pregao_dt)} ${String(o.hora_pregao).slice(0, 5)}` : dataBr(o.data_pregao_dt)],
     ['Pré-vendas', limpa(o.analista) || '—'],
     ['Orçamento', o.orcamento_sigiloso ? 'Sigiloso' : brl(o.orcamento)],
-    ['Cadastrada por', limpa(o.criado_por) || '—'],
+    mudou ? ['Alterado por', limpa(o.alterado_por) || '—'] : ['Cadastrada por', limpa(o.criado_por) || '—'],
   ]
   const assunto = montarAssunto(o)
-  const texto = [`Nova oportunidade cadastrada no Radar Pré-Vendas.`, '', ...linhas.map(([k, v]) => `${k}: ${v}`), '', `Abrir o Radar: ${url}`].join('\n')
+  const titulo = mudou ? 'Status de oportunidade alterado no Radar Pré-Vendas.' : 'Nova oportunidade cadastrada no Radar Pré-Vendas.'
+  const texto = [titulo, '', ...linhas.map(([k, v]) => `${k}: ${v}`), '', `Abrir o Radar: ${url}`].join('\n')
   const html = `<!doctype html><html lang="pt-BR"><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:14px">
-<p><strong>Nova oportunidade cadastrada no Radar Pré-Vendas.</strong></p>
+<p><strong>${esc(titulo)}</strong></p>
 <table cellpadding="6" cellspacing="0" style="border-collapse:collapse;border:1px solid #ddd">
 ${linhas.map(([k, v]) => `<tr><td style="border:1px solid #ddd;background:#f6f6f6"><strong>${esc(k)}</strong></td><td style="border:1px solid #ddd">${esc(v)}</td></tr>`).join('\n')}
 </table>
