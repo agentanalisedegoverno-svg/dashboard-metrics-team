@@ -1,5 +1,8 @@
 # Carga de dados (planilha → Postgres, por merge)
 
+> **DESCONTINUADO em 27/10/2026.** O banco não é mais alimentado pela planilha do Excel; tudo é feito no Radar web. A tarefa foi desativada e os scripts removidos. Este documento fica **só como histórico**. Ver [DECISAO-FIM-DA-CARGA-DA-PLANILHA.md](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md).
+
+
 O banco é a fonte da verdade. Hoje há **duas portas de entrada**: o cadastro na aba **Oportunidades** (web) e a carga da planilha `BaseLicitacao.xlsx` (aba **Base Governo**) feita por um agente. A carga da planilha é um **merge**: não substitui a base.
 
 ## O que o merge faz (`sincronizar_planilha`)

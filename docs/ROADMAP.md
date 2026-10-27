@@ -10,10 +10,10 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | Banco com cadastro: histórico, bloqueio otimista, listas fechadas, usuários | ✅ |
 | API de cadastro (CRUD, histórico, arquivar/restaurar, listas, usuários) | ✅ |
 | Aba **Oportunidades** (grade virtualizada, formulário, histórico, administração) | ✅ |
-| Carga da planilha por **merge** (`sync-db.mjs`) com relatório de qualidade | ✅ |
+| Carga da planilha por **merge** (`sync-db.mjs`) com relatório de qualidade | ✅ → **descontinuada em 27/10/2026** (o banco não é mais alimentado pela planilha) |
 | Backup diário criptografado no Google Drive + teste de restauração | ✅ |
 | Integração Radar → Planner (exportador, `planner-auto`, agendamento) | ✅ |
-| Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) |
+| Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) → **desativada e removida em 27/10/2026** |
 | Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ✅ (22/10) |
 
 ## 2. Próximos passos (curto prazo)
@@ -23,7 +23,7 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | 1 | ~~Aplicar a migração 002~~ **Feito (22/10)** | A carga antiga que apagava tudo não é mais executável pelo escritor | — |
 | 2 | **Corrigir as pendências da migração** pela aba (63 registros: Lost sem motivo, "Validar", pregão antes da distribuição, sem Pré-vendas) | Qualidade das métricas; hoje elas entram como "pendência" | M |
 | 3 | **Acompanhar os primeiros cartões reais do Planner** (cadastrar, conferir bucket/responsável/prazo, mudar status) e apagar o cartão `RAD-999001` | É a primeira escrita real; o 50%/100% pode sobrescrever progresso manual | P |
-| 4 | **Alerta de falha** do agente de carga e da integração (e-mail/Teams quando o log trouxer `[ERRO]` ou a última carga passar de N dias) | Hoje só se descobre olhando o log ou o "Última atualização" | M |
+| 4 | **Alerta de falha** da integração (e-mail/Teams quando o log trouxer `[ERRO]`; a carga da planilha não existe mais) | Hoje só se descobre olhando o log ou o "Última atualização" | M |
 | 5 | **Rotacionar credenciais** pendentes e passar a trimestral (papéis do banco, token Cloudflare, tokens antigos do GitHub) | Higiene; vários valores já passaram por conversas | P |
 | 6 | ~~Teste de restauração em branch real do Neon~~ **Feito (22/10):** restaura em Postgres temporário e no branch `teste-restauracao`, com cadastro de teste; vigia diário ativo | — | — |
 | 7 | **Dependabot:** revisar os PRs semanais e planejar a migração do `@tanstack/react-table` v9 (hoje fixado na v8) | Evita a main quebrada que já ocorreu uma vez | M |

@@ -1,13 +1,16 @@
 # Carga automática da planilha (planilha → banco, por merge)
 
+> **DESCONTINUADO em 27/10/2026.** O banco não é mais alimentado pela planilha do Excel; tudo é feito no Radar web. A tarefa foi desativada e os scripts removidos. Este documento fica **só como histórico**. Ver [DECISAO-FIM-DA-CARGA-DA-PLANILHA.md](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md).
+
+
 > **Mudou em 22/10/2026:** a carga deixou de depender de um agente de IA (que nunca chegou a ser agendado). Agora é uma **tarefa do Windows** determinística, sem custo de modelo: exporta a planilha e sincroniza por merge. O nome do arquivo (AGENTE-DE-CARGA) foi mantido para não quebrar links.
 
 ## O que roda
 
-Tarefa **`Radar-Carga-Planilha`** (Agendador de Tarefas do Windows), **dias úteis às 07:30** (e assim que possível se o computador estiver desligado nesse horário). Ela executa [`scripts/carga-planilha.cmd`](../scripts/carga-planilha.cmd):
+Tarefa **`Radar-Carga-Planilha`** (Agendador de Tarefas do Windows), **dias úteis às 07:30** (e assim que possível se o computador estiver desligado nesse horário). Ela executa `scripts/carga-planilha.cmd` (removido):
 
-1. [`scripts/exportar_planilha.py`](../scripts/exportar_planilha.py) copia `BaseLicitacao.xlsx` (OneDrive sincronizado) para uma pasta temporária, **somente leitura** (o original nunca é aberto), lê a aba *Base Governo* e gera `aba.json`. Valida o cabeçalho e recusa arquivo "espaço reservado" do OneDrive.
-2. [`scripts/sync-db.mjs`](../scripts/sync-db.mjs) sincroniza por **merge** (`sincronizar_planilha`): atualiza o que mudou, insere o novo, **nunca sobrescreve o que foi editado na web** e marca como "ausente" (sem apagar) o que sumiu. Recusa a carga se vierem menos de 400 linhas.
+1. `scripts/exportar_planilha.py` (removido) copia `BaseLicitacao.xlsx` (OneDrive sincronizado) para uma pasta temporária, **somente leitura** (o original nunca é aberto), lê a aba *Base Governo* e gera `aba.json`. Valida o cabeçalho e recusa arquivo "espaço reservado" do OneDrive.
+2. `scripts/sync-db.mjs` (removido) sincroniza por **merge** (`sincronizar_planilha`): atualiza o que mudou, insere o novo, **nunca sobrescreve o que foi editado na web** e marca como "ausente" (sem apagar) o que sumiu. Recusa a carga se vierem menos de 400 linhas.
 3. Apaga a cópia e o `aba.json` (contêm dados de licitações).
 
 Log: `%USERPROFILE%\.radar\carga.log` (procure `[OK]` ou `[ERRO]`). Relatório de qualidade da última carga: `%USERPROFILE%\.radar\ultimo-relatorio.json`.

@@ -13,9 +13,6 @@ on:
       max_dias_restauracao:
         description: 'Idade máxima aceita do último teste de restauração (dias)'
         default: '40'
-      max_horas_carga:
-        description: 'Idade máxima aceita da última carga da planilha (horas; 80 cobre o fim de semana). Use 0 para forçar uma falha de teste.'
-        default: '80'
 
 permissions:
   actions: read
@@ -30,7 +27,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       MAX_H: ${{ inputs.max_horas_backup || '30' }}
       MAX_D: ${{ inputs.max_dias_restauracao || '40' }}
-      MAX_C: ${{ inputs.max_horas_carga || '80' }}
       DATABASE_URL_BACKUP: ${{ secrets.DATABASE_URL_BACKUP }}
     steps:
       - name: Último backup bem-sucedido
@@ -58,15 +54,3 @@ jobs:
             echo "::error::O último teste de restauração bem-sucedido tem ${idade_d} dias (limite ${MAX_D}). Rode 'Teste de restauração do backup'."
             exit 1
           fi
-
-      - name: Última carga da planilha
-        run: |
-          # Enquanto a planilha alimentar o banco (convivência), a carga agendada precisa estar em dia.
-          idade_h=$(docker run --rm postgres:17 psql "$DATABASE_URL_BACKUP" -Atc "select coalesce(floor(extract(epoch from (now() - ultima_carga_em)) / 3600), 999999)::int from carga_status where id = 1")
-          echo "- Última carga da planilha: há **${idade_h} h** (limite ${MAX_C} h)" >> "$GITHUB_STEP_SUMMARY"
-          echo "Última carga da planilha: há ${idade_h} h (limite ${MAX_C} h)"
-          if [ "$idade_h" -ge "$MAX_C" ]; then
-            echo "::error::A última carga da planilha tem ${idade_h} h (limite ${MAX_C} h). Verifique a tarefa 'Radar-Carga-Planilha' (log em %USERPROFILE%\.radar\carga.log)."
-            exit 1
-          fi
-
