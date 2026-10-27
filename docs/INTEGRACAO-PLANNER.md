@@ -271,6 +271,7 @@ O mesmo ciclo (exportador + `planner-auto`) roda num **Cron Job do Render**, sem
 - **Variáveis do job:** `DATABASE_URL_PLANNER` (papel `radar_planner`), `PLANNER_ESTADO_CHAVE`, `PLANNER_CLIENT_ID`, `PLANNER_TENANT_ID`.
 - **Migrar do Windows sem novo login:** na máquina que já fez o login, com `DATABASE_URL_PLANNER` e `PLANNER_ESTADO_CHAVE` definidos, rode `python estado_db.py guardar`. Depois **desative a tarefa do Windows** (`Disable-ScheduledTask -TaskName "Radar-Planner integracao"`): duas execuções ao mesmo tempo poderiam duplicar cartões.
 - **Gerar a chave:** `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` (guardar em local seguro; sem ela o estado não é lido).
+- **Tempo real (cerca de 1 minuto):** ao cadastrar (201) ou salvar (200) uma oportunidade, o Radar aciona o cron job pela API do Render (`POST /v1/cron-jobs/{id}/runs`) e, junto, o workflow de e-mails do GitHub. No **Cloudflare Pages** (Variables and Secrets, produção) criar `RENDER_API_KEY` (segredo) e `RENDER_PLANNER_CRON_ID` (id `crn-...` do cron job). Sem elas nada muda: o agendamento de 5 em 5 minutos continua como rede de segurança. O Render cancela a execução em andamento ao acionar outra; o job é idempotente (relê o Planner antes de criar), então salvar várias vezes seguidas só reinicia o ciclo.
 - O login Microsoft continua sendo o do usuário e expira após ~90 dias sem uso; renovar com `login` e `guardar`.
 
 ## Limitações conhecidas (comportamento atual)
