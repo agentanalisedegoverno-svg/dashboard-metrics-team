@@ -1,6 +1,3 @@
 # Arquivos .cmd precisam de CRLF (cmd.exe)
 *.cmd text eol=crlf
 
-# Roda em contêiner Linux (Render): fim de linha LF
-*.sh text eol=lf
-Dockerfile.planner text eol=lf

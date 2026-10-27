@@ -1,4 +1,4 @@
-"""Estado do planner-auto no banco (Neon), para rodar em servidor sem disco fixo (ex.: Render cron job).
+"""Estado do planner-auto no banco (Neon), para rodar na nuvem sem disco fixo (GitHub Actions: .github/workflows/planner-integracao.yml).
 
 Guarda no banco, CIFRADOS com a chave PLANNER_ESTADO_CHAVE (Fernet), os dois arquivos que ficam em ~/.planner_auto:
   token_cache.json   token do login Microsoft (contém o refresh token)
