@@ -16,7 +16,7 @@
   --gold: #8a560d; --gold-soft: #f4e6d0;
   --series-blue: #2a78d6; --series-orange: #eb6834; --series-gold: #c98500;
   --series-green: #008300; --series-red: #e34948; --series-violet: #4a3aa7;
-  --dot-win: #16a34a; --dot-go: #2563eb; --dot-nogo: #f97316; --dot-ongoing: #eab308; --dot-lost: #dc2626; --dot-other: #9aa3b2;
+  --dot-win: #d4a017; --dot-go: #16a34a; --dot-nogo: #7c3aed; --dot-ongoing: #2563eb; --dot-lost: #dc2626; --dot-suspended: #facc15; --dot-canceled: #f97316; --dot-other: #9aa3b2;
   --st-good: #0ca30c; --st-warn: #c98200; --st-serious: #c9633f; --st-critical: #d03b3b;
   --shadow: 0 1px 2px rgba(15,20,35,.04), 0 8px 24px -12px rgba(15,20,35,.12);
 }
@@ -72,6 +72,8 @@
   --color-dot-nogo: var(--dot-nogo);
   --color-dot-ongoing: var(--dot-ongoing);
   --color-dot-lost: var(--dot-lost);
+  --color-dot-suspended: var(--dot-suspended);
+  --color-dot-canceled: var(--dot-canceled);
   --color-dot-other: var(--dot-other);
   --color-st-good: var(--st-good);
   --color-st-warn: var(--st-warn);

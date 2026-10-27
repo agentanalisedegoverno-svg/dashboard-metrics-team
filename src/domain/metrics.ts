@@ -10,15 +10,26 @@ export const TECNICO_MOTIVOS = new Set([
 ])
 
 export const STATUS_COLOR: Record<string, string> = {
-  'No Go': 'var(--st-critical)',
-  Lost: 'var(--series-orange)',
-  Canceled: 'var(--muted)',
-  Suspended: 'var(--muted)',
-  'On going': 'var(--gold)',
-  Validar: 'var(--gold)',
-  Prospect: 'var(--gold)',
-  Go: 'var(--series-blue)',
-  Win: 'var(--st-good)',
+  Win: 'var(--dot-win)', // dourado
+  Go: 'var(--dot-go)', // verde
+  'No Go': 'var(--dot-nogo)', // roxo
+  Lost: 'var(--dot-lost)', // vermelho
+  Suspended: 'var(--dot-suspended)', // amarelo
+  'On going': 'var(--dot-ongoing)', // azul
+  Canceled: 'var(--dot-canceled)', // laranja
+  Validar: 'var(--dot-other)',
+  Prospect: 'var(--dot-other)',
+}
+
+/** Emoji de cada status (selo da grade). Sem emoji próprio: círculo cinza. */
+export const STATUS_EMOJI: Record<string, string> = {
+  Win: '🏆',
+  Go: '🟢',
+  'No Go': '🟣',
+  Lost: '🔴',
+  Suspended: '🟡',
+  'On going': '🔵',
+  Canceled: '🟠',
 }
 const BACKLOG_STATUS = ['On going', 'Validar', 'Prospect']
 
