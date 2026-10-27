@@ -28,7 +28,7 @@ export type OportunidadePlanner = {
   status: string | null
   torre: string | null
   orgao: string | null
-  /** Sigla do órgão (até 8 caracteres): vai no título do cartão. */
+  /** Sigla do órgão (até 20 caracteres): vai no título do cartão. */
   sigla?: string | null
   descritivo: string | null
   /** O que está sendo contratado (campo Objeto); em branco, o título usa o descritivo como sempre usou. */

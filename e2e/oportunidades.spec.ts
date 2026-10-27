@@ -265,7 +265,7 @@ test('empresa vencedora: só o CNPJ; razão social e matriz/filial vêm da Recei
   expect(enviados[0]).toMatchObject({ empresa_vencedora_cnpj: '00000000000191', empresa_vencedora_razao: 'BANCO DO BRASIL SA', empresa_vencedora_tipo: 'Matriz' })
 })
 
-test('descritivo limitado a 50 caracteres; data de distribuição vem com a data do dia', async ({ page }) => {
+test('descritivo limitado a 60 caracteres; data de distribuição vem com a data do dia', async ({ page }) => {
   const { enviados } = await api(page)
   await abrirAba(page)
   await page.getByRole('button', { name: 'Nova oportunidade' }).click()
@@ -273,13 +273,13 @@ test('descritivo limitado a 50 caracteres; data de distribuição vem com a data
   await expect(page.getByLabel(/^Data de distribuição/)).toHaveValue(hoje)
   await page.getByLabel(/^Status/).selectOption('Go')
   await page.getByLabel(/^Instituição/).fill('Prefeitura X')
-  await page.getByLabel(/^Descritivo/).fill('x'.repeat(80)) // o campo corta em 50
-  await expect(page.getByLabel(/^Descritivo/)).toHaveValue('x'.repeat(50))
+  await page.getByLabel(/^Descritivo/).fill('x'.repeat(80)) // o campo corta em 60
+  await expect(page.getByLabel(/^Descritivo/)).toHaveValue('x'.repeat(60))
   await page.getByLabel(/^Torre/).selectOption('ITS')
   await page.getByLabel(/^Data do pregão/).fill('2099-05-20')
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
-  expect((enviados[0].descritivo as string).length).toBe(50)
+  expect((enviados[0].descritivo as string).length).toBe(60)
   expect(enviados[0].data_distribuicao).toBe(hoje)
 })
 
@@ -583,7 +583,7 @@ test('pré-vendas aceita mais de um (caixas de marcar) e o filtro acha por qualq
   expect(enviados[0].analista).toBe('Flávio Santanna, Marcia')
 })
 
-test('Sigla (até 8 caracteres) vem antes de Instituição / Órgão e é destacada em amarelo', async ({ page }) => {
+test('Sigla (até 20 caracteres) vem antes de Instituição / Órgão e é destacada em amarelo', async ({ page }) => {
   const { enviados } = await api(page)
   await abrirAba(page)
   await page.getByRole('button', { name: 'Nova oportunidade' }).click()
@@ -592,8 +592,8 @@ test('Sigla (até 8 caracteres) vem antes de Instituição / Órgão e é destac
   expect(pos(/^Sigla/), 'Sigla vem logo antes da Instituição').toBe(pos(/^Instituição/) - 1)
   const sigla = page.getByLabel(/^Sigla/)
   expect(await sigla.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 246, 168)')
-  await sigla.fill('ABCDEFGHIJ')
-  await expect(sigla).toHaveValue('ABCDEFGH')
+  await sigla.fill('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+  await expect(sigla).toHaveValue('ABCDEFGHIJKLMNOPQRST')
   await page.getByLabel(/^Status/).selectOption('Go')
   await page.getByLabel(/^Instituição/).fill('Prefeitura S')
   await page.getByLabel(/^Descritivo/).fill('Descrição')
@@ -601,5 +601,5 @@ test('Sigla (até 8 caracteres) vem antes de Instituição / Órgão e é destac
   await page.getByLabel(/^Data do pregão/).fill('2099-06-01')
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
-  expect(enviados[0].sigla).toBe('ABCDEFGH')
+  expect(enviados[0].sigla).toBe('ABCDEFGHIJKLMNOPQRST')
 })

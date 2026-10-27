@@ -29,9 +29,9 @@ export const SECOES: Secao[] = [
     titulo: 'Identificação',
     campos: [
       { nome: 'status', destaque: true, rotulo: 'Status', tipo: 'lista', obrigatorio: true },
-      { nome: 'sigla', destaque: true, rotulo: 'Sigla', tipo: 'texto', dica: 'Até 8 caracteres. Não existe na planilha' },
+      { nome: 'sigla', destaque: true, rotulo: 'Sigla', tipo: 'texto', dica: 'Até 20 caracteres. Não existe na planilha' },
       { nome: 'orgao', destaque: true, rotulo: 'Instituição / Órgão', tipo: 'texto', obrigatorio: true, largo: true },
-      { nome: 'descritivo', destaque: true, rotulo: 'Descritivo', tipo: 'longo', obrigatorio: true, largo: true, dica: 'Até 50 caracteres (resumo curto); o detalhe vai em Objeto' },
+      { nome: 'descritivo', destaque: true, rotulo: 'Descritivo', tipo: 'longo', obrigatorio: true, largo: true, dica: 'Até 60 caracteres (resumo curto); o detalhe vai em Objeto' },
       { nome: 'objeto', destaque: true, rotulo: 'Objeto', tipo: 'longo', largo: true, dica: 'O que está sendo contratado. Não existe na planilha: fica em branco nos registros importados' },
       { nome: 'processo', destaque: true, rotulo: 'Processo/Pregão', tipo: 'texto' },
       { nome: 'uasg', destaque: true, rotulo: 'UASG', tipo: 'texto' },
