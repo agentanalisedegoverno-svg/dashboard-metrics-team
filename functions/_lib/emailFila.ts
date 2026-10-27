@@ -26,7 +26,7 @@ export async function processarFila(sql: Sql, enviar: Enviar, opc: { url: string
   const r: Resumo = { pendentes: 0, enviados: 0, ignorados: 0, novaTentativa: 0, falhaDefinitiva: 0, emOutroProcesso: 0 }
 
   const itens = (await sql`
-    select f.id, f.tipo, f.tentativas, f.destino_teste, case when f.tipo = 'status' then coalesce(f.status_anterior, '') end as status_anterior, f.alterado_por,
+    select f.id, f.tipo, f.tentativas, f.destino_teste, case when f.tipo = 'status' then coalesce(f.status_anterior, '') end as status_anterior, f.alterado_por, to_jsonb(o) as dados,
            o.codigo, o.orgao, o.descritivo, o.objeto, o.processo, o.uasg, coalesce(f.status_novo, o.status) as status, o.torre, o.linha_servico, o.uf, o.data_pregao_dt::text as data_pregao_dt, o.hora_pregao::text as hora_pregao, o.analista,
            o.orcamento::float8 as orcamento, coalesce(o.orcamento_sigiloso, false) as orcamento_sigiloso, o.criado_por
     from email_fila f left join oportunidades o on o.id = f.oportunidade_id

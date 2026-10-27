@@ -79,3 +79,34 @@ describe('aviso de mudança de status', () => {
     expect(montarEmail(base, 'u').texto).toContain('Nova oportunidade cadastrada')
   })
 })
+
+describe('e-mail com todas as informações da oportunidade (como a anotação do Planner)', () => {
+  const dados = {
+    versao: 2, codigo: '2026-3162', status: 'Prospect', sigla: 'TJRN', orgao: 'TRIBUNAL DE JUSTIÇA DO ESTADO DO RN', descritivo: 'Suporte e Atendimento de TIC',
+    objeto: 'Linha 1\nLinha 2 <b>', processo: '32/2026', uasg: '925869', uf: 'RN', data_distribuicao: '2026-10-26', data_pregao_dt: '2026-11-10', hora_pregao: '14:00:00',
+    criterio: 'Menor Preço', modalidade: 'Pregão Eletrônico', linha_servico: 'Service Desk', torre: 'ITS', unidade_fornecimento: 'Serviço (valor fixo)',
+    analista: 'Flávio Santanna, Júlio César', orcamento: 54028534.5, orcamento_sigiloso: false, criado_por: 'nicolly@x.com', pendencias: [],
+  }
+  const nova = montarEmail({ ...base, codigo: '2026-3162', dados }, 'https://radar.example')
+  it('traz as seções e os rótulos do formulário, inclusive campos em branco', () => {
+    for (const t of ['IDENTIFICAÇÃO', 'EDITAL E DISPUTA', 'ESCOPO E RESPONSÁVEL', 'VALORES E MARGENS', 'RESULTADO DO CERTAME', 'Sigla: TJRN', 'Processo/Pregão: 32/2026', 'Data do pregão: 10/11/2026',
+      'Hora do pregão: 14:00', 'Pré-vendas: Flávio Santanna, Júlio César', 'Critério: Menor Preço', 'Impostos (%): —', 'Pendências: nenhuma', 'Cadastrada por: nicolly@x.com', 'Radar 2026-3162 (v2) — dados da oportunidade']) {
+      expect(nova.texto, t).toContain(t)
+    }
+    expect(nova.texto).toContain('Nova oportunidade cadastrada')
+    expect(nova.texto).toMatch(/Orçamento \(R\$\): R\$\s54\.028\.534,50/)
+  })
+  it('no aviso de status, mostra a mudança no topo e o status novo nos dados; escapa HTML e mantém quebras de linha', () => {
+    const m = montarEmail({ ...base, status: 'Go', status_anterior: 'Prospect', alterado_por: 'flavio@x.com', dados }, 'u')
+    expect(m.texto).toContain('Status: Prospect → Go')
+    expect(m.texto).toContain('Alterado por: flavio@x.com')
+    expect(m.texto).toContain('Status: Go\nSigla: TJRN')
+    expect(m.html).toContain('Linha 1\nLinha 2 &lt;b&gt;')
+    expect(m.html).not.toContain('<b>')
+  })
+  it('orçamento sigiloso não mostra valor', () => {
+    const m = montarEmail({ ...base, dados: { ...dados, orcamento_sigiloso: true } }, 'u')
+    expect(m.texto).toContain('Orçamento (R$): Sigiloso')
+    expect(m.texto).not.toMatch(/54\.028/)
+  })
+})
