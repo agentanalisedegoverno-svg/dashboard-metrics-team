@@ -11,6 +11,11 @@ on:
   schedule:
     - cron: '*/5 11-21 * * 1-5'
   workflow_dispatch:
+    inputs:
+      verificar:
+        description: 'Só conferir o login Microsoft e o acesso aos planos (leitura; não grava nada no Planner)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -30,6 +35,7 @@ jobs:
       PLANNER_CLIENT_ID: ${{ secrets.PLANNER_CLIENT_ID }}
       PLANNER_TENANT_ID: ${{ secrets.PLANNER_TENANT_ID }}
       PYTHONUTF8: '1'
+      VERIFICAR: ${{ inputs.verificar }}
     steps:
       - name: Conferir configuração
         id: cfg
@@ -61,6 +67,17 @@ jobs:
           : > "$LOG"
           python3 planner-auto/estado_db.py preparar >> "$LOG" 2>&1 || { echo "::error::Falha ao preparar a configuração."; exit 1; }
           python3 planner-auto/estado_db.py restaurar >> "$LOG" 2>&1 || { echo "::error::Falha ao restaurar o estado (login Microsoft ou chave de cifra). Rode estado_db.py guardar na máquina com o login."; exit 1; }
+          if [ "$VERIFICAR" = "true" ]; then
+            # Só leitura: confere o login e se os buckets e rótulos do mapa existem nos planos. Log público: só o resultado.
+            RCV=0
+            (cd planner-auto && python3 planner_auto.py inspecionar) >> "$LOG" 2>&1 || RCV=1
+            python3 planner-auto/estado_db.py guardar >> "$LOG" 2>&1 || RCV=1
+            if grep -q 'Sem login válido' "$LOG"; then echo "Login Microsoft: RECUSADO (sem login válido)"; RCV=1
+            elif [ "$RCV" -ne 0 ]; then echo "Verificação: falhou (detalhes só na máquina)"
+            else echo "Login Microsoft: OK"; fi
+            echo "Divergências com o mapa: $(grep -Eo '[0-9]+ divergência' "$LOG" | grep -Eo '^[0-9]+' || echo 0)"
+            exit "$RCV"
+          fi
           RC=0
           node scripts/planner-eventos.mjs --saida "$EVENTOS/entrada" >> "$LOG" 2>&1 || RC=1
           if [ "$RC" -eq 0 ]; then
