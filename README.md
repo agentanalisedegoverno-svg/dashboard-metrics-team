@@ -6,7 +6,7 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 
 | Documento | Conteúdo |
 |---|---|
-| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Desenho completo (cadastro web, carga por merge, API, banco, Planner, backup, CI/CD), diagramas, modelo de dados, decisões e riscos |
+| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Desenho completo (cadastro web, API, banco, Planner, backup, CI/CD), diagramas, modelo de dados, decisões e riscos |
 | [docs/OPERACAO.md](docs/OPERACAO.md) | Configurações e segredos, rotinas, solução de problemas, troca de senhas e tokens |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Estado atual e melhorias futuras (curto, médio e longo prazo) |
 | [docs/CADASTRO-OPORTUNIDADES.md](docs/CADASTRO-OPORTUNIDADES.md) | Especificação do cadastro de oportunidades na web (34 colunas, validações, UX) |
@@ -15,7 +15,7 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 | [docs/DIAGRAMAS.md](docs/DIAGRAMAS.md) | Catálogo de diagramas (19, em camadas, com SVG): contexto, fluxos, segurança e dados |
 | [docs/TESTES.md](docs/TESTES.md) | Bateria de testes: regressão, segurança, carga e desempenho; como rodar e achados |
 | [docs/BACKUP.md](docs/BACKUP.md) | Backup diário criptografado no Drive, restauração e teste |
-| [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md) | Carga da planilha por merge (`scripts/sync-db.mjs`) |
+| [docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md](docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md) | **Decisão (27/10/2026): o banco não é mais alimentado pela planilha do Excel** (a carga foi desativada e removida) |
 | [docs/AGENTE-DE-CARGA.md](docs/AGENTE-DE-CARGA.md) | Prompt do agente e agendamento a cada 2 dias |
 | [planner-auto/](planner-auto/README.md) | Ferramenta que aplica os eventos do Radar no Planner |
 | [db/migrations/](db/migrations/) | Esquema, funções e privilégios do banco (migrações aditivas) |
@@ -99,13 +99,12 @@ scripts/
 | Cloudflare Pages → Variables and Secrets | `DATABASE_URL` (**Secret**) | papel `radar_leitor` (painel, somente leitura) |
 | Cloudflare Pages → Variables and Secrets | `DATABASE_URL_APP` (**Secret**) | papel `radar_app` (cadastro; só executa as funções de cadastro) |
 | `wrangler.toml` `[vars]` | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | time `ctctech-radar` e AUD da aplicação Access (não são segredos) |
-| Ambiente do agente de carga | `DATABASE_URL_WRITER` | papel `radar_escritor` (só `sincronizar_planilha`) |
 | Ambiente da integração com o Planner | `DATABASE_URL_PLANNER`, `PLANNER_EVENTOS_DIR` | papel `radar_planner` (somente leitura + controle) |
 | GitHub Actions (secrets) | `DATABASE_URL_BACKUP`, `BACKUP_PASSPHRASE`, `RCLONE_DRIVE_TOKEN` | backup diário e teste de restauração |
 
 **Acesso:** Cloudflare Access (Zero Trust, plano Free) com login por código (*One-time PIN*); política *Allow* para `@ctctech.com.br`. Perfis: **administrador** (tudo), **editor** (cadastra e edita; padrão do domínio) e **visualizador** (só consulta); **só o administrador** arquiva/restaura e gerencia listas e perfis. Para liberar outro e-mail ou domínio: Zero Trust → Access → Applications → Radar Pré-Vendas → Policies. A API valida o JWT em qualquer endereço do projeto. O flag `ACESSO_PUBLICO="true"` reabre a API sem login (uso temporário; não recomendado).
 
-`functions/_lib/planilha.ts` converte a matriz bruta da planilha (34 colunas de dados) e é usado por `scripts/sync-db.mjs`; `functions/_lib/rows.ts` mantém o mapeamento do painel.
+`functions/_lib/rows.ts` mantém o mapeamento do painel. (O conversor da planilha foi removido com o fim da carga: ver [a decisão](docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md).)
 
 > O código de login Microsoft (MSAL, `src/auth/`) segue no repositório, **desligado**: só ativa com `VITE_MS_CLIENT_ID`/`VITE_MS_TENANT_ID`, que não são definidos.
 

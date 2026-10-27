@@ -34,7 +34,7 @@ export const onRequest = async ({ request, env, params }: Ctx): Promise<Response
     const sql = neon(env.DATABASE_URL)
     const [status] = (await sql`
       -- total_linhas = oportunidades vigentes AGORA (a coluna da carga ficava velha e contava as "ausentes")
-      select ultima_carga_em, erro,
+      select greatest(ultima_carga_em, (select max(atualizado_em) from oportunidades)) as ultima_carga_em, erro,
              (select count(*)::int from oportunidades where arquivado_em is null and not ausente_na_planilha) as total_linhas
       from carga_status where id = 1`) as {
       ultima_carga_em: string | null

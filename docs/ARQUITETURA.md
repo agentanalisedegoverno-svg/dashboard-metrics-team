@@ -58,7 +58,9 @@ flowchart LR
 
 **Ideia central:** cada componente tem um papel de banco com o **mínimo de privilégio** e só consegue o que precisa. Quem lê não escreve; quem exporta para o Planner só lê; quem faz backup só lê; quem cadastra só chama funções que validam e auditam.
 
-## 2. Duas portas de entrada de dados (convivência planilha ↔ web)
+## 2. Entrada de dados (histórico: convivência planilha ↔ web)
+
+> **Atualização (27/10/2026): a planilha deixou de alimentar o banco.** Hoje há **uma só porta de entrada**: o cadastro no Radar web. A carga por merge descrita abaixo foi desativada e removida ([decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)); o desenho e a função `sincronizar_planilha` ficam só como histórico.
 
 ```mermaid
 sequenceDiagram
@@ -298,7 +300,7 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 | Componente | Onde | Identificação |
 |---|---|---|
 | Planilha | SharePoint GOVERNO2 | `BaseLicitacao.xlsx`, aba *Base Governo* (~610 linhas, 39 colunas; as 6 "(Pivot)" são auxiliares e ignoradas) |
-| Carga da planilha | máquina local do João | tarefa `Radar-Carga-Planilha` (dias úteis 07:30; sem IA) |
+| ~~Carga da planilha~~ | ~~máquina local do João~~ | **Desativada em 27/10/2026** (tarefa `Radar-Carga-Planilha` desativada; scripts removidos) |
 | Integração Planner | máquina local do João | tarefa `Radar-Planner integracao` (seg–sex, 08h–19h, a cada 5 min; também envia os e-mails); código em [`planner-auto/`](../planner-auto/) |
 | Banco | Neon, `aws-sa-east-1` | projeto `radar-prevendas`, branch `main`, banco `neondb` |
 | Hospedagem | Cloudflare Pages | `https://radar-prevendas.pages.dev` |
