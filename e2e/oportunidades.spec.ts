@@ -294,7 +294,7 @@ test('campos de preenchimento em amarelo e rótulo Processo/Pregão', async ({ p
   expect(await fundo(/^Torre/)).not.toBe('rgb(255, 246, 168)') // campo calculado não é de preenchimento
 })
 
-test('abre em tela cheia, travado; Editar libera; Cancelar descarta; Salvar grava', async ({ page }) => {
+test('abre em tela cheia, travado; Editar libera; Cancelar descarta; Salvar grava e volta para a lista', async ({ page }) => {
   await api(page)
   await abrirAba(page)
   await page.getByText('Órgão 2', { exact: true }).first().click()
@@ -332,9 +332,8 @@ test('abre em tela cheia, travado; Editar libera; Cancelar descarta; Salvar grav
   await orgao.fill('Órgão salvo')
   await page.getByRole('button', { name: 'Salvar alterações' }).click()
   await expect(page.getByText('Alterações salvas.')).toBeVisible()
-  await expect(orgao).toBeDisabled()
-  await expect(orgao).toHaveValue('Órgão salvo')
-  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Nova oportunidade' })).toBeVisible()
 })
 
 test('fechar sem alterar não pergunta nada; com alteração pergunta e fecha ao descartar', async ({ page }) => {

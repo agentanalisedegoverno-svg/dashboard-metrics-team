@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { BarList } from '@/components/BarList'
 import { DonutCard, StackBar } from '@/components/Charts'
+import { CardGrafico } from '@/components/CardGrafico'
 import { KpiCard } from '@/components/KpiCard'
-import { Card, KpiGrid, NoteBox, Section, Tag } from '@/components/Primitives'
+import { KpiGrid, NoteBox, Section, Tag } from '@/components/Primitives'
 import { NV } from '@/domain/types'
 import { fmtBRLCompact, fmtPct } from '@/lib/format'
 import { EmptySections, type TabProps } from '../shared'
@@ -32,15 +33,15 @@ export function OpsTab({ m, noYear }: TabProps) {
   return (
     <>
       <Section title="Concentração da equipe de Pré-Vendas" note="Volume por analista responsável, no recorte filtrado.">
-        <Card>
+        <CardGrafico titulo="Concentração da equipe de Pré-Vendas">
           <BarList items={analistas} />
           {top && m.atribCount > 0 && (
             <NoteBox><b>{fmtPct((top.count / m.atribCount) * 100)}</b> das análises atribuídas no recorte estão concentradas em <b>{top.label}</b>. <Tag kind="confirmado" /></NoteBox>
           )}
-        </Card>
+        </CardGrafico>
       </Section>
 
-      <Section title="Distribuição geográfica (UF)"><Card><BarList items={uf} /></Card></Section>
+      <Section title="Distribuição geográfica (UF)"><CardGrafico titulo="Distribuição geográfica (UF)"><BarList items={uf} /></CardGrafico></Section>
 
       <Section title="Backlog em andamento" note="Status On going, Validar e Prospect no recorte filtrado.">
         <KpiGrid>
@@ -50,7 +51,7 @@ export function OpsTab({ m, noYear }: TabProps) {
       </Section>
 
       <Section title="Conta Vinculada & Valor Vencedor — cobertura nas oportunidades viáveis" note="Oportunidades com status ≠ No Go / Lost, dentro do recorte filtrado. Campos complementados manualmente via PNCP/ComprasNet.">
-        <Card>
+        <CardGrafico titulo="Conta Vinculada & Valor Vencedor — cobertura">
           <div className="grid grid-cols-[1.15fr_.85fr] gap-4 max-md:grid-cols-1">
             <div>
               <div className="mb-1.5 text-[12.5px] text-muted">Conta Vinculada</div>
@@ -68,7 +69,7 @@ export function OpsTab({ m, noYear }: TabProps) {
               <KpiCard flat label="Cobertura" value={V.total > 0 ? `${V.vvPreenchido} / ${V.total}` : '—'} sub={V.total > 0 ? `${fmtPct((V.vvPreenchido / V.total) * 100)} das oportunidades viáveis já com valor homologado identificado` : undefined} />
             </div>
           </div>
-        </Card>
+        </CardGrafico>
       </Section>
     </>
   )
