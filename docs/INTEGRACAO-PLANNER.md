@@ -262,6 +262,17 @@ Não têm status equivalente no Radar: *Cotação Concluída* (ITS) e *Cotaçõe
 - **Cartão de teste:** `RAD-999001` (plano ITS, formato antigo de chave) foi criado na validação; apagar à mão no Planner.
 - Problemas comuns: [OPERACAO.md](OPERACAO.md) §3.
 
+## Rodar fora do computador do João (Render)
+
+O mesmo ciclo (exportador + `planner-auto`) roda num **Cron Job do Render**, sem depender de máquina de pessoa. Peças: `Dockerfile.planner`, `planner-auto/render-job.sh` e `planner-auto/estado_db.py`.
+
+- **Estado no banco:** o servidor não tem disco fixo; o token do login e as versões já aplicadas ficam na tabela `planner_auto_estado` (migração 018), **cifrados** com `PLANNER_ESTADO_CHAVE` (o banco só vê texto cifrado). O job restaura no início e guarda no fim, mesmo se der erro.
+- **Agendamento:** `*/5 11-21 * * 1-5` (UTC = 08h–19h de Brasília, seg–sex).
+- **Variáveis do job:** `DATABASE_URL_PLANNER` (papel `radar_planner`), `PLANNER_ESTADO_CHAVE`, `PLANNER_CLIENT_ID`, `PLANNER_TENANT_ID`.
+- **Migrar do Windows sem novo login:** na máquina que já fez o login, com `DATABASE_URL_PLANNER` e `PLANNER_ESTADO_CHAVE` definidos, rode `python estado_db.py guardar`. Depois **desative a tarefa do Windows** (`Disable-ScheduledTask -TaskName "Radar-Planner integracao"`): duas execuções ao mesmo tempo poderiam duplicar cartões.
+- **Gerar a chave:** `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` (guardar em local seguro; sem ela o estado não é lido).
+- O login Microsoft continua sendo o do usuário e expira após ~90 dias sem uso; renovar com `login` e `guardar`.
+
 ## Limitações conhecidas (comportamento atual)
 
 Estas são as consequências reais da regra de atualização; cada uma está nos testes da seção anterior. As correções possíveis estão em [ROADMAP.md](ROADMAP.md).
