@@ -35,11 +35,11 @@ describe('integração Planner', () => {
   })
   it('status -> bucket e progresso por plano; sem status cai no bucket inicial', () => {
     const its = montarEvento({ ...base, status: 'On going' }, 'oportunidade_atualizada', M, email)!
-    expect(its.cartao).toMatchObject({ bucket: 'Em andamento ( Proposta Entregue)', progresso: 50 })
+    expect(its.cartao).toMatchObject({ bucket: 'ON GOING', progresso: 50 })
     const dig = montarEvento({ ...base, torre: 'DIGITAL', status: 'Win' }, 'oportunidade_atualizada', M, email)!
     expect(dig.cartao).toMatchObject({ bucket: 'WIN', progresso: 100, rotulos: ['Licitação', 'Público', 'DIGITAL'] })
-    expect(montarEvento({ ...base, status: null }, 'oportunidade_nova', M, email)!.cartao.bucket).toBe('Preparo')
-    expect(montarEvento({ ...base, torre: 'HEALTH', status: 'Canceled' }, 'oportunidade_atualizada', M, email)!.cartao.bucket).toBe('Revogado')
+    expect(montarEvento({ ...base, status: null }, 'oportunidade_nova', M, email)!.cartao.bucket).toBe('PROSPECT')
+    expect(montarEvento({ ...base, torre: 'HEALTH', status: 'Canceled' }, 'oportunidade_atualizada', M, email)!.cartao.bucket).toBe('CANCELLED')
   })
   it('vários pré-vendas: todos com e-mail viram responsáveis (o primeiro é o responsável principal)', () => {
     const doisEmails = (n: string) => ({ 'Júlio César': 'julio.silva@ctctech.com.br', Ana: 'ana@ctctech.com.br' })[n] ?? null

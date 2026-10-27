@@ -7,16 +7,16 @@
       "torres": ["ITS"],
       "rotulos": ["Licitação", "Público"],
       "buckets": {
-        "Prospect": "Prospect",
+        "Prospect": "PROSPECT",
         "Go": "GO",
-        "On going": "Em andamento ( Proposta Entregue)",
-        "Win": "Ganhos!",
-        "Lost": "Perdidos",
+        "On going": "ON GOING",
+        "Win": "WIN",
+        "Lost": "LOST",
         "No Go": "NO GO",
-        "Suspended": "SUSPENSOS",
-        "Canceled": "Revogado",
-        "Validar": "Preparo",
-        "_sem_status": "Preparo"
+        "Suspended": "SUSPENDED",
+        "Canceled": "CANCELLED",
+        "Validar": "PROSPECT",
+        "_sem_status": "PROSPECT"
       }
     },
     "digital_health": {
@@ -26,16 +26,16 @@
       "rotulos": ["Licitação", "Público"],
       "rotulosPorTorre": { "DIGITAL": ["DIGITAL"], "HEALTH": ["Health"] },
       "buckets": {
-        "Prospect": "Prospect",
+        "Prospect": "PROSPECT",
         "Go": "GO",
-        "On going": "On Going (Proposta enviada)",
+        "On going": "ON GOING",
         "Win": "WIN",
-        "Lost": "Lost",
+        "Lost": "LOST",
         "No Go": "NO GO",
-        "Suspended": "SUSPENSAS",
-        "Canceled": "Revogado",
-        "Validar": "Prospect",
-        "_sem_status": "Prospect"
+        "Suspended": "SUSPENDED",
+        "Canceled": "CANCELLED",
+        "Validar": "PROSPECT",
+        "_sem_status": "PROSPECT"
       }
     }
   },
