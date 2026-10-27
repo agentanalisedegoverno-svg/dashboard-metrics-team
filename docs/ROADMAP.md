@@ -35,8 +35,8 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | 8 | ~~Gravar o código na planilha~~ **Descartado:** o Excel não será alterado; a planilha será desativada (item 9). Até lá, a chave instável (processo + órgão + data + torre) segue como limitação conhecida da carga | O código `AAAA-NNNN` já identifica a oportunidade no Radar e no Planner, sem depender do Excel | — |
 | 9 | **Encerrar a convivência com a planilha** (data de corte; planilha somente leitura; depois desligar o agente) | Elimina duplo lançamento e a dependência da máquina local | M |
 | 10 | **Planner: propagar arquivamento e mudança de torre** (arquivar → mover para CANCELLED/concluir; trocar de plano) | Hoje o cartão fica órfão nesses casos | M |
-| 11 | **Planner: conta de serviço** do time (login do `planner-auto` fora de pessoa) ou permissão de aplicativo | Não depender do João logado e do computador ligado | M |
-| 12 | **Rodar a integração fora da máquina local** (runner agendado) | Mesma razão; exige o item 11 | G |
+| 11 | **Planner: conta de serviço** do time (login do `planner-auto` fora de pessoa) ou permissão de aplicativo | O computador já não é necessário (item 12), mas o login Microsoft ainda é o do João e expira em ~90 dias sem uso | M |
+| 12 | ~~**Rodar a integração fora da máquina local** (runner agendado)~~ **Feito em 27/10/2026:** GitHub Actions disparado pelo Radar ao salvar, estado cifrado no banco (migração 018). Falta só desativar a tarefa do Windows | Mesma razão; exigia o item 11 | G |
 | 13 | **Planner: alertas e relatório semanal** (atrasadas, vencendo, sem responsável) — Fase 1 do plano do `planner-auto` | Valor imediato para o time, sem tela nova | M |
 | 14 | **Visões salvas e exportação CSV/Excel** na aba Oportunidades | Substitui o uso do Excel para consulta e envio | M |
 | 15 | **Duplicatas:** tela de revisão (hoje só aviso no cadastro) e mesclagem | 6 grupos duplicados vindos da planilha | M |

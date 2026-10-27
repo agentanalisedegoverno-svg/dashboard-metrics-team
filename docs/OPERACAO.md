@@ -18,7 +18,8 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `DATABASE_URL_BACKUP` (papel `radar_backup`) | GitHub → Settings → Secrets and variables → Actions | **Secret** | Administrador |
 | `DATABASE_URL_RESTORE` (papel `radar_restore`, só no branch `teste-restauracao`) | GitHub (Actions) | **Secret** | Administrador |
 | `DATABASE_URL_EMAIL` (papel `radar_email`), `SMTP_USER`, `SMTP_PASS` (senha de app do Gmail), `SMTP_FROM` (opcional) e variável `APP_URL` | GitHub (Actions) | **Secret** (`APP_URL` é variável) | Administrador |
-| `GITHUB_DISPATCH_TOKEN` (token do GitHub só com permissão Actions do repositório) e, opcional, `GITHUB_REPO` | Cloudflare Pages → Settings → Variables and Secrets | **Secret** | Administrador |
+| `GITHUB_DISPATCH_TOKEN` (token do GitHub só com permissão Actions do repositório) e, opcional, `GITHUB_REPO` | Cloudflare Pages → Settings → Variables and Secrets | **Secret** (criado em 27/10/2026; aciona o e-mail **e** o Planner ao salvar) | Administrador |
+| `DATABASE_URL_PLANNER` (papel `radar_planner`), `PLANNER_ESTADO_CHAVE` (chave de cifra do estado; guardar cópia no cofre), `PLANNER_CLIENT_ID`, `PLANNER_TENANT_ID` | GitHub (Actions) | **Secret** (criados em 27/10/2026) | Administrador |
 | `BACKUP_PASSPHRASE` | GitHub (Actions) **e** cofre de senhas da empresa | **Secret** | Administrador |
 | `RCLONE_DRIVE_TOKEN` | GitHub (Actions) | **Secret** | Administrador |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub (Actions) | **Secret** | Administrador |
@@ -55,7 +56,11 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 - **Consulta de CNPJ fora do ar:** o cadastro segue; a tela avisa e a razão social é consultada de novo ao salvar.
 - **Pendências da migração:** a grade tem o filtro "Só com pendências"; corrigir o registro e salvar remove a pendência.
 
-### 2.3 Integração com o Planner e e-mails (a cada 5 minutos)
+### 2.3 Integração com o Planner e e-mails
+
+> **Desde 27/10/2026 a rotina principal roda na nuvem** (GitHub Actions, workflow `planner-integracao.yml`, disparado pelo Radar ao salvar e a cada 5 minutos em dias úteis, 08h–19h). Detalhes e como conferir: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md#rodar-na-nuvem-sem-depender-de-computador-github-actions). A tarefa do Windows abaixo vira **contingência**: com o workflow em produção ela deve ficar **desativada** (`Disable-ScheduledTask`), porque as duas rodando juntas podem duplicar cartões.
+
+Tarefa do Windows (contingência):
 - Tarefa do Windows **`Radar-Planner integracao`**: seg–sex, 08h–19h, **de 5 em 5 minutos**, executa `planner-auto\rodar-integracao.cmd` (exportador → `processar-eventos --sim` → envio de e-mails, se configurado). Se uma rodada demorar, a seguinte não se sobrepõe (`IgnoreNew`).
 - **Mudar o intervalo:** `$t = Get-ScheduledTask -TaskName "Radar-Planner integracao"; $t.Triggers[0].Repetition.Interval = 'PT5M'; Set-ScheduledTask -InputObject $t` (`PT5M` = 5 minutos). **Antes de encurtar mais, leia a conta da cota do banco na seção 5.**
 - **E-mails de nova oportunidade (mesma rotina):** a etapa de e-mail só roda se estas variáveis de **usuário** existirem nesta máquina (fora do Git; a tarefa as enxerga no próximo login): `DATABASE_URL_EMAIL` (papel `radar_email`), `SMTP_USER` e `SMTP_PASS` (senha de app do Gmail) e, opcionalmente, `SMTP_FROM` e `APP_URL`. Defina cada uma com `[Environment]::SetEnvironmentVariable("SMTP_PASS", "<valor>", "User")`. Elas são **opcionais**: o envio não depende desta máquina, porque o GitHub dispara o envio ao cadastrar a oportunidade (segredo `GITHUB_DISPATCH_TOKEN` no Cloudflare Pages) e roda de 15 em 15 minutos no horário comercial. Sem elas, a etapa é pulada aqui. Quando a máquina e o GitHub rodam ao mesmo tempo, o banco garante que cada e-mail sai **uma vez só**.
