@@ -34,7 +34,7 @@ describe('monitoramento de licitações', () => {
     const o = await criar(db, opp({ status: 'Go', site: 'https://pncp.gov.br/app/editais/00000000000191/2026/1' }))
     const inicial = await um<{ habilitado: boolean; estado_vinculo: string }>(
       'select habilitado, estado_vinculo from monitor_licitacoes where oportunidade_id = $1', [o.id])
-    expect(inicial).toEqual({ habilitado: true, estado_vinculo: 'pendente' })
+    expect(inicial).toEqual({ habilitado: true, estado_vinculo: 'vinculado' })
 
     await db.query('update oportunidades set status = $1 where id = $2', ['Lost', o.id])
     const pausado = await um<{ habilitado: boolean; estado_vinculo: string }>(
@@ -44,7 +44,16 @@ describe('monitoramento de licitações', () => {
     await db.query('update oportunidades set status = $1 where id = $2', ['Go', o.id])
     const reativado = await um<{ habilitado: boolean; estado_vinculo: string }>(
       'select habilitado, estado_vinculo from monitor_licitacoes where oportunidade_id = $1', [o.id])
-    expect(reativado).toEqual({ habilitado: true, estado_vinculo: 'pendente' })
+    expect(reativado).toEqual({ habilitado: true, estado_vinculo: 'vinculado' })
+  })
+
+  it('mantém oportunidades Suspended no monitor e vincula URL oficial PNCP', async () => {
+    const o = await criar(db, opp({ status: 'Suspended', site: 'https://pncp.gov.br/app/editais/00000000000191/2026/123' }))
+    const registro = await um<{ habilitado: boolean; portal: string; identificador_externo: string; estado_vinculo: string }>(
+      'select habilitado, portal, identificador_externo, estado_vinculo from monitor_licitacoes where oportunidade_id = $1', [o.id])
+    expect(registro).toEqual({
+      habilitado: true, portal: 'PNCP', identificador_externo: '00000000000191-1-123/2026', estado_vinculo: 'vinculado',
+    })
   })
 
   it('inclui Onboarding mesmo quando o status não fazia parte das opções originais', async () => {
