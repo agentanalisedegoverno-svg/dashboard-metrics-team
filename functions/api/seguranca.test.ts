@@ -20,6 +20,11 @@ const rotas = Object.entries(modulos)
   .filter(([arquivo]) => !arquivo.endsWith('.test.ts'))
   .map(([arquivo, m]) => ({ arquivo, onRequest: m.onRequest }))
 
+/** Rotas da API externa: chamadas servidor a servidor com chave de API (o Cloudflare Access tem Bypass só neste caminho). */
+const EXTERNAS = ['./externo/campos.ts', './externo/oportunidades.ts']
+const protegidas = rotas.filter((r) => !EXTERNAS.includes(r.arquivo))
+const externas = rotas.filter((r) => EXTERNAS.includes(r.arquivo))
+
 const ENV = {
   DATABASE_URL: 'postgres://leitor@h/db',
   DATABASE_URL_APP: 'postgres://app@h/db',
@@ -65,9 +70,13 @@ describe('descoberta de rotas', () => {
   it('encontra todas as rotas da API (se este número mudar, revise a política de cada rota nova)', () => {
     expect(rotas.map((r) => r.arquivo).sort()).toEqual([
       './[[path]].ts',
+      './api-clientes.ts',
+      './api-clientes/[id].ts',
       './cnpj/[cnpj].ts',
       './email-config.ts',
       './email-config/teste.ts',
+      './externo/campos.ts',
+      './externo/oportunidades.ts',
       './me.ts',
       './opcoes.ts',
       './oportunidades/[id].ts',
@@ -81,7 +90,7 @@ describe('descoberta de rotas', () => {
 })
 
 describe('autenticação: sem identidade válida nada passa (todas as rotas, todos os métodos)', () => {
-  it.each(rotas.map((r) => [r.arquivo, r] as const))('%s: JWT inválido -> 401/405/404, nunca 2xx, e o banco não é tocado', async (_n, r) => {
+  it.each(protegidas.map((r) => [r.arquivo, r] as const))('%s: JWT inválido -> 401/405/404, nunca 2xx, e o banco não é tocado', async (_n, r) => {
     verifyId.mockResolvedValue(null)
     verifyJwt.mockResolvedValue(false)
     for (const method of METODOS) {
@@ -91,7 +100,7 @@ describe('autenticação: sem identidade válida nada passa (todas as rotas, tod
     expect(sqlMock).not.toHaveBeenCalled()
   })
 
-  it.each(rotas.map((r) => [r.arquivo, r] as const))('%s: sem o cabeçalho do Access -> não autorizado', async (_n, r) => {
+  it.each(protegidas.map((r) => [r.arquivo, r] as const))('%s: sem o cabeçalho do Access -> não autorizado', async (_n, r) => {
     verifyId.mockImplementation(async (token: string | null) => (token ? { email: 'a@x.com' } : null))
     verifyJwt.mockImplementation(async (token: string | null) => Boolean(token))
     const req = new Request('https://radar.test/api/x', { method: 'GET' })
@@ -100,7 +109,7 @@ describe('autenticação: sem identidade válida nada passa (todas as rotas, tod
     expect(sqlMock).not.toHaveBeenCalled()
   })
 
-  it.each(rotas.map((r) => [r.arquivo, r] as const))('%s: falha fechada sem a configuração do Access (503; 405 se o método nem existe)', async (_n, r) => {
+  it.each(protegidas.map((r) => [r.arquivo, r] as const))('%s: falha fechada sem a configuração do Access (503; 405 se o método nem existe)', async (_n, r) => {
     let fechou503 = 0
     for (const method of METODOS) {
       const res = await chamar(r, { method, headers: { 'x-radar-csrf': '1' }, body: method === 'GET' ? undefined : '{}', env: { DATABASE_URL: ENV.DATABASE_URL, DATABASE_URL_APP: ENV.DATABASE_URL_APP } })
@@ -117,6 +126,69 @@ describe('autenticação: sem identidade válida nada passa (todas as rotas, tod
       expect((await chamar(rotaDe(t))).status).toBe(403)
     }
     expect(sqlMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('API externa: sem chave válida nada passa (todas as rotas externas, todos os métodos)', () => {
+  const CHAVE = 'rdr_' + 'A'.repeat(43)
+  const externa = (trecho: string) => externas.find((r) => r.arquivo.includes(trecho))!
+  const chamarExt = (r: (typeof externas)[number], o: Opc = {}) =>
+    r.onRequest({ request: new Request('https://radar.test/api/externo/x', { method: o.method ?? 'GET', headers: o.headers, body: o.body }), env: o.env ?? ENV, params: {} })
+
+  it.each(externas.map((r) => [r.arquivo, r] as const))('%s: sem chave, ou com chave de formato inválido -> 401/405, nunca 2xx, e o banco não é tocado', async (_n, r) => {
+    for (const headers of [{}, { authorization: 'Bearer curta' }, { authorization: 'Basic abc' }, { 'x-api-key': "rdr_'; drop table oportunidades;--" }, { 'cf-access-jwt-assertion': 'jwt' }] as Record<string, string>[]) {
+      for (const method of METODOS) {
+        const res = await chamarExt(r, { method, headers, body: method === 'GET' ? undefined : '{}' })
+        expect([401, 405], `${r.arquivo} ${method} ${JSON.stringify(headers)}`).toContain(res.status)
+        expect(res.headers.get('cache-control')).toBe('private, no-store')
+      }
+    }
+    expect(sqlMock).not.toHaveBeenCalled()
+  })
+
+  it.each(externas.map((r) => [r.arquivo, r] as const))('%s: chave com formato válido mas desconhecida ou revogada -> 401', async (_n, r) => {
+    sqlMock.mockResolvedValue([{ nome: null }])
+    for (const method of ['GET', 'POST']) {
+      const res = await chamarExt(r, { method, headers: { authorization: `Bearer ${CHAVE}` }, body: method === 'GET' ? undefined : '{}' })
+      expect([401, 405]).toContain(res.status)
+    }
+  })
+
+  it('sem o banco do cadastro configurado -> 503 sem detalhes', async () => {
+    const res = await chamarExt(externa('oportunidades'), { method: 'POST', headers: { authorization: `Bearer ${CHAVE}` }, body: '{}', env: { ...ENV, DATABASE_URL_APP: undefined } })
+    expect(res.status).toBe(503)
+    expect(sqlMock).not.toHaveBeenCalled()
+  })
+
+  it('chave válida cria sem o cabeçalho CSRF (é servidor a servidor), mas corpo inválido é recusado antes de gravar', async () => {
+    sqlMock.mockResolvedValue([{ nome: 'sistema-x' }])
+    const ruim = await chamarExt(externa('oportunidades'), { method: 'POST', headers: { authorization: `Bearer ${CHAVE}` }, body: JSON.stringify({ orcamento: 'abc' }) })
+    expect(ruim.status).toBe(422)
+    expect(sqlMock).toHaveBeenCalledTimes(1) // só a autenticação da chave; nada foi gravado
+    const naoObjeto = await chamarExt(externa('oportunidades'), { method: 'POST', headers: { authorization: `Bearer ${CHAVE}` }, body: '[]' })
+    expect(naoObjeto.status).toBe(400)
+  })
+
+  it('a autoria vem da chave (nunca do corpo) e o solicitante e a Idempotency-Key chegam ao banco', async () => {
+    sqlMock.mockResolvedValueOnce([{ nome: 'sistema-x' }]).mockResolvedValue([{ o: { id: 1, codigo: '2026-0001' } }])
+    const res = await chamarExt(externa('oportunidades'), {
+      method: 'POST',
+      headers: { authorization: `Bearer ${CHAVE}`, 'idempotency-key': 'pedido-1' },
+      body: JSON.stringify({ status: 'Go', orgao: 'X', descritivo: 'D', torre: 'ITS', data_pregao_dt: '2026-03-10', solicitante: 'Maria', criado_por: 'ceo@ctctech.com.br', fonte: 'planilha', versao: 99 }),
+    })
+    expect(res.status).toBe(201)
+    const [, corpoJson, cliente, solicitante, idem] = sqlMock.mock.calls.at(-1)!
+    expect([cliente, solicitante, idem]).toEqual(['sistema-x', 'Maria', 'pedido-1'])
+    expect(corpoJson).not.toMatch(/ceo@ctctech|criado_por|solicitante|fonte|versao/)
+  })
+
+  it('a chave nunca vai para a resposta nem para o log de erro', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    sqlMock.mockRejectedValue(new Error('falha de rede'))
+    const res = await chamarExt(externa('campos'), { headers: { authorization: `Bearer ${CHAVE}` } })
+    expect(res.status).toBe(502)
+    expect(await res.text()).not.toContain(CHAVE)
+    expect(JSON.stringify(log.mock.calls)).not.toContain('A'.repeat(43)) // o log guarda só a mensagem do erro, nunca os cabeçalhos
   })
 })
 
@@ -171,6 +243,8 @@ describe('autorização: rotas de administração', () => {
     ['./email-config/teste.ts', 'POST', {}],
     ['./oportunidades/[id]/arquivar.ts', 'POST', {}],
     ['./oportunidades/[id]/restaurar.ts', 'POST', {}],
+    ['./api-clientes.ts', 'POST', { nome: 'sistema-x' }],
+    ['./api-clientes/[id].ts', 'DELETE', {}],
   ] as const)('%s %s: recusa do banco (P0403) vira 403', async (t, method, corpo) => {
     sqlMock.mockRejectedValue(Object.assign(new Error('Somente administradores'), { code: 'P0403' }))
     const res = await chamar(rotaDe(t), { method, headers: comCsrf, body: JSON.stringify(corpo) })
