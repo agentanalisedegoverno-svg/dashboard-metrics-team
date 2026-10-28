@@ -20,6 +20,7 @@ const MetaTab = lazy(() => import('@/features/meta/MetaTab'))
 const PlanoTab = lazy(() => import('@/features/plano/PlanoTab'))
 const OportunidadesTab = lazy(() => import('@/features/oportunidades/OportunidadesTab'))
 const AdminTab = lazy(() => import('@/features/admin/AdminTab'))
+const MonitorLicitaçõesTab = lazy(() => import('@/features/licitacoes/MonitorLicitaçõesTab'))
 
 const TABS = [
   ['exec', 'Visão Executiva'],
@@ -28,6 +29,7 @@ const TABS = [
   ['meta', 'Metodologia & Maturidade'],
   ['plano', 'Plano de Ação'],
   ['oportunidades', 'Oportunidades'],
+  ['licitacoes', 'Licitações'],
 ] as const
 
 export default function App() {
@@ -47,7 +49,7 @@ export default function App() {
   const noYear = deferred.ano.size === 0
 
   return (
-    <div className={`mx-auto px-5 ${abaAtiva === 'oportunidades' || abaAtiva === 'admin' ? 'max-w-[1700px]' : 'max-w-295'} pb-14 pt-7 max-sm:px-4 max-sm:pb-10 max-sm:pt-5`}>
+    <div className={`mx-auto px-5 ${abaAtiva === 'oportunidades' || abaAtiva === 'admin' || abaAtiva === 'licitacoes' ? 'max-w-[1700px]' : 'max-w-295'} pb-14 pt-7 max-sm:px-4 max-sm:pb-10 max-sm:pt-5`}>
       <Header total={m.total} all={allRows?.length ?? 0} updatedAt={data?.updatedAt ?? null} noYear={noYear} />
       <SyncStatus />
 
@@ -72,6 +74,7 @@ export default function App() {
             <TabsContent value="plano"><Suspense fallback={<EmptyNote>Carregando…</EmptyNote>}><PlanoTab /></Suspense></TabsContent>
             {ehAdmin && <TabsContent value="admin"><Suspense fallback={<EmptyNote>Carregando…</EmptyNote>}><AdminTab /></Suspense></TabsContent>}
             <TabsContent value="oportunidades"><Suspense fallback={<EmptyNote>Carregando…</EmptyNote>}><OportunidadesTab /></Suspense></TabsContent>
+            <TabsContent value="licitacoes"><Suspense fallback={<EmptyNote>Carregando módulo de licitações…</EmptyNote>}><MonitorLicitaçõesTab /></Suspense></TabsContent>
           </Tabs>
         </>
       )}
