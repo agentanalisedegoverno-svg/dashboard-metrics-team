@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Propósito** | Catálogo visual de todos os fluxos da aplicação, do contexto ao detalhe, para quem desenvolve, opera, audita ou aprova mudanças |
-| **Versão / atualização** | 1.2 · 28/10/2026 · cobre as migrações 001 a 019 |
+| **Versão / atualização** | 1.3 · 28/10/2026 · cobre as migrações 001 a 020 |
 | **Fonte** | Mermaid, neste arquivo (o GitHub desenha sozinho). Todo diagrama foi validado no conector do Mermaid antes de entrar. Versões em SVG em [diagramas/](diagramas/), geradas por `npm run diagramas` |
 | **Padrão adotado** | Guia *Architecture design diagrams* da Microsoft (Well-Architected): camadas **contexto → contêiner → componente**, mais implantação, fluxo de dados com fronteiras de confiança (STRIDE), sequência por caso de uso, jornada do usuário, estado, ER e fluxo de identidade; vocabulário do **C4** (contexto/contêiner/componente) e do **UML** (sequência/estado) |
 | **Relacionados** | [ARQUITETURA.md](ARQUITETURA.md) (decisões e narrativa), [OPERACAO.md](OPERACAO.md), [TESTES.md](TESTES.md) |
@@ -72,6 +72,7 @@ flowchart TB
   end
 
   gh["GitHub Actions<br/>rotinas na nuvem, sem máquina de pessoa"]:::externo
+  ext["Aplicações externas<br/>criam oportunidades pela API<br/>(chave por aplicação)"]:::externo
   planner["Microsoft Planner<br/>planos ITS e Digital e Health"]:::externo
   gmail["Gmail (SMTP)"]:::externo
   receita["APIs públicas de CNPJ<br/>dados da Receita Federal"]:::externo
@@ -82,6 +83,7 @@ flowchart TB
   edt --> access
   vis --> access
   access -->|"sessão autenticada"| radar
+  ext -->|"HTTPS + chave: POST /api/externo/oportunidades"| radar
   radar -->|"consulta razão social e matriz/filial"| receita
   radar -.->|"ao salvar: aciona na hora"| gh
   gh -.->|"cria e atualiza cartões (sentido único)"| planner
@@ -129,6 +131,7 @@ flowchart LR
   end
 
   PL["Microsoft Planner<br/>Graph API"]:::externo
+  EXA["Aplicação externa<br/>outro sistema da empresa"]:::externo
   GM["Gmail SMTP 465"]:::externo
   RC["APIs de CNPJ<br/>BrasilAPI e outras"]:::externo
   DRV[("Google Drive")]:::externo
@@ -137,6 +140,7 @@ flowchart LR
   SPA -->|"fetch JSON com JWT e x-radar-csrf"| API
   API -->|"radar_leitor (painel)<br/>radar_app (cadastro)"| DB
   API -->|"HTTPS (servidor consulta)"| RC
+  EXA -->|"HTTPS + chave de API<br/>POST /api/externo/oportunidades"| API
   API -.->|"workflow_dispatch ao cadastrar ou salvar<br/>(token restrito a Actions)"| PLN
   API -.->|"workflow_dispatch ao cadastrar ou salvar"| MAIL
   PLN -->|"radar_planner: lê oportunidades,<br/>grava exportação e estado cifrado"| DB
@@ -233,6 +237,7 @@ flowchart LR
     EMC["_lib/emailConfig<br/>regras de e-mail (admin)"]:::interno
     CNP["_lib/cnpj<br/>4 fontes em sequência"]:::interno
     DSP["_lib/dispararEmails + dispararPlanner<br/>acionam os workflows ao salvar"]:::interno
+    EXT["_lib/apiExterna + api/externo/*<br/>chave, catálogo, idempotência"]:::interno
     ROWS["api/[[path]] + _lib/rows<br/>leitura do painel"]:::interno
   end
 
@@ -242,7 +247,7 @@ flowchart LR
   end
 
   subgraph bd["Banco (db/migrations)"]
-    FUN["funções: criar, atualizar, arquivar,<br/>salvar_usuario, salvar_opcao, salvar_email_config"]:::dados
+    FUN["funções: criar, atualizar, arquivar,<br/>salvar_usuario, salvar_opcao, salvar_email_config,<br/>criar_oportunidade_api e chaves da API"]:::dados
     TRG["gatilhos: derivar, torre, código,<br/>auditar, e-mail (nova e mudança de status)"]:::dados
     TAB[("tabelas<br/>inclui planner_auto_estado")]:::dados
   end
@@ -259,6 +264,8 @@ flowchart LR
   HTTP --> EMC
   HTTP --> CNP
   HTTP -.->|"após 201 ou 200"| DSP
+  EXT -->|"radar_app: criar_oportunidade_api"| FUN
+  EXT -.->|"após 201"| DSP
   CAD --> DOM
   EMC --> DOM
   CAD -->|"radar_app"| FUN
@@ -755,6 +762,7 @@ flowchart LR
   subgraph z0["Zona 0: Internet (não confiável)"]
     U(["Usuário e navegador"]):::pessoa
     ATK(["Qualquer desconhecido"]):::pessoa
+    APX(["Aplicação externa<br/>com chave de API"]):::pessoa
   end
 
   subgraph z1["Zona 1: Borda Cloudflare (autentica)"]
@@ -777,6 +785,7 @@ flowchart LR
   EXT["Serviços externos<br/>Receita, Planner, Gmail, Drive, Supabase"]:::externo
 
   ATK -.->|"sem login: 302 para o Access (testado de fora)"| ACC
+  APX -->|"HTTPS + chave Bearer [dados da oportunidade] (caminho /api/externo/* sem Access; só a chave protege)"| API
   U -->|"HTTPS: e-mail e código"| ACC
   ACC -->|"HTTPS + JWT RS256 assinado [identidade]"| SPA
   SPA -->|"HTTPS JSON + x-radar-csrf [dados internos e e-mails]"| API
@@ -813,7 +822,7 @@ flowchart LR
   ESC["radar_escritor<br/>sem uso: carga descontinuada"]:::papel
   PLN["radar_planner<br/>exportador do Planner"]:::papel
   EML["radar_email<br/>envio de e-mail"]:::papel
-  BKP["radar_backup<br/>backup"]:::papel
+  BKP["radar_backup<br/>backup e espelho"]:::papel
 
   T1[("oportunidades<br/>opcoes, usuarios, carga_status, linhas_torre")]:::tab
   T2[("oportunidades_historico")]:::tab
@@ -822,6 +831,7 @@ flowchart LR
   T5[("planner_marco<br/>planner_exportacao<br/>planner_auto_estado (cifrado)")]:::tab
   F1["criar, atualizar, arquivar<br/>salvar_usuario, salvar_opcao<br/>salvar_email_config, enfileirar_email_teste, eh_admin"]:::fun
   F2["sincronizar_planilha<br/>(legado)"]:::fun
+  F3["criar_oportunidade_api, autenticar_api_cliente<br/>criar, listar e revogar_api_cliente<br/>(chaves só como hash; administrador gerencia)"]:::fun
   N["Ninguém tem DELETE ou TRUNCATE.<br/>A carga total antiga foi revogada."]:::nega
 
   LEI -->|"SELECT"| T1
@@ -830,6 +840,7 @@ flowchart LR
   APP -->|"SELECT"| T3
   APP -->|"SELECT"| T4
   APP -->|"EXECUTE"| F1
+  APP -->|"EXECUTE"| F3
   ESC -->|"EXECUTE"| F2
   PLN -->|"SELECT em oportunidades e usuários"| T1
   PLN -->|"SELECT, INSERT, UPDATE"| T5
@@ -848,6 +859,7 @@ erDiagram
   oportunidades ||--o{ oportunidades_historico : "audita"
   oportunidades ||--o| planner_exportacao : "exportada"
   oportunidades ||--o{ email_fila : "pede aviso"
+  oportunidades ||--o| api_idempotencia : "criada pela API"
   usuarios ||--o{ oportunidades : "pré-vendas (por nome)"
   linhas_torre ||--o{ oportunidades : "define a torre"
   codigo_sequencia ||--o{ oportunidades : "numera o código por ano"
@@ -861,6 +873,7 @@ erDiagram
     text orgao
     text descritivo "sem limite"
     text sigla "até 20 caracteres, fora da planilha"
+    text solicitante "quem pediu na aplicação externa (API)"
     text objeto "o que se contrata, fora da planilha"
     int duracao_contrato_meses "1 a 600, opcional"
     date data_pregao_dt
@@ -928,6 +941,18 @@ erDiagram
     bigint oportunidade_id PK
     int versao_exportada
     text chave
+  }
+  api_clientes {
+    bigint id PK
+    text nome "único, vira api:nome na autoria"
+    text chave_hash "SHA-256, nunca a chave"
+    bool ativo
+    timestamptz ultimo_uso_em
+  }
+  api_idempotencia {
+    text cliente PK
+    text chave PK "Idempotency-Key"
+    bigint oportunidade_id
   }
   planner_auto_estado {
     text nome PK "token_cache.json ou estado_radar.json"
@@ -1006,6 +1031,7 @@ Para regenerar depois de mudar um diagrama: `npm run diagramas` (usa o Chromium 
 
 | Versão | Data | Mudança |
 |---|---|---|
+| 1.3 | 28/10/2026 | API externa para criar oportunidades (D1, D2, D4, D17, D18, D19): chave por aplicação, autoria `api:<cliente>`, solicitante e idempotência |
 | 1.2 | 28/10/2026 | Rotinas na nuvem (GitHub Actions disparado pelo Radar ao salvar; sem máquina de pessoa); fim da carga da planilha (D12); espelho diário no Supabase (D2, D3, D15, D17); e-mail também na mudança de status e com todas as informações (D14); estado do Planner cifrado no banco (D13, D18, D19); novos campos (sigla, duração do contrato) |
 | 1.1 | 25/10/2026 | D10b deixa de sugerir um ciclo de status e passa a mostrar só o que o sistema faz: lista fechada sem ordem imposta, exigências por status e efeitos do status (Planner, e-mail, painel) |
 | 1.0 | 25/10/2026 | Catálogo inicial com 19 diagramas (D1 a D19), cobrindo contexto, contêineres, implantação, componentes, jornada, perfis, cadastro, concorrência, validação, estados, CNPJ, carga, Planner, e-mail, backup, CI/CD, STRIDE, papéis do banco e ER |

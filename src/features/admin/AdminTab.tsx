@@ -1,7 +1,8 @@
-import { ListChecks, Mail, Map, Users } from 'lucide-react'
+import { KeyRound, ListChecks, Mail, Map, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useMe, useOpcoes } from '../oportunidades/api'
+import { ApiAdmin } from './ApiAdmin'
 import { EmailsAdmin } from './EmailsAdmin'
 import { LinhasTorre } from './LinhasTorre'
 import { ListasAdmin } from './ListasAdmin'
@@ -12,6 +13,7 @@ const SECOES = [
   { id: 'listas', rotulo: 'Listas de opções', Icone: ListChecks },
   { id: 'linhas', rotulo: 'Linha → Torre', Icone: Map },
   { id: 'emails', rotulo: 'E-mails', Icone: Mail },
+  { id: 'api', rotulo: 'API', Icone: KeyRound },
 ] as const
 type SecaoId = (typeof SECOES)[number]['id']
 
@@ -63,6 +65,7 @@ export default function AdminTab() {
         {secao === 'listas' && <ListasAdmin opcoes={opcoes.data} />}
         {secao === 'linhas' && <LinhasTorre opcoes={opcoes.data} />}
         {secao === 'emails' && <EmailsAdmin opcoes={opcoes.data} />}
+        {secao === 'api' && <ApiAdmin />}
       </div>
     </section>
   )

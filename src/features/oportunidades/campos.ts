@@ -22,7 +22,13 @@ export type Campo = {
 
 export type Secao = { id: string; titulo: string; campos: Campo[] }
 
-/** As 34 colunas da planilha, agrupadas na ordem em que o time preenche. */
+/**
+ * As 34 colunas da planilha, agrupadas na ordem em que o time preenche.
+ *
+ * ATENÇÃO: estes campos também são a interface da API externa (`POST /api/externo/oportunidades`, ver docs/API-EXTERNA.md).
+ * Ao criar, renomear ou remover um campo aqui: (1) atualize a tabela de campos de docs/API-EXTERNA.md (um teste falha se faltar);
+ * (2) confira a migração do banco e o esquema Zod; (3) avise as aplicações que usam a API.
+ */
 export const SECOES: Secao[] = [
   {
     id: 'identificacao',

@@ -128,3 +128,25 @@ export const useEmailTeste = () => {
   const qc = useQueryClient()
   return useMutation({ mutationFn: () => chamar('/email-config/teste', { method: 'POST' }), onSuccess: () => qc.invalidateQueries({ queryKey: ['email-config'] }) })
 }
+
+export type ApiCliente = { id: number; nome: string; ativo: boolean; criado_em: string; criado_por: string; ultimo_uso_em: string | null; revogado_em: string | null }
+
+export const useApiClientes = () =>
+  useQuery({ queryKey: ['api-clientes'], queryFn: ({ signal }) => chamar<{ clientes: ApiCliente[] }>('/api-clientes', { signal }).then((r) => r.clientes), staleTime: 15_000, retry: false })
+
+/** Cria o cliente da API externa; a resposta traz a chave UMA vez (o servidor guarda só o hash). */
+export const useCriarApiCliente = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (nome: string) => chamar<{ cliente: ApiCliente; chave: string }>('/api-clientes', { method: 'POST', body: { nome } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['api-clientes'] }),
+  })
+}
+
+export const useRevogarApiCliente = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => chamar(`/api-clientes/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['api-clientes'] }),
+  })
+}
