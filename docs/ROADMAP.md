@@ -20,6 +20,18 @@ Estado em 28/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) → **desativada e removida em 27/10/2026** |
 | Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ✅ (22/10) |
 
+## Monitoramento de licitações — evolução incremental
+
+| Etapa | Estado | Escopo / critério de conclusão |
+|---|---|---|
+| Consulta inicial do PNCP na aba Licitações | 🟡 Em validação | Somente leitura no navegador, cache em memória React Query e sugestões de possíveis correspondências. Corrigir a consulta, exibir detalhes técnicos de falhas e validar com oportunidades reais. Sem novas tabelas ou APIs do Radar nesta fase. |
+| Ampliar a cobertura de descoberta | ⬜ Futuro | Avaliar paginação e filtros adicionais do PNCP; documentar limites de cobertura e reduzir falsos negativos. |
+| Outras fontes públicas | ⬜ Futuro | Avaliar Compras.gov.br/Comprasnet e outros portais somente quando houver endpoint público estável e uso permitido; manter PNCP como primeira fonte. |
+| Acompanhamento de certames em que participamos | ⬜ Futuro | Evoluir de descoberta para acompanhamento de oportunidades confirmadas: vínculo por identificador oficial, prazos/sessões, mudanças publicadas, resultado/andamento e links oficiais. Definir o fluxo operacional com o time antes de persistir qualquer dado novo. |
+| Alertas de prazo e mudança | ⬜ Futuro | Após validar a etapa de acompanhamento, definir alertas para prazos e alterações relevantes com fonte e data da última verificação visíveis. |
+
+**Limite da fase atual:** o módulo é um paliativo de consulta. Não registra participação, não confirma automaticamente vínculos e não altera banco/back-end. As etapas futuras precisam de decisão explícita antes de introduzir persistência ou automações.
+
 ## 2. Próximos passos (curto prazo)
 
 | # | Item | Por quê | Tam. |
