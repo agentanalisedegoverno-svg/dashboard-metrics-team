@@ -19,7 +19,7 @@ describe('migrações', () => {
     expect(new Set(f.rows.map((r) => r.proname)).size).toBe(12)
     const t = await db.query<{ tgname: string }>(`select tgname from pg_trigger where not tgisinternal and tgname like 'oportunidades_%'`)
     expect(t.rows.map((r) => r.tgname).sort()).toEqual(
-      ['oportunidades_auditar_tg', 'oportunidades_codigo_tg', 'oportunidades_derivar_tg', 'oportunidades_email_status_tg', 'oportunidades_email_tg', 'oportunidades_solicitante_tg', 'oportunidades_torre_tg'],
+      ['oportunidades_auditar_tg', 'oportunidades_codigo_tg', 'oportunidades_derivar_tg', 'oportunidades_email_status_tg', 'oportunidades_email_tg', 'oportunidades_monitor_licitacoes_tg', 'oportunidades_solicitante_tg', 'oportunidades_torre_tg'],
     )
   })
   it('reaplicar qualquer migração é inofensivo (idempotência)', async () => {
