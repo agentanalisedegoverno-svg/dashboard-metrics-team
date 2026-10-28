@@ -1,6 +1,6 @@
 # Especificação: cadastro de oportunidades na aplicação web
 
-> Status: **implementado e em produção** (F0–F4 concluídas em 20–21/10/2026; F5, encerramento da planilha, pendente). Este documento mantém a especificação original; o desenho atual está em [ARQUITETURA.md](ARQUITETURA.md) e o que falta em [ROADMAP.md](ROADMAP.md).
+> Status: **implementado e em produção** (F0–F5 concluídas: a planilha deixou de alimentar o banco em 27/10/2026, ver [DECISAO-FIM-DA-CARGA-DA-PLANILHA.md](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)). Este documento mantém a especificação original; o desenho atual está em [ARQUITETURA.md](ARQUITETURA.md) e o que falta em [ROADMAP.md](ROADMAP.md).
 > Objetivo: tirar a planilha `BaseLicitacao.xlsx` do centro do processo. Os usuários da organização cadastram e atualizam oportunidades numa nova aba do Radar; cada gravação alimenta o banco que já serve as métricas do time.
 
 ## 1. Decisões de produto
@@ -12,7 +12,7 @@
 | Edição | Qualquer usuário edita; toda alteração fica no **histórico** (quem, quando, campo, valor anterior e novo). |
 | Exclusão | Somente **administradores** arquivam (exclusão lógica, reversível). |
 | Listas de opções | **Listas fechadas** (Status, Torre, Linha de Serviço, Pré-vendas, Site, Modalidade, motivos...), administráveis numa tela de configuração. Grafias normalizadas. |
-| Virada da planilha | **Convivência temporária**: planilha e web em paralelo, com sincronização por merge (seção 3). Data de encerramento a definir; depois a planilha vira somente leitura. |
+| Virada da planilha | **Concluída em 27/10/2026**: a convivência acabou, o banco é alimentado só pelo Radar web e a carga da planilha foi removida (seção 3 fica como histórico). |
 | Escopo da v1 | Formulário completo + grade com busca/filtros/ordenação + edição + histórico + migração limpa dos 600 registros atuais. |
 
 ## 2. Dicionário de dados (34 colunas da planilha)
@@ -61,7 +61,9 @@ Perfil feito sobre as 600 linhas de 14/10/2026. "Preench." é o percentual de li
 
 Campos derivados (nunca digitados): `ano`, `mes` (de `data_pregao`) e `sla` = dias entre `data_distribuicao` e `data_pregao`.
 
-## 3. Convivência planilha ↔ web (sincronização por merge)
+## 3. Convivência planilha ↔ web (sincronização por merge) — **histórico, encerrada em 27/10/2026**
+
+> Esta seção descreve a convivência que existiu entre 20 e 27/10/2026. A carga foi **descontinuada e removida** ([decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)).
 
 O agente atual **apaga e reescreve toda a base**. Isso é incompatível com cadastro na web. Na convivência:
 
@@ -89,7 +91,7 @@ flowchart LR
   API -->|"papel radar_app (INSERT/UPDATE limitado)"| DB[("Neon Postgres")]
   DB --> HIST[("oportunidades_historico")]
   DB --> OPT[("opcoes (listas)")]
-  AG["Agente de carga (merge)"] -->|"sincronizar_planilha()"| DB
+  GHA["Planner e e-mails<br/>(GitHub Actions)"] -->|"radar_planner e radar_email"| DB
   SPA2["Abas de métricas"] -->|"papel radar_leitor (SELECT)"| DB
 ```
 
@@ -155,7 +157,7 @@ Mantemos a base atual (React 19, TypeScript, Tailwind v4, componentes no padrão
 | F2 ✅ | **API** com validação, auditoria, bloqueio otimista, CSRF e papéis | Testes unitários e de contrato; conflito de edição detectado. |
 | F3 ✅ | **Front:** aba Oportunidades (formulário, grade, edição, histórico) | E2E (criar, editar, conflito, arquivar), axe sem violações, visual 390–7680 px. |
 | F4 ✅ | **Convivência:** agente passa ao merge; runbook e data de encerramento | Carga do agente não sobrescreve edição web (teste automatizado). |
-| F5 ⏳ | Encerramento: planilha somente leitura; limpeza | Checklist de virada. |
+| F5 ✅ | Encerramento: a carga foi desativada e removida (27/10/2026) | [Decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md). |
 
 ## 9. Riscos e pontos em aberto (resolvidos e pendentes)
 
@@ -166,4 +168,4 @@ Mantemos a base atual (React 19, TypeScript, Tailwind v4, componentes no padrão
 - **Custo Total CTC e Ação IA:** campos novos/reservados; confirmar se `Ação IA` continuará sob outro agente.
 
 **Resolvido:** administradores (`joao.henrique@ctctech.com.br`; os demais são promovidos na própria aba); Pré-vendas viram usuários com e-mail (também usado para atribuir cartões no Planner); dados com problema migraram como **pendência**; permissões mantidas (todos cadastram e editam, só o admin arquiva).
-**Pendente:** data de encerramento da convivência com a planilha (F5) e destino de `Ação IA`.
+**Pendente:** destino de `Ação IA`.

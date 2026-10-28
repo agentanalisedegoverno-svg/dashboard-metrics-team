@@ -74,7 +74,7 @@ Pontos que costumam surpreender:
 - **"Nova" ou "atualizada" depende de o Radar já ter exportado**, não de o cartão existir. Se o cartão foi apagado, o próximo evento "atualizada" cria um cartão novo (ver cenários).
 - **Arquivar não atualiza o cartão** (ele fica como está, sem apagar nem marcar). **Restaurar** a oportunidade volta a enviá-la.
 - **O envio é marcado no momento em que o evento é gerado**, não quando o Planner o aplica. Um evento que cai em `erros\` **não é reenviado sozinho** (ver "Quando algo dá errado").
-- O integrador só roda **seg–sex, 08h–19h, a cada 5 minutos**, com o computador ligado. Mudanças feitas fora dessa janela esperam a próxima rodada.
+- O ciclo roda **na nuvem**: ao cadastrar ou salvar (em qualquer horário, cartão em cerca de 1 minuto) e, como rede de segurança, **seg–sex, 08h–19h, a cada 5 minutos**. Não depende de computador ligado.
 
 ### 2. O que acontece em cada campo do cartão
 
@@ -161,20 +161,21 @@ Para rodar: `npm test` (parte TypeScript e banco) e `python -m unittest discover
 |---|---|---|
 | Exportador `scripts/planner-eventos.mjs` | este repositório | lê o banco (`radar_planner`) e grava eventos JSON v2 |
 | `planner-auto` ([`planner-auto/`](../planner-auto/)) | este repositório; roda em `C:\Users\CTC\planner-auto` | login no Graph, `inspecionar`, `processar-eventos` |
-| `rodar-integracao.cmd` | `planner-auto/` | roda as duas etapas em sequência, com log |
+| `rodar-integracao.cmd` | `planner-auto/` | **contingência (Windows):** roda as duas etapas em sequência, com log |
 | Workflow `planner-integracao.yml` | GitHub Actions | **Principal (desde 27/10/2026):** disparo ao salvar + 5 em 5 min, na nuvem. Ver [Rodar na nuvem](#rodar-na-nuvem-sem-depender-de-computador-github-actions) |
-| Tarefa `Radar-Planner integracao` (contingência) | Agendador do Windows | seg–sex, 08h–19h, a cada 5 min (também envia os e-mails de nova oportunidade) |
+| Tarefa `Radar-Planner integracao` (contingência, **desativada em 28/10/2026**) | Agendador do Windows | seg–sex, 08h–19h, a cada 5 min (também enviava os e-mails) |
 | Mapa `config/planner-mapa.json` | este repositório | planos, buckets, rótulos, progresso, checklist padrão |
 | Tabelas `planner_marco` e `planner_exportacao` | Neon (migração 003) | marco de ativação e versão já exportada por oportunidade |
 
 ```mermaid
 flowchart LR
   W["Aba Oportunidades<br/>cadastro/edição"] --> DB[("Neon")]
+  W -.->|"workflow_dispatch ao salvar"| GH["Workflow planner-integracao<br/>(GitHub Actions)<br/>+ agendamento de 5 min"]
+  GH -->|"restaura e guarda o estado cifrado<br/>(planner_auto_estado)"| DB
   DB -->|"radar_planner<br/>somente leitura"| EX["planner-eventos.mjs"]
-  EX -->|"JSON v2"| PE[("eventos\entrada")]
-  AG["Agendador<br/>5 em 5 min"] --> RUN["rodar-integracao.cmd"]
-  RUN --> EX
-  RUN --> PA["planner_auto.py<br/>processar-eventos --sim"]
+  GH --> EX
+  EX -->|"JSON v2 (pasta temporária)"| PE[("eventos/entrada")]
+  GH --> PA["planner_auto.py<br/>processar-eventos --sim"]
   PE --> PA
   PA -->|"Graph delegado"| PL["Planner (2 planos)"]
   PA --> OK[("processados")]
@@ -252,6 +253,8 @@ Comandos do `planner-auto`:
 Não têm status equivalente no Radar: *Cotação Concluída* (ITS) e *Cotações Enviadas* (Digital e Health).
 
 ## Operação
+
+> **Rotina principal: na nuvem** (veja [Rodar na nuvem](#rodar-na-nuvem-sem-depender-de-computador-github-actions)): conferir com `gh workflow run planner-integracao.yml -f verificar=true`, acompanhar em Actions → *Planner integração*. Os comandos abaixo valem para a **contingência no Windows** (tarefa desativada em 28/10/2026).
 
 - **Variáveis** (usuário Windows, fora do Git): `DATABASE_URL_PLANNER` e `PLANNER_EVENTOS_DIR`.
 - **Ativar / conferir / pausar:**

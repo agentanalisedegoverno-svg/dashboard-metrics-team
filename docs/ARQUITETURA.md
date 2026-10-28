@@ -1,6 +1,6 @@
 # Arquitetura do Radar Pré-Vendas
 
-Painel interno de pré-vendas (licitações) **e** cadastro de oportunidades. O banco **Postgres (Neon)** é a fonte da verdade: ele é alimentado de duas formas (a planilha *BaseLicitacao.xlsx*, por merge, e o cadastro direto na aba **Oportunidades**) e alimenta o painel de métricas, o backup e o Microsoft Planner. Tudo atrás do **Cloudflare Access** (código por e-mail `@ctctech.com.br`).
+Painel interno de pré-vendas (licitações) **e** cadastro de oportunidades. O banco **Postgres (Neon)** é a fonte da verdade e é alimentado **só pelo Radar web** (desde 27/10/2026 a planilha *BaseLicitacao.xlsx* deixou de alimentá-lo: [decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)). As rotinas (Planner, e-mail, backup, espelho) rodam na **nuvem do GitHub Actions**, acionadas pelo próprio Radar ao salvar, **sem depender de nenhum computador de pessoa**. Há um espelho diário do banco no Supabase.
 
 A operação do dia a dia está em [OPERACAO.md](OPERACAO.md); o que vem a seguir está em [ROADMAP.md](ROADMAP.md).
 
@@ -10,17 +10,7 @@ A operação do dia a dia está em [OPERACAO.md](OPERACAO.md); o que vem a segui
 
 ```mermaid
 flowchart LR
-  subgraph origem["Origem dos dados"]
-    XLS["BaseLicitacao.xlsx<br/>(aba Base Governo)<br/>SharePoint / OneDrive"]
-    U(["Usuário do time<br/>@ctctech.com.br"])
-  end
-
-  subgraph local["Máquina local (Windows)"]
-    AG["Carga agendada (dias úteis 07:30)<br/>sync-db.mjs (merge)<br/>papel radar_escritor"]
-    EXP["Exportador<br/>planner-eventos.mjs<br/>papel radar_planner"]
-    PA["planner-auto<br/>processar-eventos"]
-    EV[("eventos/<br/>entrada · processados · erros")]
-  end
+  U(["Usuário do time<br/>@ctctech.com.br"])
 
   subgraph cf["Cloudflare"]
     ACC["Access (One-time PIN)"]
@@ -31,66 +21,64 @@ flowchart LR
   end
 
   subgraph neon["Neon Postgres (sa-east-1)"]
-    DB[("oportunidades · historico<br/>opcoes · usuarios<br/>carga_status · planner_*")]
-    FN["funções SECURITY DEFINER<br/>criar / atualizar / arquivar<br/>sincronizar_planilha"]
+    DB[("oportunidades · historico<br/>opcoes · usuarios<br/>email_fila · planner_*")]
+    FN["funções SECURITY DEFINER<br/>criar / atualizar / arquivar"]
   end
 
-  subgraph gh["GitHub"]
-    CI["Pipeline CI/CD"]
+  subgraph gh["GitHub Actions (sem máquina de pessoa)"]
+    PLN["Planner integração<br/>planner-eventos.mjs + planner-auto<br/>papel radar_planner"]
+    MAIL["Enviar e-mails<br/>papel radar_email"]
     BK["Backup diário<br/>+ teste de restauração"]
+    ESP["Espelho no Supabase<br/>diário"]
+    CI["Pipeline CI/CD"]
   end
 
   DRV[("Google Drive<br/>dumps criptografados")]
+  SUPA[("Supabase<br/>espelho do banco")]
   PL["Microsoft Planner<br/>ITS · Digital e Health"]
+  GM["Gmail SMTP"]
 
-  XLS -->|"cópia somente leitura"| AG
-  AG -->|"sincronizar_planilha"| FN
   U --> ACC --> SPA
   SPA -->|"/api/rows · /api/oportunidades · /api/opcoes"| API
   API -->|"radar_leitor (painel)<br/>radar_app (cadastro)"| FN
   FN --> DB
-  DB -->|"SELECT"| EXP
-  EXP -->|"JSON v2"| EV
-  EV --> PA -->|"Microsoft Graph"| PL
+  API -.->|"workflow_dispatch ao salvar"| PLN
+  API -.->|"workflow_dispatch ao salvar"| MAIL
+  DB -->|"SELECT + estado cifrado"| PLN
+  PLN -->|"Microsoft Graph"| PL
+  DB -->|"fila"| MAIL -->|"SMTP"| GM
   DB -->|"pg_dump (radar_backup)"| BK --> DRV
+  DB -->|"pg_dump (radar_backup)"| ESP --> SUPA
   CI -->|"deploy"| pages
 ```
 
 **Ideia central:** cada componente tem um papel de banco com o **mínimo de privilégio** e só consegue o que precisa. Quem lê não escreve; quem exporta para o Planner só lê; quem faz backup só lê; quem cadastra só chama funções que validam e auditam.
 
-## 2. Entrada de dados (histórico: convivência planilha ↔ web)
+## 2. Entrada de dados (só pelo Radar web)
 
-> **Atualização (27/10/2026): a planilha deixou de alimentar o banco.** Hoje há **uma só porta de entrada**: o cadastro no Radar web. A carga por merge descrita abaixo foi desativada e removida ([decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)); o desenho e a função `sincronizar_planilha` ficam só como histórico.
+> **Desde 27/10/2026 há uma só porta de entrada de dados: o cadastro no Radar web.** A carga da planilha por merge foi desativada e removida ([decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)). O que está abaixo de "Legado" só existe como histórico no banco.
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant XLS as Planilha (cópia)
-  participant AG as Agente (sync-db.mjs)
-  participant DB as Neon (sincronizar_planilha)
   actor U as Usuário
   participant WEB as Aba Oportunidades + API
+  participant DB as Neon
+  participant GH as GitHub Actions
 
-  AG->>XLS: lê a aba Base Governo (somente leitura)
-  AG->>AG: mapeia 34 colunas, normaliza, gera chave_planilha
-  AG->>DB: sincronizar_planilha(linhas)
-  DB->>DB: insere novas · atualiza as que mudaram
-  DB->>DB: NÃO toca em linhas editadas na web
-  DB->>DB: sumiu da planilha → marca "ausente" (não apaga)
   U->>WEB: cadastra / edita (Zod + regras)
   WEB->>DB: criar_/atualizar_oportunidade (versão otimista)
   DB->>DB: valida, grava, registra histórico (quem, quando, campo, de→para)
+  DB->>DB: gatilho enfileira o e-mail (nova ou mudança de status)
+  WEB-->>GH: workflow_dispatch (Planner e e-mails) em segundo plano
 ```
 
 Regras de projeto:
-- **A edição na web vence a planilha.** Linhas com `editado_na_web` ou `fonte = 'web'` nunca são sobrescritas pela carga.
-- **Nada é apagado:** linha que sumiu da planilha vira `ausente_na_planilha` (o painel e a grade a ignoram); "excluir" na web é **arquivar** (só administrador, reversível).
-- **Código da oportunidade** (`codigo`, `AAAA-NNNN`): identificador de negócio, único e imutável, numerado por ano da data do pregão. É o mesmo código mostrado no Radar e no título do cartão do Planner. A planilha **não** recebe o código (ela será desativada).
-- **Chave de sincronização** (`chave_planilha`) = processo + órgão + data do pregão + torre. Se alguém corrigir um desses campos na planilha, o banco enxerga uma linha nova e marca a antiga como ausente (limitação conhecida; ver [ROADMAP.md](ROADMAP.md)).
-- **Trava de segurança:** o agente recusa a carga se vierem menos de 400 linhas (leitura parcial marcaria o resto como ausente).
-- A carga total antiga (`carregar_oportunidades`) é **bloqueada pelo banco** se existir qualquer linha criada pela web.
+- **Nada é apagado:** "excluir" na web é **arquivar** (só administrador, reversível).
+- **Código da oportunidade** (`codigo`, `AAAA-NNNN`): identificador de negócio, único e imutável, numerado por ano da data do pregão. É o mesmo código mostrado no Radar e no título do cartão do Planner.
+- **Legado da planilha (sem uso):** função `sincronizar_planilha`, tabela `carga_status`, colunas `chave_planilha` e `ausente_na_planilha`, e `fonte = 'planilha'` nas linhas antigas. A carga total antiga (`carregar_oportunidades`) segue bloqueada pelo banco.
 
-Detalhes: [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md), [CARGA-DE-DADOS.md](CARGA-DE-DADOS.md), [CADASTRO-OPORTUNIDADES.md](CADASTRO-OPORTUNIDADES.md).
+Detalhes: [CADASTRO-OPORTUNIDADES.md](CADASTRO-OPORTUNIDADES.md). Histórico da carga (descontinuada): [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md) e [CARGA-DE-DADOS.md](CARGA-DE-DADOS.md).
 
 ## 3. Cadastro pela web (API)
 
@@ -149,18 +137,17 @@ sequenceDiagram
 ```mermaid
 flowchart LR
   W["Oportunidade criada ou<br/>alterada na web<br/>(depois do marco)"] --> DB[("Neon")]
+  W -.->|"workflow_dispatch ao salvar<br/>(+ agendamento de 5 min, seg a sex 08h às 19h)"| GHA["Workflow planner-integracao<br/>(GitHub Actions)"]
+  GHA -->|"restaura o estado cifrado<br/>(planner_auto_estado)"| DB
   DB -->|"radar_planner<br/>somente leitura"| EXP["planner-eventos.mjs"]
-  EXP -->|"evento v2 (JSON)"| EV[("eventos/entrada")]
-  AGD["Agendador do Windows<br/>seg–sex, 08h–19h, a cada 5 min"] --> RUN["rodar-integracao.cmd"]
-  RUN --> EXP
-  RUN --> PA["planner_auto.py<br/>processar-eventos --sim"]
-  EV --> PA
+  EXP -->|"evento v2 (JSON, pasta temporária)"| PA["planner_auto.py<br/>processar-eventos --sim"]
   PA -->|"Graph (delegado)"| P1["Plano ITS Oportunidades"]
   PA -->|"Graph (delegado)"| P2["Plano Digital e Health"]
-  PA --> EV2[("processados / erros")]
+  PA -->|"guarda o estado cifrado"| DB
 ```
 
-- **Sentido único** (Radar → Planner). Só oportunidades **criadas na web depois da ativação**; as vindas da planilha nunca são enviadas.
+- **Sentido único** (Radar → Planner). Só oportunidades **criadas na web depois da ativação** são enviadas (as linhas antigas da planilha nunca são).
+- **Na nuvem, em tempo quase real:** o Radar aciona o workflow ao cadastrar ou salvar (cartão em cerca de 1 minuto); o agendamento de 5 minutos é só rede de segurança. O token do login Microsoft e as versões já aplicadas ficam **cifrados no banco** (`planner_auto_estado`). A tarefa do Windows foi **desativada em 28/10/2026**.
 - **Torre → plano:** ITS vai para *ITS Oportunidades*; DIGITAL e HEALTH vão para *Digital e Health*.
 - **Status → bucket e progresso**; **Pré-vendas → responsável** (e-mail cadastrado em *Administração → Usuários e perfis*); título `[AAAA-NNNN] Órgão | Objeto | PE | UASG | DATA` (o **código da oportunidade**).
 - **Idempotente e conservador:** a chave (o código `AAAA-NNNN`) evita duplicar; versão antiga é ignorada; responsável vazio não mexe; nunca apaga cartão nem arquivo; erro vai para `erros\` com o motivo.
@@ -212,12 +199,16 @@ flowchart LR
 erDiagram
   oportunidades ||--o{ oportunidades_historico : "audita"
   oportunidades ||--o| planner_exportacao : "exportada"
+  oportunidades ||--o{ email_fila : "pede aviso"
   oportunidades {
     bigint id PK
     text status
     text torre
     text orgao
-    text descritivo
+    text sigla "até 20 caracteres"
+    text descritivo "até 60 caracteres"
+    text objeto "o que se contrata"
+    int duracao_contrato_meses "1 a 600, opcional"
     text codigo "AAAA-NNNN, único e imutável"
     text empresa_vencedora_cnpj "14 dígitos"
     text empresa_vencedora_razao "da Receita"
@@ -229,7 +220,7 @@ erDiagram
     numeric orcamento
     bool orcamento_sigiloso
     numeric valor_ctc
-    text fonte "planilha ou web"
+    text fonte "web (planilha: legado)"
     text chave_planilha
     bool editado_na_web
     bool ausente_na_planilha
@@ -269,12 +260,26 @@ erDiagram
     int versao_exportada
     text chave
   }
+  planner_auto_estado {
+    text nome PK "token_cache.json ou estado_radar.json"
+    text conteudo "cifrado"
+    timestamptz atualizado_em
+  }
+  email_fila {
+    bigint id PK
+    text tipo "nova, status ou teste"
+    bigint oportunidade_id FK
+    text situacao
+    text status_anterior
+    text status_novo
+    text alterado_por
+  }
   linhas_torre {
     text linha PK
     text torre "DIGITAL ou HEALTH; as demais linhas são ITS"
   }
   carga_status {
-    int id PK "sempre 1"
+    int id PK "legado, sem uso"
     timestamptz ultima_carga_em
     int total_linhas
     text fonte
@@ -286,11 +291,11 @@ erDiagram
 
 | Papel | Quem usa | Pode | Não pode |
 |---|---|---|---|
-| `radar_leitor` | API do painel | `SELECT` nas tabelas de leitura | escrever, apagar, executar carga |
-| `radar_app` | API de cadastro | `SELECT` + `EXECUTE` das funções de cadastro | `INSERT` direto, sincronizar planilha |
-| `radar_escritor` | Carga agendada | `EXECUTE sincronizar_planilha` (a carga total antiga foi revogada) | ler tabelas, apagar, alterar esquema |
-| `radar_planner` | Exportador do Planner | `SELECT` em oportunidades e usuários; grava só nas tabelas `planner_*` | alterar oportunidades |
-| `radar_backup` | Backup diário | leitura de tudo (`pg_read_all_data`) | gravar |
+| `radar_leitor` | API do painel | `SELECT` nas tabelas de leitura | escrever, apagar |
+| `radar_app` | API de cadastro | `SELECT` + `EXECUTE` das funções de cadastro | `INSERT` direto |
+| `radar_escritor` | **Sem uso** (a carga da planilha foi descontinuada em 27/10/2026) | `EXECUTE sincronizar_planilha` (a carga total antiga foi revogada) | ler tabelas, apagar, alterar esquema |
+| `radar_planner` | Exportador e `planner-auto` (GitHub Actions) | `SELECT` em oportunidades e usuários; grava só nas tabelas `planner_*` (inclui `planner_auto_estado`, cifrado) | alterar oportunidades |
+| `radar_backup` | Backup diário e espelho no Supabase | leitura de tudo (`pg_read_all_data`) | gravar |
 | `neondb_owner` | Administração (console/CLI) | tudo | — (uso excepcional) |
 
 As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do dono, então os papéis acima não precisam de acesso direto às tabelas para escrever.
@@ -299,14 +304,16 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 
 | Componente | Onde | Identificação |
 |---|---|---|
-| Planilha | SharePoint GOVERNO2 | `BaseLicitacao.xlsx`, aba *Base Governo* (~610 linhas, 39 colunas; as 6 "(Pivot)" são auxiliares e ignoradas) |
+| ~~Planilha~~ | SharePoint GOVERNO2 | `BaseLicitacao.xlsx`: **não alimenta mais o banco** desde 27/10/2026 |
 | ~~Carga da planilha~~ | ~~máquina local do João~~ | **Desativada em 27/10/2026** (tarefa `Radar-Carga-Planilha` desativada; scripts removidos) |
-| Integração Planner | máquina local do João | tarefa `Radar-Planner integracao` (seg–sex, 08h–19h, a cada 5 min; também envia os e-mails); código em [`planner-auto/`](../planner-auto/) |
+| Integração Planner | GitHub Actions | workflow `planner-integracao.yml`: disparo ao salvar + agendamento de 5 min (seg–sex, 08h–19h); código em [`planner-auto/`](../planner-auto/). A tarefa do Windows `Radar-Planner integracao` está **desativada** (contingência) |
+| E-mails | GitHub Actions | workflow `enviar-emails.yml`: disparo ao salvar + agendamento (nova oportunidade e mudança de status) |
 | Banco | Neon, `aws-sa-east-1` | projeto `radar-prevendas`, branch `main`, banco `neondb` |
 | Hospedagem | Cloudflare Pages | `https://radar-prevendas.pages.dev` |
 | Autenticação | Cloudflare Zero Trust (Free) | time `ctctech-radar`, *One-time PIN*, política `@ctctech.com.br` |
 | Código e CI/CD | GitHub | `agentanalisedegoverno-svg/dashboard-metrics-team` |
 | Backup | GitHub Actions → Google Drive | `Backup do banco` (diário), `Teste de restauração do backup` (mensal, 2 destinos, inclui o branch Neon `teste-restauracao`) e `Vigia do backup` (alerta diário) |
+| Espelho do banco | Supabase (plano Free, `us-east-1`) | projeto dedicado `radar-backup`; workflow `Backup no Supabase` (diário). Ver [BACKUP.md](BACKUP.md) |
 | Planner | Microsoft 365 | planos *ITS Oportunidades* e *Digital e Health - Oportunidades* |
 
 ## 10. Decisões de arquitetura
@@ -314,7 +321,9 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 | Decisão | Motivo | Alternativa descartada |
 |---|---|---|
 | Painel e cadastro leem/gravam num **banco** | Independe das permissões do Microsoft 365; rápido e estável; uma fonte da verdade | Leitura direta da planilha pelo Graph |
-| **Merge** na carga da planilha (não troca total) | Permite cadastro web em paralelo sem perder edições | Substituir a base inteira a cada carga (apagaria o que foi cadastrado na web) |
+| **Fim da carga da planilha** (27/10/2026) | A migração para o Radar web terminou; a carga era paliativa e dependia de uma máquina | Manter a convivência planilha ↔ web ([decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)) |
+| **Rotinas no GitHub Actions disparadas pelo Radar** (28/10/2026) | Sem depender de computador de pessoa; tempo quase real; custo zero (repositório público); estado do Planner cifrado no banco | VM no GCP e cron no Render (exigem cartão e têm custo); tarefa do Windows (depende da máquina) |
+| **Espelho diário no Supabase** | Segunda cópia viva do banco, além do backup criptografado no Drive | Só o backup em arquivo |
 | **Neon Postgres** | Gratuito, Postgres de verdade, driver HTTP em Workers, região em São Paulo | Cloudflare D1 |
 | **Regras de negócio no banco**, formato no Zod | Uma única fonte da verdade; vale para qualquer cliente (API, agente) | Validar só no navegador ou só na API |
 | **Bloqueio otimista** (`versao`) + histórico por gatilho | Detecta edição simultânea; auditoria que não depende da aplicação | Última gravação vence |
@@ -322,13 +331,14 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 | **Cloudflare Access** com código por e-mail | Sem TI e sem app registration; plano gratuito | Login Microsoft (MSAL): código no repositório, **desligado** |
 | API valida o JWT **ela mesma** | A borda cobre um hostname; a API responde também nos `<hash>.pages.dev` | Confiar só na borda |
 | Papéis separados por função | Privilégio mínimo | Uma conexão com poder total |
-| **Planner por eventos em arquivo** (não chamada direta do Radar) | Nenhum segredo da Microsoft no Radar/Cloudflare; roda com o login delegado já aprovado pelo TI; auditável (arquivos em `processados\`) | Função serverless com permissão de aplicativo (pedido maior ao TI) |
+| **Planner por eventos** (não chamada direta do Radar) | Nenhum segredo da Microsoft no Radar/Cloudflare; roda com o login delegado já aprovado pelo TI; o workflow roda na nuvem | Função serverless com permissão de aplicativo (pedido maior ao TI) |
 | Backup por `pg_dump` criptografado | Restaura tudo (esquema, funções, gatilhos); cobre o histórico de 6 h do Neon free | JSON só dos dados |
 
 ## 11. Limites e riscos conhecidos
 
-- **Máquina local:** carga da planilha e integração com o Planner dependem do computador ligado e logado. Se falhar, o painel e o cadastro seguem normais; só a carga/os cartões atrasam. Há log em `planner-auto\logs\integracao.log`.
-- **Chave da planilha instável:** corrigir processo/órgão/data/torre na planilha gera uma linha nova e uma "ausente".
+- **Login Microsoft do Planner:** é o de uma pessoa (delegado) e expira após ~90 dias sem uso; a renovação exige uma pessoa (`login` + `estado_db.py guardar`). Solução futura: app do Entra com permissão de aplicativo (precisa do administrador do tenant).
+- **Agendamento do GitHub:** é "melhor esforço" e pode atrasar; o tempo real vem do disparo ao salvar (token `GITHUB_DISPATCH_TOKEN` no Cloudflare). Se o disparo falhar, o agendamento cobre.
+- **Espelho no Supabase:** guarda só o estado mais recente e ainda não foi testado como banco ativo (faltam os papéis `radar_*`). O projeto gratuito pausa após 7 dias sem atividade; a restauração diária evita.
 - **Planner:** sentido único; arquivar no Radar não atualiza o cartão; mudar a torre não move o cartão entre planos; o 50%/100% do Radar pode sobrescrever progresso marcado à mão.
 - **Plano gratuito do Neon:** histórico de 6 h (coberto pelo backup diário); limites de computação, folgados para ~600 linhas.
 - **Backup no Google Drive:** o token do rclone tem acesso à conta Google que o gerou; ver [BACKUP.md](BACKUP.md).

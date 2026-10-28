@@ -1,6 +1,6 @@
-# Backup do banco (Neon → Google Drive)
+# Backup do banco (Neon → Google Drive e espelho no Supabase)
 
-O Neon free guarda só 6 horas de histórico, então o backup é a nossa proteção real contra erro humano, carga errada ou perda do projeto.
+O Neon free guarda só 6 horas de histórico, então o backup é a nossa proteção real contra erro humano, carga errada ou perda do projeto. Além do backup criptografado no Drive, há um **espelho diário no Supabase** (segunda redundância).
 
 > **Estado (22/10/2026): funcional e comprovado.** Backups diários automáticos desde 21/10; restauração testada em Postgres temporário **e** em um branch real do Neon; cópia semanal e vigia de alerta ativos.
 
@@ -9,6 +9,7 @@ O Neon free guarda só 6 horas de histórico, então o backup é a nossa proteç
 | Workflow | Quando | O que faz |
 |---|---|---|
 | [`backup-banco.yml`](../.github/workflows/backup-banco.yml) — *Backup do banco* | diário (agendado para 03:00 Brasília) e sob demanda | dump criptografado → Drive |
+| [`backup-supabase.yml`](../.github/workflows/backup-supabase.yml) — *Backup no Supabase* | diário (04:30 Brasília) e sob demanda | restaura o banco num projeto dedicado do Supabase (espelho); ver a seção abaixo |
 | [`restore-test.yml`](../.github/workflows/restore-test.yml) — *Teste de restauração do backup* | dia 1 de cada mês e sob demanda | baixa o último backup e restaura em 2 destinos |
 | [`verificar-backup.yml`](../.github/workflows/verificar-backup.yml) — *Vigia do backup* | diário às 12:00 Brasília | **falha (e o GitHub envia e-mail)** se o backup ou o teste de restauração estiverem velhos |
 

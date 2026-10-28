@@ -1,6 +1,6 @@
 # Roadmap de melhorias
 
-Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **tamanho** aproximado (P = horas, M = dias, G = semanas). A prioridade é uma sugestão para validação do time.
+Estado em 28/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **tamanho** aproximado (P = horas, M = dias, G = semanas). A prioridade é uma sugestão para validação do time.
 
 ## 1. Onde estamos
 
@@ -12,7 +12,10 @@ Estado em 21/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | Aba **Oportunidades** (grade virtualizada, formulário, histórico, administração) | ✅ |
 | Carga da planilha por **merge** (`sync-db.mjs`) com relatório de qualidade | ✅ → **descontinuada em 27/10/2026** (o banco não é mais alimentado pela planilha) |
 | Backup diário criptografado no Google Drive + teste de restauração | ✅ |
-| Integração Radar → Planner (exportador, `planner-auto`, agendamento) | ✅ |
+| Integração Radar → Planner (exportador, `planner-auto`) **na nuvem**, disparada ao salvar (GitHub Actions, estado cifrado no banco) | ✅ (28/10) |
+| E-mails de nova oportunidade e de mudança de status, com todas as informações | ✅ (27/10) |
+| Espelho diário do banco no Supabase (segunda redundância) | ✅ (28/10) |
+| Campos novos: sigla (20), descritivo (60), duração do contrato em meses, valores em R$ com máscara | ✅ (27–28/10) |
 | Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) → **desativada e removida em 27/10/2026** |
 | Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ✅ (22/10) |
 
