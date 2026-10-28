@@ -1,0 +1,321 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Radar Pré-Vendas: API externa",
+    "version": "1.0.0",
+    "description": "Cria oportunidades no Radar como o cadastro manual (e-mail e cartão no Planner seguem o fluxo normal). Autenticação por chave de API (Bearer rdr_...). Texto completo: docs/API-EXTERNA.md."
+  },
+  "servers": [
+    {
+      "url": "https://radar-prevendas.pages.dev/api/externo"
+    }
+  ],
+  "security": [
+    {
+      "chaveApi": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "chaveApi": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Chave rdr_... criada em Administração → API (alternativa: cabeçalho x-api-key)."
+      }
+    },
+    "schemas": {
+      "Oportunidade": {
+        "type": "object",
+        "required": [
+          "status",
+          "orgao",
+          "descritivo",
+          "data_pregao_dt"
+        ],
+        "properties": {
+          "status": {
+            "description": "Status. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "sigla": {
+            "description": "Sigla. Até 20 caracteres. Não existe na planilha. texto",
+            "type": "string"
+          },
+          "orgao": {
+            "description": "Instituição / Órgão. texto",
+            "type": "string"
+          },
+          "descritivo": {
+            "description": "Descritivo. Até 60 caracteres (resumo curto); o detalhe vai em Objeto. texto (pode ter várias linhas)",
+            "type": "string"
+          },
+          "objeto": {
+            "description": "Objeto. O que está sendo contratado. Não existe na planilha: fica em branco nos registros importados. texto (pode ter várias linhas)",
+            "type": "string"
+          },
+          "processo": {
+            "description": "Processo/Pregão. texto",
+            "type": "string"
+          },
+          "uasg": {
+            "description": "UASG. texto",
+            "type": "string"
+          },
+          "uf": {
+            "description": "UF. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "data_distribuicao": {
+            "description": "Data de distribuição (envio do edital). data no formato AAAA-MM-DD",
+            "type": "string",
+            "format": "date",
+            "example": "2026-12-10"
+          },
+          "data_pregao_dt": {
+            "description": "Data do pregão. data no formato AAAA-MM-DD",
+            "type": "string",
+            "format": "date",
+            "example": "2026-12-10"
+          },
+          "hora_pregao": {
+            "description": "Hora do pregão. Opcional, horário de Brasília. A planilha só tem a data. hora HH:MM (horário de Brasília)",
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "example": "10:00"
+          },
+          "criterio": {
+            "description": "Critério. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "modalidade": {
+            "description": "Modalidade. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "duracao_contrato_meses": {
+            "description": "Duração do contrato (meses). Em meses, de 1 a 600. número inteiro",
+            "type": "integer"
+          },
+          "modo_disputa": {
+            "description": "Modo de disputa. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "origem_oportunidade": {
+            "description": "Origem. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "site": {
+            "description": "Site. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "vistoria": {
+            "description": "Vistoria. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "linha_servico": {
+            "description": "Linha de serviço. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "torre": {
+            "description": "Torre. Preenchida automaticamente pela linha de serviço. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "unidade_fornecimento": {
+            "description": "Unidade de fornecimento. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "conta_vinculada": {
+            "description": "Conta vinculada. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "analista": {
+            "description": "Pré-vendas. Marque um ou mais pré-vendas. texto: nome(s) de pré-vendas ativos, separados por vírgula",
+            "type": "string"
+          },
+          "orcamento": {
+            "description": "Orçamento (R$). número em reais, com ponto decimal (ex.: 1234.56)",
+            "type": "number",
+            "minimum": 0,
+            "example": 1234.56
+          },
+          "orcamento_sigiloso": {
+            "description": "Orçamento sigiloso. Marque quando o órgão não divulga o valor. true ou false",
+            "type": "boolean"
+          },
+          "valor_ctc": {
+            "description": "Valor CTC (R$). número em reais, com ponto decimal (ex.: 1234.56)",
+            "type": "number",
+            "minimum": 0,
+            "example": 1234.56
+          },
+          "custo_total_ctc": {
+            "description": "Custo total CTC (R$). número em reais, com ponto decimal (ex.: 1234.56)",
+            "type": "number",
+            "minimum": 0,
+            "example": 1234.56
+          },
+          "mc_ctc": {
+            "description": "MC CTC (%). fração (0.185 = 18,5%)",
+            "type": "number",
+            "example": 0.185
+          },
+          "simulacao_mc_arrematante": {
+            "description": "Simulação da MC × arrematante (%). fração (0.185 = 18,5%)",
+            "type": "number",
+            "example": 0.185
+          },
+          "impostos": {
+            "description": "Impostos (%). Percentual com duas casas decimais (ex.: 8,65). fração (0.185 = 18,5%)",
+            "type": "number",
+            "example": 0.185
+          },
+          "valor_vencedor": {
+            "description": "Valor vencedor (R$). número em reais, com ponto decimal (ex.: 1234.56)",
+            "type": "number",
+            "minimum": 0,
+            "example": 1234.56
+          },
+          "empresa_vencedora_cnpj": {
+            "description": "Empresa vencedora (CNPJ). Informe só o CNPJ: a razão social e se é matriz ou filial vêm da Receita Federal. 14 dígitos (com ou sem máscara); razão social e matriz/filial vêm da Receita",
+            "type": "string",
+            "example": "00000000000191"
+          },
+          "posicao_lance": {
+            "description": "Posição pós-lance CTC. número inteiro",
+            "type": "integer"
+          },
+          "situacao_lance": {
+            "description": "Situação do lance. Use quando não há posição (ex.: Desclassificada). texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "motivo_lost": {
+            "description": "Motivo do Lost. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "motivo_no_go": {
+            "description": "Motivo do No Go. texto: um dos valores da lista indicada",
+            "type": "string"
+          },
+          "detalhe_no_go": {
+            "description": "Detalhe do No Go. texto (pode ter várias linhas)",
+            "type": "string"
+          },
+          "observacoes": {
+            "description": "Acompanhamento / status / observações. texto (pode ter várias linhas)",
+            "type": "string"
+          },
+          "solicitante": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Quem pediu a criação na aplicação externa (opcional)."
+          }
+        }
+      },
+      "Erro": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "erros": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "campo": {
+                  "type": "string"
+                },
+                "mensagem": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/oportunidades": {
+      "post": {
+        "summary": "Cria uma oportunidade",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "description": "Repetir com a mesma chave devolve a oportunidade já criada, sem duplicar."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Oportunidade"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Repetição com a mesma Idempotency-Key: a oportunidade já criada, com \"idempotente\": true."
+          },
+          "201": {
+            "description": "Criada (o corpo é a oportunidade, com id, codigo AAAA-NNNN, versao, criado_por, solicitante e avisos)."
+          },
+          "400": {
+            "description": "Corpo que não é um objeto JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Chave ausente, inválida ou revogada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Corpo acima de 64 KB."
+          },
+          "422": {
+            "description": "Dados inválidos (lista \"erros\" com campo e mensagem).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campos": {
+      "get": {
+        "summary": "Catálogo dos campos, listas válidas e regras",
+        "responses": {
+          "200": {
+            "description": "campos, extras e regras"
+          },
+          "401": {
+            "description": "Chave ausente, inválida ou revogada."
+          }
+        }
+      }
+    }
+  }
+}

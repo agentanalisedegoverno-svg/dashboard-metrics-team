@@ -16,7 +16,7 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 | [docs/TESTES.md](docs/TESTES.md) | Bateria de testes: regressão, segurança, carga e desempenho; como rodar e achados |
 | [docs/BACKUP.md](docs/BACKUP.md) | Backup diário criptografado no Drive, restauração e teste |
 | [docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md](docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md) | **Decisão (27/10/2026): o banco não é mais alimentado pela planilha do Excel** (a carga foi desativada e removida) |
-| [docs/API-EXTERNA.md](docs/API-EXTERNA.md) | **API para outras aplicações criarem oportunidades** (chave por aplicação, campos, exemplos; atualize ao mudar um campo) |
+| [docs/API-EXTERNA.md](docs/API-EXTERNA.md) | **API para outras aplicações criarem oportunidades** (chave por aplicação, campos, exemplos, guia rápido, roteiro de teste; atualize ao mudar um campo). Especificação OpenAPI: [docs/api-externa.openapi.json](docs/api-externa.openapi.json) |
 | [docs/AGENTE-DE-CARGA.md](docs/AGENTE-DE-CARGA.md) | Histórico da carga automática da planilha (**descontinuada**) |
 | [planner-auto/](planner-auto/README.md) | Ferramenta que aplica os eventos do Radar no Planner |
 | [db/migrations/](db/migrations/) | Esquema, funções e privilégios do banco (migrações aditivas) |

@@ -8,6 +8,55 @@ Uma aplicação externa cria oportunidades no Radar Pré-Vendas **como se fosse 
 > 2. Se o campo for novo no banco, confira a migração (`criar_oportunidade`) e o esquema Zod (`src/domain/oportunidade.ts`): a API usa os dois.
 > 3. **Avise as aplicações que usam a API** (campo novo obrigatório quebra quem não o envia) e registre a mudança no [histórico](#histórico-de-mudanças) no fim.
 
+## Guia rápido para quem integra (uma página)
+
+| | |
+|---|---|
+| **URL base** | `https://radar-prevendas.pages.dev/api/externo` |
+| **Autenticação** | `Authorization: Bearer rdr_...` (a chave é entregue por um administrador do Radar; trate como senha) |
+| **Criar** | `POST /oportunidades` com JSON dos campos (obrigatórios: `status`, `orgao`, `descritivo`, `data_pregao_dt`; `torre` se não enviar `linha_servico`) |
+| **Quem pediu** | campo opcional `solicitante` (texto até 120): aparece no e-mail e no Planner |
+| **Não duplicar** | cabeçalho `Idempotency-Key: <id do pedido na origem>`; repetir devolve a mesma oportunidade (HTTP 200, `"idempotente": true`) |
+| **Listas válidas** | `GET /campos` (valores de status, UF, modalidade, linha de serviço etc.; mudam quando o administrador edita as listas) |
+| **Sucesso** | `201` com `id`, `codigo` (`AAAA-NNNN`) e `versao`. Guarde o `codigo`: é a chave da oportunidade no Radar e no Planner |
+| **Erros** | `401` chave inválida ou revogada · `422` dados inválidos (lista `erros` com `campo` e `mensagem`; corrija e repita com a mesma `Idempotency-Key`) · `413` corpo > 64 KB · `5xx` falha nossa (repita com a mesma `Idempotency-Key`) |
+| **Especificação** | [api-externa.openapi.json](api-externa.openapi.json) (OpenAPI 3, gerada dos campos do formulário; importe no Postman/Insomnia ou gere um cliente) |
+| **Ambiente de teste** | não existe: toda chamada cria uma oportunidade **real** (e-mail e cartão no Planner). Para testar, use `orgao` = "TESTE ..." e `data_pregao_dt` em 2099 e avise o time do Radar |
+| **Chamar de onde** | sempre de servidor (nunca do navegador: a chave ficaria exposta) |
+
+## Teste ponta a ponta e entrada em produção
+
+### Já validado (28/10/2026)
+- Migração `020` aplicada em produção; código publicado; regra **Bypass** do Cloudflare Access criada só para `/api/externo/*` (o painel e o resto da API continuam protegidos).
+- Sem chave ou com chave inexistente a API responde `401`; os demais caminhos respondem `302` (Access).
+- A função de criação foi executada **no banco de produção dentro de uma transação desfeita** (nada ficou gravado): criou como `web`, com `criado_por = api:<cliente>`, `solicitante`, versão 1, código `AAAA-NNNN`, **um** pedido de e-mail na fila e, repetida com a mesma `Idempotency-Key`, devolveu **a mesma oportunidade** com `idempotente = true`.
+- 502 testes automáticos (banco real em memória, rotas, segurança, e-mail, esquema OpenAPI).
+
+### Falta (precisa de uma pessoa)
+1. **Criar a chave** de teste (`teste-api`) em *Administração → API* e guardá-la.
+2. **Rodar o roteiro automático** (cria 1 oportunidade de teste; avise o time):
+   ```powershell
+   $env:RADAR_API_CHAVE = Read-Host "Cole a chave"
+   node scripts/teste-api-externa.mjs             # completo
+   node scripts/teste-api-externa.mjs --sem-criar # só leitura (não cria nada)
+   ```
+   O script confere: 401 sem chave, catálogo, validações (422/400), criação (201, código, `api:<cliente>`, solicitante, `fonte = web`) e a repetição com a mesma `Idempotency-Key` (200, mesma oportunidade). No fim lista o que conferir no e-mail e no Planner.
+3. **Conferir o e-mail e o cartão:** o e-mail "Nova oportunidade" chegou com *Cadastrada por: api:...* e *Solicitante (via API)*; em cerca de 1 minuto surgiu **um** cartão no Planner (plano ITS, coluna PROSPECT). Peça a conferência do banco a quem mantém o Radar (consulta abaixo).
+4. **Limpar:** arquivar a oportunidade de teste no Radar, apagar o cartão do Planner e **revogar a chave `teste-api`**.
+5. **Chave real:** criar a chave com o nome da aplicação integradora e entregá-la por canal seguro (cofre de senhas). Uma chave por aplicação; para trocar, crie a nova e revogue a antiga.
+6. **Limite de requisições (recomendado):** como `/api/externo/*` não passa pelo Access, crie no Cloudflare *Security → WAF → Rate limiting rules*: expressão `URI Path starts with "/api/externo"`, por exemplo 60 requisições por minuto por IP, ação **Block**. É mudança de segurança do Cloudflare (fica com o administrador).
+
+### Conferência no banco (administrador, depois do teste)
+```sql
+-- a oportunidade criada pela API e seu aviso de e-mail
+select o.codigo, o.fonte, o.criado_por, o.solicitante, o.versao, o.criado_em,
+       (select string_agg(f.tipo || ':' || f.situacao, ', ') from email_fila f where f.oportunidade_id = o.id) as avisos
+from oportunidades o where o.criado_por like 'api:%' order by o.id desc limit 5;
+
+-- uso das chaves
+select nome, ativo, criado_por, ultimo_uso_em, revogado_em from api_clientes order by id;
+```
+
 ## Como conectar
 
 1. Um **administrador do Radar** abre *Administração → API*, informa o nome da aplicação (ex.: `sistema-contratos`) e clica em **Criar chave**. A chave (`rdr_...`) aparece **uma única vez**: guarde em cofre de senhas. O banco guarda só o hash; não é possível recuperá-la depois (se perder, revogue e crie outra).

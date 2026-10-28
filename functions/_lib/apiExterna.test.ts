@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { TODOS_CAMPOS } from '../../src/features/oportunidades/campos.ts'
 import { oportunidadeInput } from '../../src/domain/oportunidade.ts'
@@ -22,7 +22,7 @@ vi.mock('./http.ts', async (importOriginal) => ({
   },
 }))
 
-import { catalogoCampos, chaveDaRequisicao, chaveIdempotencia, gerarChave, hashChave, rotaExterna, separarSolicitante } from './apiExterna.ts'
+import { catalogoCampos, chaveDaRequisicao, chaveIdempotencia, gerarChave, hashChave, openApi, rotaExterna, separarSolicitante } from './apiExterna.ts'
 import { criar } from './cadastro.ts'
 
 const CHAVE = 'rdr_' + 'A'.repeat(43)
@@ -138,5 +138,21 @@ describe('catálogo de campos e documentação (lembrete: mudou campo, atualize 
     const internos = new Set(['pendencias', 'empresa_vencedora_razao', 'empresa_vencedora_tipo', 'empresas_vencedoras'])
     const novos = chavesZod.filter((k) => !formulario.has(k) && !internos.has(k))
     expect(novos, 'campo novo no esquema sem constar no formulário nem na lista de internos (decida: documentar na API ou marcar como interno)').toEqual([])
+  })
+})
+
+describe('especificação OpenAPI (docs/api-externa.openapi.json)', () => {
+  const arquivo = new URL('../../docs/api-externa.openapi.json', import.meta.url)
+  const esperado = JSON.stringify(openApi(catalogoCampos({})), null, 2) + '\n'
+  it('está em dia com o formulário (se falhar: rode UPDATE_OPENAPI=1 npx vitest run functions/_lib/apiExterna.test.ts e faça commit do arquivo)', () => {
+    if (process.env.UPDATE_OPENAPI) writeFileSync(arquivo, esperado, 'utf8')
+    expect(readFileSync(arquivo, 'utf8').replace(/\r\n/g, '\n')).toBe(esperado)
+  })
+  it('exige exatamente os campos obrigatórios do catálogo e aceita todos os campos do formulário', () => {
+    const o = openApi(catalogoCampos({})) as { components: { schemas: { Oportunidade: { required: string[]; properties: Record<string, unknown> } } } }
+    const esq = o.components.schemas.Oportunidade
+    expect(esq.required).toEqual(['status', 'orgao', 'descritivo', 'data_pregao_dt'])
+    for (const c of TODOS_CAMPOS) expect(esq.properties, c.nome).toHaveProperty(c.nome)
+    expect(esq.properties).toHaveProperty('solicitante')
   })
 })

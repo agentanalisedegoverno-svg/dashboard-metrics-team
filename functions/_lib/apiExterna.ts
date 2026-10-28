@@ -119,6 +119,71 @@ export const REGRAS = [
   'Valores monetários não podem ser negativos; orcamento_sigiloso=true esconde o orçamento no e-mail e no Planner.',
 ] as const
 
+/** Esquema OpenAPI 3.0 da API externa, gerado do catálogo (docs/api-externa.openapi.json; um teste confere que está em dia). */
+export function openApi(catalogo: CampoApi[]) {
+  const tipoJson = (c: CampoApi): Record<string, unknown> => {
+    const base: Record<string, unknown> = { description: [c.rotulo, c.dica, c.formato].filter(Boolean).join('. ') }
+    switch (c.tipo) {
+      case 'data': return { ...base, type: 'string', format: 'date', example: '2026-12-10' }
+      case 'hora': return { ...base, type: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', example: '10:00' }
+      case 'dinheiro': return { ...base, type: 'number', minimum: 0, example: 1234.56 }
+      case 'percentual': return { ...base, type: 'number', example: 0.185 }
+      case 'inteiro': return { ...base, type: 'integer' }
+      case 'bool': return { ...base, type: 'boolean' }
+      case 'cnpj': return { ...base, type: 'string', example: '00000000000191' }
+      default: return { ...base, type: 'string' }
+    }
+  }
+  const erro = { type: 'object', properties: { error: { type: 'string' }, erros: { type: 'array', items: { type: 'object', properties: { campo: { type: 'string' }, mensagem: { type: 'string' } } } } } }
+  return {
+    openapi: '3.0.3',
+    info: {
+      title: 'Radar Pré-Vendas: API externa',
+      version: '1.0.0',
+      description: 'Cria oportunidades no Radar como o cadastro manual (e-mail e cartão no Planner seguem o fluxo normal). Autenticação por chave de API (Bearer rdr_...). Texto completo: docs/API-EXTERNA.md.',
+    },
+    servers: [{ url: 'https://radar-prevendas.pages.dev/api/externo' }],
+    security: [{ chaveApi: [] }],
+    components: {
+      securitySchemes: { chaveApi: { type: 'http', scheme: 'bearer', description: 'Chave rdr_... criada em Administração → API (alternativa: cabeçalho x-api-key).' } },
+      schemas: {
+        Oportunidade: {
+          type: 'object',
+          required: catalogo.filter((c) => c.obrigatorio).map((c) => c.nome),
+          properties: {
+            ...Object.fromEntries(catalogo.map((c) => [c.nome, tipoJson(c)])),
+            solicitante: { type: 'string', maxLength: 120, description: 'Quem pediu a criação na aplicação externa (opcional).' },
+          },
+        },
+        Erro: erro,
+      },
+    },
+    paths: {
+      '/oportunidades': {
+        post: {
+          summary: 'Cria uma oportunidade',
+          parameters: [{ name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string', minLength: 1, maxLength: 100 }, description: 'Repetir com a mesma chave devolve a oportunidade já criada, sem duplicar.' }],
+          requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/Oportunidade' } } } },
+          responses: {
+            '201': { description: 'Criada (o corpo é a oportunidade, com id, codigo AAAA-NNNN, versao, criado_por, solicitante e avisos).' },
+            '200': { description: 'Repetição com a mesma Idempotency-Key: a oportunidade já criada, com "idempotente": true.' },
+            '400': { description: 'Corpo que não é um objeto JSON.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Erro' } } } },
+            '401': { description: 'Chave ausente, inválida ou revogada.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Erro' } } } },
+            '413': { description: 'Corpo acima de 64 KB.' },
+            '422': { description: 'Dados inválidos (lista "erros" com campo e mensagem).', content: { 'application/json': { schema: { $ref: '#/components/schemas/Erro' } } } },
+          },
+        },
+      },
+      '/campos': {
+        get: {
+          summary: 'Catálogo dos campos, listas válidas e regras',
+          responses: { '200': { description: 'campos, extras e regras' }, '401': { description: 'Chave ausente, inválida ou revogada.' } },
+        },
+      },
+    },
+  }
+}
+
 // ---------------------------------------------------------------- rota com chave de API
 
 type ArgsExterno = { sql: Sql; cliente: string; request: Request; env: Env; corpo: () => Promise<unknown> }
