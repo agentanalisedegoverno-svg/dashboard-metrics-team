@@ -14,7 +14,7 @@ beforeAll(async () => {
 const PAPEIS = ['radar_leitor', 'radar_escritor', 'radar_app', 'radar_planner', 'radar_email'] as const
 const TABELAS = [
   'oportunidades', 'oportunidades_historico', 'opcoes', 'usuarios', 'carga_status', 'linhas_torre', 'codigo_sequencia',
-  'planner_marco', 'planner_exportacao', 'email_config', 'email_destinatarios', 'email_fila',
+  'planner_marco', 'planner_exportacao', 'planner_auto_estado', 'email_config', 'email_destinatarios', 'email_fila', 'api_clientes', 'api_idempotencia',
 ] as const
 const ACOES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'] as const
 
@@ -30,6 +30,7 @@ const TABELA_PERMITIDA: Record<string, Record<string, string[]>> = {
   },
   radar_planner: {
     oportunidades: ['SELECT'], usuarios: ['SELECT'], planner_marco: ['SELECT', 'UPDATE'], planner_exportacao: ['SELECT', 'INSERT', 'UPDATE'],
+    planner_auto_estado: ['SELECT', 'INSERT', 'UPDATE'],
   },
   radar_email: {
     oportunidades: ['SELECT'], email_config: ['SELECT'], email_destinatarios: ['SELECT'], email_fila: ['SELECT', 'UPDATE'],
@@ -81,6 +82,11 @@ const FUNCAO_PERMITIDA: Record<string, string[] | 'PUBLIC'> = {
   salvar_usuario: ['radar_app'],
   salvar_email_config: ['radar_app'],
   enfileirar_email_teste: ['radar_app'],
+  autenticar_api_cliente: ['radar_app'],
+  criar_oportunidade_api: ['radar_app'],
+  listar_api_clientes: ['radar_app'],
+  criar_api_cliente: ['radar_app'],
+  revogar_api_cliente: ['radar_app'],
   eh_admin: ['radar_app'],
   eh_somente_leitura: [],
   proximo_codigo: [],
@@ -189,6 +195,10 @@ describe('papéis em ação (privilégios reais)', () => {
       `select salvar_email_config(true, ARRAY['Go'], '[{"email":"a@x.com"}]'::jsonb, '${ADMIN}', false)`,
       `select enfileirar_email_teste('${ADMIN}')`,
       `select eh_admin('${ADMIN}')`,
+      `select criar_api_cliente('intruso', '${'c'.repeat(64)}', '${ADMIN}')`,
+      `select listar_api_clientes('${ADMIN}')`,
+      `select criar_oportunidade_api('{}'::jsonb, 'sistema-x', null, null)`,
+      `select autenticar_api_cliente('${'c'.repeat(64)}')`,
     ]
     for (const papel of ['radar_leitor', 'radar_escritor', 'radar_planner', 'radar_email']) {
       for (const sql of tentativas) {

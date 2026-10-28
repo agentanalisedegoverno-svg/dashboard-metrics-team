@@ -46,6 +46,7 @@ export function secoesNota(d: Record<string, unknown>): SecaoNota[] {
   const pend = Array.isArray(d.pendencias) ? (d.pendencias as string[]) : []
   const fim: [string, string][] = [['Pendências', pend.length ? pend.join(', ') : 'nenhuma']]
   if (!vazio(d.criado_por)) fim.push(['Cadastrada por', limpa(d.criado_por)])
+  if (!vazio(d.solicitante)) fim.push(['Solicitante (via API)', limpa(d.solicitante)]) // quem pediu a criação na aplicação externa
   secoes.push({ titulo: '', itens: fim })
   return secoes
 }
