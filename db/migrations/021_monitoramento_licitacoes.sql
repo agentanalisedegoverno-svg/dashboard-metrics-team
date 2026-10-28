@@ -97,6 +97,8 @@ DECLARE
   v_status text;
   v_portal text;
   v_url text;
+  v_identificador text;
+  v_match text[];
   v_ativa boolean;
 BEGIN
   IF TG_OP = 'UPDATE'
@@ -108,7 +110,7 @@ BEGIN
     RETURN NEW;
   END IF;
   v_status := lower(btrim(coalesce(NEW.status, '')));
-  v_ativa := NEW.arquivado_em IS NULL AND v_status IN ('prospect', 'go', 'onboarding', 'on going');
+  v_ativa := NEW.arquivado_em IS NULL AND v_status IN ('prospect', 'go', 'onboarding', 'on going', 'ongoing', 'suspenso', 'suspensa', 'suspended');
   v_url := nullif(btrim(coalesce(NEW.site, '')), '');
   v_portal := CASE
     WHEN coalesce(v_url, '') ~* 'pncp\.gov\.br' THEN 'PNCP'
@@ -116,15 +118,24 @@ BEGIN
     ELSE NULL
   END;
 
+  v_identificador := NULL;
+  IF v_portal = 'PNCP' THEN
+    v_match := regexp_match(v_url, '/app/editais/(\\d{14})/(\\d{4})/(\\d+)');
+    IF v_match IS NULL THEN v_match := regexp_match(v_url, '/orgaos/(\\d{14})/compras/(\\d{4})/(\\d+)'); END IF;
+    IF v_match IS NOT NULL THEN v_identificador := v_match[1] || '-1-' || v_match[3] || '/' || v_match[2]; END IF;
+  END IF;
+
   IF v_ativa THEN
-    INSERT INTO monitor_licitacoes (oportunidade_id, portal, url_oficial, estado_vinculo, habilitado)
-    VALUES (NEW.id, v_portal, CASE WHEN v_url ~* '^https?://' THEN v_url ELSE NULL END,
-      CASE WHEN v_portal IS NULL THEN 'pendente' ELSE 'pendente' END, true)
+    INSERT INTO monitor_licitacoes (oportunidade_id, portal, identificador_externo, url_oficial, estado_vinculo, habilitado)
+    VALUES (NEW.id, v_portal, v_identificador, CASE WHEN v_url ~* '^https?://' THEN v_url ELSE NULL END,
+      CASE WHEN v_identificador IS NOT NULL THEN 'vinculado' ELSE 'pendente' END, true)
     ON CONFLICT (oportunidade_id) DO UPDATE SET
       habilitado = true,
       estado_vinculo = CASE WHEN monitor_licitacoes.identificador_externo IS NOT NULL THEN 'vinculado' ELSE 'pendente' END,
-      portal = coalesce(monitor_licitacoes.portal, EXCLUDED.portal),
-      url_oficial = coalesce(monitor_licitacoes.url_oficial, EXCLUDED.url_oficial),
+      portal = coalesce(EXCLUDED.portal, monitor_licitacoes.portal),
+      identificador_externo = coalesce(EXCLUDED.identificador_externo, monitor_licitacoes.identificador_externo),
+      url_oficial = coalesce(EXCLUDED.url_oficial, monitor_licitacoes.url_oficial),
+      estado_vinculo = CASE WHEN coalesce(EXCLUDED.identificador_externo, monitor_licitacoes.identificador_externo) IS NOT NULL THEN 'vinculado' ELSE 'pendente' END,
       atualizado_em = now();
   ELSIF TG_OP = 'UPDATE' AND EXISTS (SELECT 1 FROM monitor_licitacoes WHERE oportunidade_id = NEW.id) THEN
     UPDATE monitor_licitacoes SET habilitado = false, estado_vinculo = 'pausado', atualizado_em = now()
@@ -147,7 +158,7 @@ SELECT o.id,
   CASE WHEN coalesce(o.site, '') ~* '^https?://' THEN o.site ELSE NULL END
 FROM oportunidades o
 WHERE o.arquivado_em IS NULL
-  AND lower(btrim(coalesce(o.status, ''))) IN ('prospect', 'go', 'onboarding', 'on going')
+  AND lower(btrim(coalesce(o.status, ''))) IN ('prospect', 'go', 'onboarding', 'on going', 'ongoing', 'suspenso', 'suspensa', 'suspended')
 ON CONFLICT (oportunidade_id) DO NOTHING;;
 
 COMMENT ON TABLE monitor_licitacoes IS 'Fila e configuração de acompanhamento de licitações vinculadas a oportunidades do Radar.';
@@ -177,3 +188,6 @@ GRANT INSERT ON oportunidades_historico TO radar_app;;
 GRANT USAGE, SELECT ON SEQUENCE oportunidades_historico_id_seq TO radar_app;;
 GRANT SELECT ON monitor_licitacoes, monitor_licitacoes_coletas, monitor_licitacoes_snapshots,
   monitor_licitacoes_eventos, monitor_licitacoes_alertas TO radar_leitor;;
+GRANT SELECT, INSERT ON monitor_licitacoes_auditoria TO radar_app;;
+GRANT USAGE, SELECT ON SEQUENCE monitor_licitacoes_auditoria_id_seq TO radar_app;;
+GRANT SELECT ON monitor_licitacoes_auditoria TO radar_leitor;;
