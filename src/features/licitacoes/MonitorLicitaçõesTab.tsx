@@ -57,7 +57,7 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
     { path: 'modulo-legado/1_consultarLicitacao', params: { data_publicacao_inicial: de, data_publicacao_final: ate } },
   ]
   const tentativas = await Promise.allSettled(consultas.map(async ({ path, params }) => {
-    const url = new URL('/comprasgov/' + path, window.location.origin)
+    const url = new URL('/pncp/comprasgov/' + path, window.location.origin)
     url.searchParams.set('pagina', '1')
     url.searchParams.set('tamanhoPagina', '100')
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value))
@@ -164,7 +164,6 @@ export default function MonitorLicitaçõesTab() {
       lista.refetch(),
     ])
   }
-  const fontesFalharam = consultas.filter(q => q.isError).length
   const fontesOk = consultas.filter(q => q.isSuccess).length
   const totalResultados = consultas.reduce((n, q) => n + (q.data?.length ?? 0), 0) + (comprasGov.data?.length ?? 0)
   const totalComCandidato = elegiveis.filter(o => {
@@ -182,7 +181,12 @@ export default function MonitorLicitaçõesTab() {
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {[{label:'Oportunidades acompanhadas',value:lista.isPending?'—':elegiveis.length},{label:'Consultas por UF',value:ufs.length},{label:'Com correspondência candidata',value:lista.isPending?'—':totalComCandidato},{label:'Alertas críticos',value:lista.isPending?'—':criticos}].map(k=><div key={k.label} className="rounded-xl border border-line bg-surface p-4 shadow-card"><p className="text-xs text-muted">{k.label}</p><p className="mt-2 font-mono text-2xl font-medium tabular-nums text-ink">{k.value}</p></div>)}
     </div>
-    <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted"/><p>O PNCP consultado retorna contratações com recebimento de propostas. Não garante cobertura de processos encerrados, suspensos ou de portais privados. Compatibilidade é sugestão automática, não confirmação de vínculo oficial.</p></div>
+    <div className="grid gap-3 md:grid-cols-3">
+      <div className="rounded-xl border border-st-critical/30 bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><AlertTriangle className="size-4 text-st-critical"/>Ação necessária</div><p className="mt-1 text-xs text-muted">{criticos} oportunidade(s) exigem correção de cadastro, validação ou nova consulta.</p></div>
+      <div className="rounded-xl border border-st-warning/30 bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><Clock3 className="size-4 text-st-warning"/>Em revisão</div><p className="mt-1 text-xs text-muted">{atencao} oportunidade(s) precisam de conferência operacional.</p></div>
+      <div className="rounded-xl border border-st-success/30 bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><CheckCircle2 className="size-4 text-st-success"/>Correspondências candidatas</div><p className="mt-1 text-xs text-muted">{totalComCandidato} oportunidade(s) têm registros para conferir nas fontes consultadas.</p></div>
+    </div>
+    <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted"/><p>O PNCP retorna contratações com propostas abertas nesta consulta. Isso não cobre, por si só, sessões encerradas, alterações em tempo real ou todos os portais. Correspondência automática é hipótese e precisa ser confirmada com o identificador oficial.</p></div>
     <div className="rounded-xl border border-line bg-surface p-4">
     <div className="rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">Teste da fonte alternativa · Compras.gov.br</h2><p className="text-xs text-muted">Pregões e licitações legadas publicados nos últimos 45 dias · somente leitura</p></div><span className="rounded-md border border-line px-2 py-1 text-xs text-muted">{comprasGov.isSuccess ? (comprasGov.data?.length ?? 0)+' registros' : comprasGov.isError ? 'Fonte indisponível' : 'Consultando…'}</span></div>
