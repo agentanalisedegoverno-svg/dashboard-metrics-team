@@ -104,6 +104,14 @@ describe('e-mail com todas as informações da oportunidade (como a anotação d
     expect(m.html).toContain('Linha 1\nLinha 2 &lt;b&gt;')
     expect(m.html).not.toContain('<b>')
   })
+  it('oportunidade criada pela API mostra a aplicação em "Cadastrada por" e o "Solicitante (via API)"; a manual não mostra solicitante', () => {
+    const api = montarEmail({ ...base, dados: { ...dados, criado_por: 'api:sistema-contratos', solicitante: 'Maria Souza (Contratos)', duracao_contrato_meses: 24 } }, 'u')
+    expect(api.texto).toContain('Cadastrada por: api:sistema-contratos')
+    expect(api.texto).toContain('Solicitante (via API): Maria Souza (Contratos)')
+    expect(api.texto).toContain('Duração do contrato (meses): 24')
+    expect(api.html).toContain('Solicitante (via API)')
+    expect(nova.texto).not.toContain('Solicitante')
+  })
   it('orçamento sigiloso não mostra valor', () => {
     const m = montarEmail({ ...base, dados: { ...dados, orcamento_sigiloso: true } }, 'u')
     expect(m.texto).toContain('Orçamento (R$): Sigiloso')

@@ -15,7 +15,7 @@ Estado em 28/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | Integração Radar → Planner (exportador, `planner-auto`) **na nuvem**, disparada ao salvar (GitHub Actions, estado cifrado no banco) | ✅ (28/10) |
 | E-mails de nova oportunidade e de mudança de status, com todas as informações | ✅ (27/10) |
 | Espelho diário do banco no Supabase (segunda redundância) | ✅ (28/10) |
-| API externa para outras aplicações criarem oportunidades (chave por aplicação, idempotência, solicitante) | ✅ (28/10); falta o administrador do Cloudflare criar o Bypass do Access em `/api/externo/*` |
+| API externa para outras aplicações criarem oportunidades (chave por aplicação, idempotência, solicitante) | ✅ (28/10); Bypass do Access criado e função validada em produção (sem rastro); **falta**: teste ponta a ponta com chave (`scripts/teste-api-externa.mjs`), chave da aplicação real e regra de *rate limiting* no Cloudflare |
 | Campos novos: sigla (20), descritivo (60), duração do contrato em meses, valores em R$ com máscara | ✅ (27–28/10) |
 | Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) → **desativada e removida em 27/10/2026** |
 | Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ✅ (22/10) |
