@@ -36,7 +36,7 @@ function Vincular({ item, onClose }: { item: Monitor; onClose: () => void }) {
   const qc = useQueryClient()
   const [portal, setPortal] = useState<'PNCP' | 'COMPRAS_GOV'>(item.portal === 'COMPRAS_GOV' ? 'COMPRAS_GOV' : 'PNCP')
   const [identificador, setIdentificador] = useState(item.identificador_externo ?? '')
-  const [url, setUrl] = useState(item.url_oficial ?? item.site ?? '')
+  const [url, setUrl] = useState(item.url_oficial ?? (item.site?.startsWith('http') ? item.site : ''))
   const [habilitado, setHabilitado] = useState(item.habilitado)
   const salvar = useMutation({
     mutationFn: () => request(`/monitor-licitacoes/${item.oportunidade_id}`, { method: 'PUT', body: JSON.stringify({ portal, identificador_externo: identificador, url_oficial: url, habilitado }) }),
