@@ -29,7 +29,7 @@ async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem
   url.searchParams.set('pagina', '1')
   url.searchParams.set('tamanhoPagina', '50')
   url.searchParams.set('uf', uf)
-  const response = await fetch(url, { headers: { accept: 'application/json' }, signal })
+  // O PNCP pode ficar sem responder; não deixe uma consulta presa indefinidamente.\n  const timeout = AbortSignal.timeout(12_000)\n  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout\n  const response = await fetch(url, { headers: { accept: 'application/json' }, signal: requestSignal })
   if (!response.ok) throw new Error('PNCP respondeu HTTP ' + response.status)
   const json = await response.json() as PncpResponse | PncpItem[]
   if (Array.isArray(json)) return json
@@ -70,7 +70,7 @@ export default function MonitorLicitaçõesTab() {
   const consultas = useQueries({ queries: ufs.map(uf => ({
     queryKey: ['pncp-licitacoes-front', uf],
     queryFn: ({ signal }: { signal: AbortSignal }) => consultarPncp(uf, signal),
-    staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 1, refetchOnWindowFocus: false,
+    staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false,
   })) })
   const atualizando = lista.isFetching || consultas.some(q => q.isFetching)
   const porUf = useMemo(() => new Map(ufs.map((uf, i) => [uf, consultas[i]])), [ufs, consultas])
@@ -129,8 +129,8 @@ export default function MonitorLicitaçõesTab() {
         return <article key={o.id} className="rounded-lg border border-line p-3">
           <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-semibold text-ink">{(o.codigo ?? '#'+o.id) + ' · ' + o.orgao}</p><p className="mt-1 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p><p className="mt-1 text-xs text-muted">Processo/pregão: {o.processo || 'Não informado'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}</p><p className="mt-1 text-xs text-muted">Portal informado: {o.site || 'Não informado'} · Pregão: {data(o.data_pregao_dt)}</p></div><span className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs text-ink">{o.status}</span></div>
           <div className="mt-3 border-t border-line pt-3">
-            {consulta?.isPending || !consulta ? <p className="text-xs text-muted">Aguardando consulta do PNCP{uf ? ' ('+uf+')' : ''}…</p> :
-            consulta.isError ? <div className="text-xs text-st-critical"><p>Consulta PNCP indisponível nesta sessão.</p><p className="mt-1 break-words text-muted">Detalhe técnico: {(consulta.error as Error)?.message || 'Falha de rede ou bloqueio CORS.'}</p><button type="button" onClick={() => qc.refetchQueries({ queryKey: ['pncp-licitacoes-front', uf], type: 'active' })} className="mt-1 font-semibold underline">Tentar novamente nesta UF</button></div> :
+            {!uf ? <p className="text-xs text-muted">Consulta não executada: esta oportunidade está sem UF válida no cadastro.</p> : consulta?.isPending || !consulta ? <p className="text-xs text-muted">Aguardando consulta do PNCP ({uf})… A consulta será encerrada automaticamente após 12 segundos se a fonte não responder.</p> :
+            consulta.isError ? <div className="text-xs text-st-critical"><p>Consulta PNCP indisponível nesta sessão (tempo limite de 12 s ou falha da fonte).</p><p className="mt-1 break-words text-muted">Detalhe técnico: {(consulta.error as Error)?.message || 'Falha de rede ou bloqueio CORS.'}</p><button type="button" onClick={() => qc.refetchQueries({ queryKey: ['pncp-licitacoes-front', uf], type: 'active' })} className="mt-1 font-semibold underline">Tentar novamente nesta UF</button></div> :
             matches.length===0 ? <p className="text-xs text-muted">Nenhum candidato compatível entre os resultados abertos consultados para {uf}. Isso não significa que o certame não exista.</p> :
             <div className="space-y-2"><p className="text-xs font-semibold text-ink"><Activity className="mr-1 inline size-3.5"/>Possíveis correspondências no PNCP</p>{matches.map((m,i)=><div key={m.item.numeroControlePNCP || i} className="rounded-md bg-surface-2 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-medium text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'}</p><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">Compatibilidade {m.score}</span></div><p className="mt-1 text-xs text-ink-soft">{(m.item.processo ? 'Processo '+m.item.processo+' · ' : '')+(m.item.objetoCompra || m.item.informacaoComplementar || 'Objeto não informado')}</p><p className="mt-1 text-xs text-muted">{m.motivos.join(' · ')} · Situação: {m.item.situacaoCompraNome || 'Não informada'} · Encerramento: {data(m.item.dataEncerramentoProposta)}</p>{m.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer">Abrir contratação no PNCP <ExternalLink className="size-3"/></a>}</div>)}</div>}
           </div>
