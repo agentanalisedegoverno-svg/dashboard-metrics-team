@@ -29,7 +29,8 @@ async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem
   url.searchParams.set('pagina', '1')
   url.searchParams.set('tamanhoPagina', '50')
   url.searchParams.set('uf', uf)
-  // O PNCP pode ficar sem responder; não deixe uma consulta presa indefinidamente.\n  const timeout = AbortSignal.timeout(12_000)\n  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout\n  const response = await fetch(url, { headers: { accept: 'application/json' }, signal: requestSignal })
+  // O PNCP pode ficar sem responder; não deixe uma consulta presa indefinidamente.
+  const timeout = AbortSignal.timeout(12_000)\n  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout\n  const response = await fetch(url, { headers: { accept: 'application/json' }, signal: requestSignal })
   if (!response.ok) throw new Error('PNCP respondeu HTTP ' + response.status)
   const json = await response.json() as PncpResponse | PncpItem[]
   if (Array.isArray(json)) return json
