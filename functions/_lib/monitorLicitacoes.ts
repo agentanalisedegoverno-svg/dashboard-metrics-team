@@ -68,7 +68,7 @@ export async function vincularMonitoramento(sql: Sql, email: string, rawId: stri
         url_oficial=excluded.url_oficial, habilitado=excluded.habilitado,
         estado_vinculo=case when excluded.habilitado then 'vinculado' else 'pausado' end,
         proxima_coleta_em=now(), atualizado_em=now()
-      returning to_jsonb(monitor_licitacoes.*) as m
+      returning to_jsonb(monitor_licitacoes) as m
     `
     if (!m) return send(404, { error: 'Oportunidade não encontrada ou arquivada.' })
     await sql`
