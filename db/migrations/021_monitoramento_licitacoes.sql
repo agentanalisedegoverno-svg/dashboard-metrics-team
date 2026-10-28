@@ -111,6 +111,7 @@ BEGIN
       CASE WHEN v_portal IS NULL THEN 'pendente' ELSE 'pendente' END, true)
     ON CONFLICT (oportunidade_id) DO UPDATE SET
       habilitado = true,
+      estado_vinculo = CASE WHEN monitor_licitacoes.identificador_externo IS NOT NULL THEN 'vinculado' ELSE 'pendente' END,
       portal = coalesce(monitor_licitacoes.portal, EXCLUDED.portal),
       url_oficial = coalesce(monitor_licitacoes.url_oficial, EXCLUDED.url_oficial),
       atualizado_em = now();
