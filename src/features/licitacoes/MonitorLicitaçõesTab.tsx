@@ -27,7 +27,7 @@ async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem
   const url = new URL('https://pncp.gov.br/api/consulta/v1/contratacoes/proposta')
   url.searchParams.set('dataFinal', hoje())
   url.searchParams.set('pagina', '1')
-  url.searchParams.set('tamanhoPagina', '100')
+  url.searchParams.set('tamanhoPagina', '50')
   url.searchParams.set('uf', uf)
   const response = await fetch(url, { headers: { accept: 'application/json' }, signal })
   if (!response.ok) throw new Error('PNCP respondeu HTTP ' + response.status)
@@ -80,8 +80,14 @@ export default function MonitorLicitaçõesTab() {
       (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.site].join(' ')).includes(q)))
   }, [elegiveis, filtroStatus, busca])
   const consultarNovamente = async () => {
-    await Promise.all([qc.invalidateQueries({ queryKey: ['oportunidades'] }), qc.invalidateQueries({ queryKey: ['pncp-licitacoes-front'] })])
-    await lista.refetch()
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['oportunidades'] }),
+      qc.invalidateQueries({ queryKey: ['pncp-licitacoes-front'] }),
+    ])
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['pncp-licitacoes-front'], type: 'active' }),
+      lista.refetch(),
+    ])
   }
   const fontesFalharam = consultas.filter(q => q.isError).length
   const fontesOk = consultas.filter(q => q.isSuccess).length
@@ -113,7 +119,7 @@ export default function MonitorLicitaçõesTab() {
           <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-semibold text-ink">{(o.codigo ?? '#'+o.id) + ' · ' + o.orgao}</p><p className="mt-1 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p><p className="mt-1 text-xs text-muted">Processo/pregão: {o.processo || 'Não informado'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}</p><p className="mt-1 text-xs text-muted">Portal informado: {o.site || 'Não informado'} · Pregão: {data(o.data_pregao_dt)}</p></div><span className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs text-ink">{o.status}</span></div>
           <div className="mt-3 border-t border-line pt-3">
             {consulta?.isPending || !consulta ? <p className="text-xs text-muted">Aguardando consulta do PNCP{uf ? ' ('+uf+')' : ''}…</p> :
-            consulta.isError ? <p className="text-xs text-st-critical">Consulta PNCP indisponível nesta sessão. Tente atualizar as consultas.</p> :
+            consulta.isError ? <div className="text-xs text-st-critical"><p>Consulta PNCP indisponível nesta sessão.</p><p className="mt-1 break-words text-muted">Detalhe técnico: {(consulta.error as Error)?.message || 'Falha de rede ou bloqueio CORS.'}</p><button type="button" onClick={() => qc.refetchQueries({ queryKey: ['pncp-licitacoes-front', uf], type: 'active' })} className="mt-1 font-semibold underline">Tentar novamente nesta UF</button></div> :
             matches.length===0 ? <p className="text-xs text-muted">Nenhum candidato compatível entre os resultados abertos consultados para {uf}. Isso não significa que o certame não exista.</p> :
             <div className="space-y-2"><p className="text-xs font-semibold text-ink"><Activity className="mr-1 inline size-3.5"/>Possíveis correspondências no PNCP</p>{matches.map((m,i)=><div key={m.item.numeroControlePNCP || i} className="rounded-md bg-surface-2 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-medium text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'}</p><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">Compatibilidade {m.score}</span></div><p className="mt-1 text-xs text-ink-soft">{(m.item.processo ? 'Processo '+m.item.processo+' · ' : '')+(m.item.objetoCompra || m.item.informacaoComplementar || 'Objeto não informado')}</p><p className="mt-1 text-xs text-muted">{m.motivos.join(' · ')} · Situação: {m.item.situacaoCompraNome || 'Não informada'} · Encerramento: {data(m.item.dataEncerramentoProposta)}</p>{m.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer">Abrir contratação no PNCP <ExternalLink className="size-3"/></a>}</div>)}</div>}
           </div>
