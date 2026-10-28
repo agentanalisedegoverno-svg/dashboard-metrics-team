@@ -2,8 +2,9 @@
 //
 // Uso (PowerShell):
 //   $env:RADAR_API_CHAVE = Read-Host "Cole a chave"      # a chave nunca é impressa nem gravada
-//   node scripts/teste-api-externa.mjs                    # roda tudo (CRIA UMA OPORTUNIDADE DE TESTE)
+//   node scripts/teste-api-externa.mjs --simular          # RECOMENDADO: roda tudo SEM gravar nada (nem e-mail, nem cartão): o Radar executa a criação e desfaz
 //   node scripts/teste-api-externa.mjs --sem-criar        # só leitura: chave, catálogo e validações (não cria nada)
+//   node scripts/teste-api-externa.mjs                    # roda tudo (CRIA UMA OPORTUNIDADE DE TESTE de verdade)
 //
 // Variáveis: RADAR_API_CHAVE (obrigatória), RADAR_URL (padrão https://radar-prevendas.pages.dev).
 // ATENÇÃO: sem --sem-criar, cria uma oportunidade REAL (órgão "TESTE API (pode apagar)"): dispara e-mail e cartão no Planner.
@@ -12,6 +13,7 @@
 const URL_BASE = (process.env.RADAR_URL || 'https://radar-prevendas.pages.dev').replace(/\/$/, '')
 const CHAVE = process.env.RADAR_API_CHAVE || ''
 const SO_LEITURA = process.argv.includes('--sem-criar')
+const SIMULAR = process.argv.includes('--simular')
 
 if (!/^rdr_[A-Za-z0-9_-]{20,80}$/.test(CHAVE)) {
   console.error('Defina RADAR_API_CHAVE com a chave da aplicação (formato rdr_...). Ex.: $env:RADAR_API_CHAVE = Read-Host "Cole a chave"')
@@ -40,7 +42,7 @@ async function chamar(caminho, { metodo = 'GET', corpo, cabecalhos = {}, comChav
   return { status: res.status, json }
 }
 
-console.log(`\nAPI externa do Radar: ${URL_BASE}${SO_LEITURA ? '  (somente leitura)' : '  (vai criar 1 oportunidade de teste)'}\n`)
+console.log(`\nAPI externa do Radar: ${URL_BASE}${SO_LEITURA ? '  (somente leitura)' : SIMULAR ? '  (simulação: nada é gravado)' : '  (vai criar 1 oportunidade de teste)'}\n`)
 
 // 1. Segurança básica
 console.log('1. Segurança')
@@ -75,6 +77,28 @@ ok('valor fora da lista -> 422 apontando o campo status', listaErrada.status ===
 
 if (SO_LEITURA) {
   console.log('\nModo somente leitura: nada foi criado.')
+} else if (SIMULAR) {
+  // 4. Simulação: o Radar executa a criação inteira (validações, gatilhos, código, e-mail) e desfaz tudo no fim
+  console.log('\n4. Simulação da criação (não grava nada, não envia e-mail, não cria cartão)')
+  const dados = {
+    solicitante: 'Teste da integração',
+    status: 'Prospect',
+    orgao: 'TESTE API (simulação)',
+    descritivo: 'Teste da API externa',
+    data_pregao_dt: '2099-12-31',
+    torre: 'ITS',
+  }
+  const a = await chamar('/oportunidades?simular=true', { metodo: 'POST', corpo: dados })
+  ok('simulação -> 200 marcada como simulada (não 201)', a.status === 200 && a.json?.simulado === true, `HTTP ${a.status} ${JSON.stringify(a.json)}`)
+  ok('código AAAA-NNNN que a oportunidade receberia', /^\d{4}-\d{4}$/.test(String(a.json?.codigo)), String(a.json?.codigo))
+  ok('autoria é a aplicação (api:<nome>) e o solicitante foi lido', String(a.json?.criado_por).startsWith('api:') && a.json?.solicitante === 'Teste da integração', `${a.json?.criado_por} / ${a.json?.solicitante}`)
+  ok('prévia do e-mail traz "Cadastrada por" e "Solicitante (via API)"', String(a.json?.previa?.email?.texto).includes('Solicitante (via API)') && String(a.json?.previa?.email?.texto).includes('Cadastrada por: api:'), String(a.json?.previa?.email?.assunto))
+  ok('prévia do cartão do Planner tem o título [RADAR código]', /^\[RADAR \d{4}-\d{4}\]/.test(String(a.json?.previa?.planner?.titulo)), String(a.json?.previa?.planner?.titulo))
+  const ruim = await chamar('/oportunidades?simular=true', { metodo: 'POST', corpo: { status: 'No Go', orgao: 'TESTE', descritivo: 'x', torre: 'ITS', data_pregao_dt: '2099-12-31' } })
+  ok('erro de regra (No Go sem motivo) -> 422 também na simulação', ruim.status === 422 && JSON.stringify(ruim.json).includes('motivo_no_go'), `HTTP ${ruim.status}`)
+  console.log(`\n         Assunto do e-mail que sairia: ${a.json?.previa?.email?.assunto}`)
+  console.log(`         Título do cartão no Planner:  ${a.json?.previa?.planner?.titulo}`)
+  console.log('\nNada foi gravado. Para testar a criação de verdade (e-mail e cartão reais), rode sem --simular.')
 } else {
   // 4. Criação + idempotência
   console.log('\n4. Criação e idempotência (CRIA uma oportunidade real)')

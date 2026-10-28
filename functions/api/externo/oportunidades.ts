@@ -1,10 +1,11 @@
-import { chaveIdempotencia, rotaExterna, separarSolicitante } from '../../_lib/apiExterna.ts'
+import { chaveIdempotencia, comPrevia, querSimular, rotaExterna, separarSolicitante } from '../../_lib/apiExterna.ts'
 import { criar } from '../../_lib/cadastro.ts'
 import { consultaCnpj } from '../../_lib/cnpj.ts'
 
 /**
  * POST /api/externo/oportunidades: cria uma oportunidade como o cadastro manual (mesmos campos, validações, e-mail e Planner).
  * Corpo: os campos da oportunidade + `solicitante` (opcional). Cabeçalho opcional `Idempotency-Key`. Ver docs/API-EXTERNA.md.
+ * `?simular=true`: só valida e devolve como ficaria (com a prévia do e-mail e do cartão); NÃO grava, não envia e-mail e não cria cartão.
  */
 export const onRequest = rotaExterna({
   POST: async ({ sql, cliente, request, corpo }) => {
@@ -14,6 +15,7 @@ export const onRequest = rotaExterna({
     if (j instanceof Response) return j
     const sep = separarSolicitante(j)
     if (sep instanceof Response) return sep
+    if (querSimular(request)) return comPrevia(await criar(sql, `api:${cliente}`, sep.dados, consultaCnpj, { cliente, solicitante: sep.solicitante, idem: null, simular: true }))
     return criar(sql, `api:${cliente}`, sep.dados, consultaCnpj, { cliente, solicitante: sep.solicitante, idem })
   },
 })

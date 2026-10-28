@@ -670,3 +670,48 @@ test('Administração → API: cria a chave de uma aplicação (mostrada uma vez
   await page.getByRole('button', { name: 'Revogar' }).first().click()
   await expect(page.getByText('Chave revogada.')).toBeVisible()
 })
+
+test('Administração → API → Como chamar: documentação gerada dos campos e painel de teste que simula por padrão', async ({ page }) => {
+  await api(page, true)
+  const chamadas: { url: string; auth: string | undefined; corpo: unknown }[] = []
+  await page.route('**/api/externo/**', (r) => {
+    chamadas.push({ url: r.request().url(), auth: r.request().headers()['authorization'], corpo: r.request().postDataJSON() })
+    return r.fulfill({ json: { id: 1, codigo: '2026-0001', simulado: true, previa: { email: { assunto: '[Radar] Prospect | 2026-0001', texto: 'Nova oportunidade' }, planner: { titulo: '[RADAR 2026-0001] X', anotacao: 'Radar 2026-0001' } } } })
+  })
+  await abrirAba(page)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await page.getByRole('button', { name: 'API', exact: true }).click()
+  await page.getByRole('tab', { name: /Como chamar/ }).click()
+
+  // Estilo Swagger: operações, parâmetros, respostas, exemplos e tabela de campos
+  await expect(page.getByRole('region', { name: 'POST /oportunidades' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /GET \/campos/ })).toBeVisible()
+  await expect(page.getByText('Idempotency-Key').first()).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Tabela de campos' }).getByText('data_pregao_dt').first()).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Tabela de campos' }).getByText('duracao_contrato_meses').first()).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Tabela de campos' }).getByText('Go ·', { exact: false }).first()).toBeVisible() // valores válidos vêm das listas do banco
+
+  // Painel de teste: simula por padrão (query ?simular=true) e mostra a prévia
+  const chave = 'rdr_' + 'T'.repeat(43)
+  await page.getByLabel('Chave para testar POST /oportunidades').fill(chave)
+  const simular = page.getByLabel(/Simular \(não grava/)
+  await expect(simular).toBeChecked()
+  await page.getByRole('button', { name: 'Enviar' }).first().click()
+  await expect(page.getByRole('status').getByText('200')).toBeVisible()
+  await expect(page.getByRole('status').getByText('"simulado": true')).toBeVisible()
+  expect(chamadas).toHaveLength(1)
+  expect(chamadas[0].url).toContain('/api/externo/oportunidades?simular=true')
+  expect(chamadas[0].auth).toBe(`Bearer ${chave}`)
+  expect(chamadas[0].corpo).toMatchObject({ status: 'Prospect', torre: 'ITS' })
+
+  // Sem simular: pede confirmação (e se o usuário recusa, nada é enviado)
+  await simular.uncheck()
+  page.once('dialog', (d) => d.dismiss())
+  await page.getByRole('button', { name: 'Enviar' }).first().click()
+  expect(chamadas).toHaveLength(1)
+
+  // Chave em formato errado nem chega à rede
+  await page.getByLabel('Chave para testar POST /oportunidades').fill('qualquer')
+  await page.getByRole('button', { name: 'Enviar' }).first().click()
+  expect(chamadas).toHaveLength(1)
+})

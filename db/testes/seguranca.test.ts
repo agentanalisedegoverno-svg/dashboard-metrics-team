@@ -91,6 +91,7 @@ const FUNCAO_PERMITIDA: Record<string, string[] | 'PUBLIC'> = {
   enfileirar_email_teste: ['radar_app'],
   autenticar_api_cliente: ['radar_app'],
   criar_oportunidade_api: ['radar_app'],
+  simular_oportunidade_api: ['radar_app'],
   listar_api_clientes: ['radar_app'],
   criar_api_cliente: ['radar_app'],
   revogar_api_cliente: ['radar_app'],
@@ -205,6 +206,7 @@ describe('papéis em ação (privilégios reais)', () => {
       `select criar_api_cliente('intruso', '${'c'.repeat(64)}', '${ADMIN}')`,
       `select listar_api_clientes('${ADMIN}')`,
       `select criar_oportunidade_api('{}'::jsonb, 'sistema-x', null, null)`,
+      `select simular_oportunidade_api('{}'::jsonb, 'sistema-x', null)`,
       `select autenticar_api_cliente('${'c'.repeat(64)}')`,
     ]
     for (const papel of ['radar_leitor', 'radar_escritor', 'radar_planner', 'radar_email']) {
