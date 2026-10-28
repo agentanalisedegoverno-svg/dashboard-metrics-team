@@ -114,13 +114,13 @@ function pontuar(o: Oportunidade, c: PncpItem): Resultado | null {
   if (!score) return null
   return { item: c, score, motivos, url: c.url || pncpUrl(c.numeroControlePNCP) }
 }
-function alertaNoc(o: Oportunidade, matches: Resultado[], consulta: { isError?: boolean } | undefined, comprasGov: { isError?: boolean }) {
+function alertaNoc(o: Oportunidade, matches: Resultado[], consulta: { isError?: boolean } | undefined, comprasGov: { isError?: boolean }, conlicitacao?: { isError?: boolean }) {
   const uf = (o.uf ?? '').trim().toUpperCase()
   if (!uf) return { nivel: 'critico', titulo: 'Cadastro incompleto', acao: 'Corrija a UF desta oportunidade no Radar e execute a consulta novamente.' }
-  if (consulta?.isError && comprasGov.isError) return { nivel: 'critico', titulo: 'Fontes indisponíveis', acao: 'Não tome decisão com dados desatualizados. Reexecute as consultas e valide os portais oficiais.' }
+  if (consulta?.isError && comprasGov.isError && conlicitacao?.isError) return { nivel: 'critico', titulo: 'Fontes indisponíveis', acao: 'Não tome decisão com dados desatualizados. Reexecute as consultas e valide os portais oficiais.' }
   if (matches.some(m => m.score >= 100)) return { nivel: 'atencao', titulo: 'Correspondência forte — confirmar', acao: 'Confira processo, UASG e órgão. Confirme o vínculo oficial antes de agir sobre o certame.' }
   if (matches.length) return { nivel: 'atencao', titulo: 'Possível correspondência', acao: 'Revise os candidatos abaixo e confirme se algum corresponde à oportunidade cadastrada.' }
-  if (consulta?.isError || comprasGov.isError) return { nivel: 'atencao', titulo: 'Consulta parcial', acao: 'Consulte novamente a fonte com erro e verifique o portal oficial antes de concluir que não há certame.' }
+  if (consulta?.isError || comprasGov.isError || conlicitacao?.isError) return { nivel: 'atencao', titulo: 'Consulta parcial', acao: 'Consulte novamente a fonte com erro e verifique o portal oficial antes de concluir que não há certame.' }
   return { nivel: 'critico', titulo: 'Sem correspondência encontrada', acao: 'Valide número do processo, UASG, órgão e UF. A busca cobre apenas os registros retornados pelas fontes consultadas.' }
 }
 
@@ -185,7 +185,7 @@ export default function MonitorLicitaçõesTab() {
     const q = porUf.get((o.uf ?? '').trim().toUpperCase())
     return (q?.data || comprasGov.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])]).length > 0
   }).length
-  const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov).nivel==='critico' }).length
+  const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='critico' }).length
   const atencao = Math.max(0, elegiveis.length - criticos - totalComCandidato)
   return <section className="mt-5 space-y-5" aria-label="Monitoramento de licitações">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -221,7 +221,7 @@ export default function MonitorLicitaçõesTab() {
         const matches=candidatos(o,[...(consulta?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])])
         return <article key={o.id} className="rounded-lg border border-line p-3">
           <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-semibold text-ink">{(o.codigo ?? '#'+o.id) + ' · ' + o.orgao}</p><p className="mt-1 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p><p className="mt-1 text-xs text-muted">Processo/pregão: {o.processo || 'Não informado'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}</p><p className="mt-1 text-xs text-muted">Portal informado: {o.site || 'Não informado'} · Pregão: {data(o.data_pregao_dt)}</p></div><span className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs text-ink">{o.status}</span></div>
-          {(() => { const alerta = alertaNoc(o, matches, consulta, comprasGov); const cor = alerta.nivel==='critico' ? 'border-st-critical/30 bg-st-critical/5' : 'border-st-warning/30 bg-st-warning/5'; return <div className={'mt-3 rounded-lg border p-3 '+cor}><div className="flex items-center gap-2 text-sm font-semibold text-ink">{alerta.nivel==='critico' ? <AlertTriangle className="size-4 text-st-critical"/> : <Clock3 className="size-4 text-st-warning"/>}{alerta.titulo}</div><p className="mt-1 text-sm text-ink-soft"><strong>Próxima ação:</strong> {alerta.acao}</p></div> })()}
+          {(() => { const alerta = alertaNoc(o, matches, consulta, comprasGov, conlicitacao); const cor = alerta.nivel==='critico' ? 'border-st-critical/30 bg-st-critical/5' : 'border-st-warning/30 bg-st-warning/5'; return <div className={'mt-3 rounded-lg border p-3 '+cor}><div className="flex items-center gap-2 text-sm font-semibold text-ink">{alerta.nivel==='critico' ? <AlertTriangle className="size-4 text-st-critical"/> : <Clock3 className="size-4 text-st-warning"/>}{alerta.titulo}</div><p className="mt-1 text-sm text-ink-soft"><strong>Próxima ação:</strong> {alerta.acao}</p></div> })()}
           <div className="mt-3 border-t border-line pt-3">
             {!uf ? <p className="text-xs text-muted">Consulta não executada: esta oportunidade está sem UF válida no cadastro.</p> :
             matches.length > 0 ? <div className="space-y-2"><p className="text-xs font-semibold text-ink"><Activity className="mr-1 inline size-3.5"/>Registros encontrados nas fontes públicas — confira os dados</p>{matches.map((m,i)=><div key={m.item.numeroControlePNCP || m.item.id_compra || i} className="rounded-md bg-surface-2 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-medium text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'}</p><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">Compatibilidade {m.score}</span></div><p className="mt-1 text-xs text-ink-soft">{(m.item.processo ? 'Processo '+m.item.processo+' · ' : '')+(m.item.objetoCompra || m.item.informacaoComplementar || 'Objeto não informado')}</p><p className="mt-1 text-xs text-muted">{m.motivos.join(' · ')} · Fonte: {m.item.source || 'PNCP'} · Situação: {m.item.situacaoCompraNome || 'Não informada'} · Encerramento: {data(m.item.dataEncerramentoProposta)}</p>{m.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer">Ver fonte oficial <ExternalLink className="size-3"/></a>}</div>)}</div> :
