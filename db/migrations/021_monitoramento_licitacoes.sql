@@ -99,6 +99,14 @@ DECLARE
   v_url text;
   v_ativa boolean;
 BEGIN
+  IF TG_OP = 'UPDATE'
+    AND OLD.status IS NOT DISTINCT FROM NEW.status
+    AND OLD.site IS NOT DISTINCT FROM NEW.site
+    AND OLD.processo IS NOT DISTINCT FROM NEW.processo
+    AND OLD.uasg IS NOT DISTINCT FROM NEW.uasg
+    AND OLD.arquivado_em IS NOT DISTINCT FROM NEW.arquivado_em THEN
+    RETURN NEW;
+  END IF;
   v_status := lower(btrim(coalesce(NEW.status, '')));
   v_ativa := NEW.arquivado_em IS NULL AND v_status IN ('prospect', 'go', 'onboarding', 'on going');
   v_url := nullif(btrim(coalesce(NEW.site, '')), '');
