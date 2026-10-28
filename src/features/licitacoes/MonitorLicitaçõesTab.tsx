@@ -55,6 +55,7 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
   const consultas = [
     { path: 'modulo-legado/3_consultarPregoes', params: { dt_data_edital_inicial: de, dt_data_edital_final: ate } },
     { path: 'modulo-legado/1_consultarLicitacao', params: { data_publicacao_inicial: de, data_publicacao_final: ate } },
+    { path: 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133', params: {} },
   ]
   const tentativas = await Promise.allSettled(consultas.map(async ({ path, params }) => {
     const url = new URL('/pncp/comprasgov/' + path, window.location.origin)
@@ -64,7 +65,8 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
     const response = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(22_000) })
     if (!response.ok) throw new Error('Compras.gov.br respondeu HTTP ' + response.status + ' em ' + path)
     const json = await response.json() as PncpResponse
-    return (json.resultado ?? []).map((item): PncpItem => ({
+    const registros = (json.resultado ?? json.data ?? json.items ?? json.content ?? []) as PncpItem[]
+    return registros.map((item): PncpItem => ({
       ...item,
       processo: item.co_processo ?? item.numero_processo ?? (item.numero != null ? String(item.numero) : undefined),
       numeroCompra: item.numero != null ? String(item.numero) : item.numero_aviso != null ? String(item.numero_aviso) : undefined,
@@ -76,7 +78,7 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
       orgaoEntidade: { razaoSocial: item.no_orgao ?? item.orgaoEntidadeRazaoSocial },
       unidadeOrgao: { codigoUnidade: item.co_uasg != null ? String(item.co_uasg) : item.uasg != null ? String(item.uasg) : undefined, nomeUnidade: item.no_ausg, ufSigla: item.unidadeOrgaoUfSigla },
       numeroControlePNCP: item.id_compra,
-      source: 'Compras.gov.br — legado',
+      source: path.includes('modulo-legado') ? 'Compras.gov.br — legado' : 'Compras.gov.br — Lei 14.133/PNCP',
     }))
   }))
   const resultados = tentativas.filter((r): r is PromiseFulfilledResult<PncpItem[]> => r.status === 'fulfilled').map(r => r.value)
