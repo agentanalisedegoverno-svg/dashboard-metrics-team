@@ -17,18 +17,22 @@ function pncpRef(m) {
   const candidates = [m.identificador_externo, m.url_oficial].filter(Boolean)
   for (const value of candidates) {
     const text = String(value)
-    // URL REST oficial: /orgaos/{CNPJ}/compras/{ano}/{sequencial}
-    let match = text.match(/(?:orgaos\\/)?(\\d{14})\\/compras\\/(\\d{4})\\/(\\d+)/i)
+    // Canonical official REST path /orgaos/{CNPJ}/compras/{ano}/{sequencial}
+    let match = text.match(/(?:orgaos\/)?(\d{14})\/compras\/(\d{4})\/(\d+)/i)
     if (match) return { cnpj: match[1], ano: match[2], sequencial: match[3] }
-    // ID exibido no PNCP: CNPJ-modalidade-sequencial/ano, ex. 079...-1-000097/2026
-    match = text.match(/(\\d{14})-(\\d+)-(\\d+)\\/(\\d{4})/)
+    // PNCP identifier displayed in the portal: CNPJ-modality-sequence/year
+    match = text.match(/(\d{14})-(\d+)-(\d+)\/(\d{4})/)
     if (match) return { cnpj: match[1], ano: match[4], sequencial: match[3] }
-    // Formato compacto: CNPJ/ano/sequencial
-    match = text.match(/^(\\d{14})[\\s/;-]+(\\d{4})[\\s/;-]+(\\d+)$/)
+    // Canonical public page /app/editais/{CNPJ}/{ano}/{sequencial}
+    match = text.match(/\/app\/editais\/(\d{14})\/(\d{4})\/(\d+)/i)
+    if (match) return { cnpj: match[1], ano: match[2], sequencial: match[3] }
+    // Compact CNPJ/year/sequence form
+    match = text.match(/^(\d{14})[\s/;-]+(\d{4})[\s/;-]+(\d+)$/)
     if (match) return { cnpj: match[1], ano: match[2], sequencial: match[3] }
   }
   return null
 }
+
 async function fetchJson(url) {
   const res = await fetch(url, {
     headers: { accept: 'application/json', 'user-agent': 'Radar-PreVendas-Licitacoes/1.0' },
