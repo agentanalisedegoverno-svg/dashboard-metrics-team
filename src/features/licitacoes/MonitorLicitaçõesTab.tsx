@@ -31,7 +31,7 @@ const pncpUrl = (control?: string) => {
   return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[3] + '/' + m[2] : null
 }
 async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
-  const url = new URL('/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
+  const url = new URL('/api/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
   url.searchParams.set('dataFinal', hoje())
   url.searchParams.set('pagina', '1')
   url.searchParams.set('tamanhoPagina', '50')
@@ -58,7 +58,7 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
     { path: 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133', params: {} },
   ]
   const tentativas = await Promise.allSettled(consultas.map(async ({ path, params }) => {
-    const url = new URL('/pncp/comprasgov/' + path, window.location.origin)
+    const url = new URL('/api/pncp/comprasgov/' + path, window.location.origin)
     url.searchParams.set('pagina', '1')
     url.searchParams.set('tamanhoPagina', '100')
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value))
