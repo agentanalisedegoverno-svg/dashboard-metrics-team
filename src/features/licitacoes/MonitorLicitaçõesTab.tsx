@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, ExternalLink, RefreshCw, Search, ShieldAlert } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle2, Clock3, ExternalLink, RefreshCw, Search, ShieldAlert } from 'lucide-react'
 import { useOportunidades } from '@/features/oportunidades/api'
 import type { Oportunidade } from '@/domain/oportunidade'
 
@@ -102,6 +102,16 @@ function pontuar(o: Oportunidade, c: PncpItem): Resultado | null {
   if (!score) return null
   return { item: c, score, motivos, url: pncpUrl(c.numeroControlePNCP) }
 }
+function alertaNoc(o: Oportunidade, matches: Resultado[], consulta: { isError?: boolean } | undefined, comprasGov: { isError?: boolean }) {
+  const uf = (o.uf ?? '').trim().toUpperCase()
+  if (!uf) return { nivel: 'critico', titulo: 'Cadastro incompleto', acao: 'Corrija a UF desta oportunidade no Radar e execute a consulta novamente.' }
+  if (consulta?.isError && comprasGov.isError) return { nivel: 'critico', titulo: 'Fontes indisponíveis', acao: 'Não tome decisão com dados desatualizados. Reexecute as consultas e valide os portais oficiais.' }
+  if (matches.some(m => m.score >= 100)) return { nivel: 'atencao', titulo: 'Correspondência forte — confirmar', acao: 'Confira processo, UASG e órgão. Confirme o vínculo oficial antes de agir sobre o certame.' }
+  if (matches.length) return { nivel: 'atencao', titulo: 'Possível correspondência', acao: 'Revise os candidatos abaixo e confirme se algum corresponde à oportunidade cadastrada.' }
+  if (consulta?.isError || comprasGov.isError) return { nivel: 'atencao', titulo: 'Consulta parcial', acao: 'Consulte novamente a fonte com erro e verifique o portal oficial antes de concluir que não há certame.' }
+  return { nivel: 'critico', titulo: 'Sem correspondência encontrada', acao: 'Valide número do processo, UASG, órgão e UF. A busca cobre apenas os registros retornados pelas fontes consultadas.' }
+}
+
 function candidatos(o: Oportunidade, itens: PncpItem[]) {
   return itens.map(c => pontuar(o, c)).filter((x): x is Resultado => x !== null).sort((a, b) => b.score - a.score).slice(0, 3)
 }
@@ -161,14 +171,16 @@ export default function MonitorLicitaçõesTab() {
     const q = porUf.get((o.uf ?? '').trim().toUpperCase())
     return (q?.data || comprasGov.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? [])]).length > 0
   }).length
+  const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[])]); return alertaNoc(o,ms,q,comprasGov).nivel==='critico' }).length
+  const atencao = Math.max(0, elegiveis.length - criticos - totalComCandidato)
   return <section className="mt-5 space-y-5" aria-label="Monitoramento de licitações">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Módulo de inteligência de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento de licitações</h1><p className="mt-1 max-w-3xl text-sm text-muted">Consulta somente leitura às oportunidades do Radar e às contratações abertas publicadas no PNCP. Cache em memória do React Query; nenhuma tabela ou API do Radar é alterada por este módulo.</p></div>
+      <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Módulo de inteligência de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento de licitações</h1><p className="mt-1 max-w-3xl text-sm text-muted">Central de comando de certames: dados da contratação, nível de atenção e próxima ação diretamente no Radar. Consulta somente leitura; sem alteração no banco do Radar.</p></div>
       <button onClick={consultarNovamente} disabled={atualizando} className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"><RefreshCw className={'size-4 ' + (atualizando ? 'animate-spin' : '')}/> Atualizar consultas</button>
     </div>
     {lista.error && <div role="alert" className="rounded-lg border border-st-critical/30 bg-surface p-4 text-sm text-ink-soft">Não foi possível ler as oportunidades do Radar: {(lista.error as Error).message}</div>}
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {[{label:'Oportunidades acompanhadas',value:lista.isPending?'—':elegiveis.length},{label:'Consultas por UF',value:ufs.length},{label:'Com candidatos no PNCP',value:lista.isPending?'—':totalComCandidato},{label:'UFs com falha',value:fontesFalharam}].map(k=><div key={k.label} className="rounded-xl border border-line bg-surface p-4 shadow-card"><p className="text-xs text-muted">{k.label}</p><p className="mt-2 font-mono text-2xl font-medium tabular-nums text-ink">{k.value}</p></div>)}
+      {[{label:'Oportunidades acompanhadas',value:lista.isPending?'—':elegiveis.length},{label:'Consultas por UF',value:ufs.length},{label:'Com correspondência candidata',value:lista.isPending?'—':totalComCandidato},{label:'Alertas críticos',value:lista.isPending?'—':criticos}].map(k=><div key={k.label} className="rounded-xl border border-line bg-surface p-4 shadow-card"><p className="text-xs text-muted">{k.label}</p><p className="mt-2 font-mono text-2xl font-medium tabular-nums text-ink">{k.value}</p></div>)}
     </div>
     <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted"/><p>O PNCP consultado retorna contratações com recebimento de propostas. Não garante cobertura de processos encerrados, suspensos ou de portais privados. Compatibilidade é sugestão automática, não confirmação de vínculo oficial.</p></div>
     <div className="rounded-xl border border-line bg-surface p-4">
@@ -186,15 +198,16 @@ export default function MonitorLicitaçõesTab() {
         const matches=candidatos(o,[...(consulta?.data ?? []), ...(comprasGov.data ?? [])])
         return <article key={o.id} className="rounded-lg border border-line p-3">
           <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-semibold text-ink">{(o.codigo ?? '#'+o.id) + ' · ' + o.orgao}</p><p className="mt-1 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p><p className="mt-1 text-xs text-muted">Processo/pregão: {o.processo || 'Não informado'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}</p><p className="mt-1 text-xs text-muted">Portal informado: {o.site || 'Não informado'} · Pregão: {data(o.data_pregao_dt)}</p></div><span className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs text-ink">{o.status}</span></div>
+          {(() => { const alerta = alertaNoc(o, matches, consulta, comprasGov); const cor = alerta.nivel==='critico' ? 'border-st-critical/30 bg-st-critical/5' : 'border-st-warning/30 bg-st-warning/5'; return <div className={'mt-3 rounded-lg border p-3 '+cor}><div className="flex items-center gap-2 text-sm font-semibold text-ink">{alerta.nivel==='critico' ? <AlertTriangle className="size-4 text-st-critical"/> : <Clock3 className="size-4 text-st-warning"/>}{alerta.titulo}</div><p className="mt-1 text-sm text-ink-soft"><strong>Próxima ação:</strong> {alerta.acao}</p></div> })()}
           <div className="mt-3 border-t border-line pt-3">
             {!uf ? <p className="text-xs text-muted">Consulta não executada: esta oportunidade está sem UF válida no cadastro.</p> :
-            matches.length > 0 ? <div className="space-y-2"><p className="text-xs font-semibold text-ink"><Activity className="mr-1 inline size-3.5"/>Possíveis correspondências em fontes públicas</p>{matches.map((m,i)=><div key={m.item.numeroControlePNCP || m.item.id_compra || i} className="rounded-md bg-surface-2 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-medium text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'}</p><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">Compatibilidade {m.score}</span></div><p className="mt-1 text-xs text-ink-soft">{(m.item.processo ? 'Processo '+m.item.processo+' · ' : '')+(m.item.objetoCompra || m.item.informacaoComplementar || 'Objeto não informado')}</p><p className="mt-1 text-xs text-muted">{m.motivos.join(' · ')} · Fonte: {m.item.source || 'PNCP'} · Situação: {m.item.situacaoCompraNome || 'Não informada'} · Encerramento: {data(m.item.dataEncerramentoProposta)}</p>{m.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer">Abrir contratação no PNCP <ExternalLink className="size-3"/></a>}</div>)}</div> :
+            matches.length > 0 ? <div className="space-y-2"><p className="text-xs font-semibold text-ink"><Activity className="mr-1 inline size-3.5"/>Registros encontrados nas fontes públicas — confira os dados</p>{matches.map((m,i)=><div key={m.item.numeroControlePNCP || m.item.id_compra || i} className="rounded-md bg-surface-2 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-medium text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'}</p><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">Compatibilidade {m.score}</span></div><p className="mt-1 text-xs text-ink-soft">{(m.item.processo ? 'Processo '+m.item.processo+' · ' : '')+(m.item.objetoCompra || m.item.informacaoComplementar || 'Objeto não informado')}</p><p className="mt-1 text-xs text-muted">{m.motivos.join(' · ')} · Fonte: {m.item.source || 'PNCP'} · Situação: {m.item.situacaoCompraNome || 'Não informada'} · Encerramento: {data(m.item.dataEncerramentoProposta)}</p>{m.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer">Ver fonte oficial <ExternalLink className="size-3"/></a>}</div>)}</div> :
             consulta?.isPending || !consulta || comprasGov.isPending ? <p className="text-xs text-muted">Consultando PNCP e Compras.gov.br para esta oportunidade…</p> :
             <div className="text-xs text-muted"><p>Nenhum candidato compatível nos resultados retornados pelas fontes públicas para {uf}.</p>{consulta?.isError && <p className="mt-1 break-words text-st-critical">PNCP: {(consulta.error as Error)?.message || 'falha de rede'}</p>}{comprasGov.isError && <p className="mt-1 break-words text-st-critical">Compras.gov.br: {(comprasGov.error as Error)?.message || 'falha de consulta'}</p>}<button type="button" onClick={() => { qc.refetchQueries({ queryKey: ['pncp-licitacoes-front', uf], type: 'active' }); qc.refetchQueries({ queryKey: ['comprasgov-licitacoes-front'], type: 'active' }) }} className="mt-1 font-semibold underline">Tentar novamente nas fontes</button></div>}
           </div>          </div>
         </article>
       })}</div>}
-      <p className="mt-4 text-xs text-muted">Fontes consultadas: PNCP {fontesOk}/{ufs.length} UFs · Compras.gov.br {comprasGov.isSuccess ? 'OK' : comprasGov.isError ? 'com erro' : 'consultando'} · {totalResultados} registros recebidos · Cache de 5 minutos · {fontesFalharam ? fontesFalharam+' consulta(s) PNCP com erro' : 'PNCP sem falhas registradas'}.</p>
+      <p className="mt-4 text-xs text-muted">Fontes consultadas: PNCP {fontesOk}/{ufs.length} UFs · Compras.gov.br {comprasGov.isSuccess ? 'OK' : comprasGov.isError ? 'com erro' : 'consultando'} · {totalResultados} registros recebidos · Cache de 5 minutos. A interface mostra o estado da consulta atual; detecção histórica de alterações exige snapshots persistentes, ainda não habilitados nesta etapa.</p>
     </div>
   </section>
 }
