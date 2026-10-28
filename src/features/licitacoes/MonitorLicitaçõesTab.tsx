@@ -72,13 +72,24 @@ export default function MonitorLicitaçõesTab() {
     queryFn: ({ signal }: { signal: AbortSignal }) => consultarPncp(uf, signal),
     staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 1, refetchOnWindowFocus: false,
   })) })
-  const porUf = useMemo(() => new Map(ufs.map((uf, i) => [uf, consultas[i]])), [ufs, consultas])
   const atualizando = lista.isFetching || consultas.some(q => q.isFetching)
+  const porUf = useMemo(() => new Map(ufs.map((uf, i) => [uf, consultas[i]])), [ufs, consultas])
   const linhas = useMemo(() => {
     const q = fold(busca)
-    return elegiveis.filter(o => (filtroStatus === 'Todos' || fold(o.status) === fold(filtroStatus)) &&
-      (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.site].join(' ')).includes(q)))
-  }, [elegiveis, filtroStatus, busca])
+    return elegiveis
+      .filter(o => (filtroStatus === 'Todos' || fold(o.status) === fold(filtroStatus)) &&
+        (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.site].join(' ')).includes(q)))
+      .sort((a, b) => {
+        const rank = (o: Oportunidade) => {
+          const uf = (o.uf ?? '').trim().toUpperCase()
+          const consulta = porUf.get(uf)
+          if (!consulta || consulta.isPending) return 2
+          if (consulta.isError) return 3
+          return consulta.data && candidatos(o, consulta.data).length > 0 ? 0 : 1
+        }
+        return rank(a) - rank(b)
+      })
+  }, [elegiveis, filtroStatus, busca, porUf])
   const consultarNovamente = async () => {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ['oportunidades'] }),
