@@ -15,7 +15,7 @@ const PAPEIS = ['radar_leitor', 'radar_escritor', 'radar_app', 'radar_planner', 
 const TABELAS = [
   'oportunidades', 'oportunidades_historico', 'opcoes', 'usuarios', 'carga_status', 'linhas_torre', 'codigo_sequencia',
   'planner_marco', 'planner_exportacao', 'planner_auto_estado', 'email_config', 'email_destinatarios', 'email_fila', 'api_clientes', 'api_idempotencia',
-  'monitor_licitacoes', 'monitor_licitacoes_coletas', 'monitor_licitacoes_snapshots', 'monitor_licitacoes_eventos', 'monitor_licitacoes_alertas',
+  'monitor_licitacoes', 'monitor_licitacoes_coletas', 'monitor_licitacoes_snapshots', 'monitor_licitacoes_eventos', 'monitor_licitacoes_alertas', 'monitor_licitacoes_auditoria',
 ] as const
 
 /** Tabelas do monitor de licitações (migração 021): a API do cadastro (radar_app) lê e grava; o painel (radar_leitor) só lê. */
@@ -26,14 +26,14 @@ const ACOES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'] as const
 /** Privilégios de TABELA permitidos por papel (tudo que não está aqui é proibido). */
 const TABELA_PERMITIDA: Record<string, Record<string, string[]>> = {
   radar_leitor: {
-    oportunidades: ['SELECT'], carga_status: ['SELECT'], opcoes: ['SELECT'], usuarios: ['SELECT'], linhas_torre: ['SELECT'], ...monitor(['SELECT']),
+    oportunidades: ['SELECT'], carga_status: ['SELECT'], opcoes: ['SELECT'], usuarios: ['SELECT'], linhas_torre: ['SELECT'], ...monitor(['SELECT']), monitor_licitacoes_auditoria: ['SELECT'],
   },
   radar_escritor: {},
   radar_app: {
     // ATENÇÃO: a migração 021 (monitor de licitações) deu INSERT direto em oportunidades_historico e escrita nas tabelas do monitor ao radar_app.
     // O INSERT no histórico permite à aplicação gravar linhas de auditoria (antes só o gatilho gravava): revisar se é mesmo necessário.
     oportunidades: ['SELECT'], oportunidades_historico: ['SELECT', 'INSERT'], opcoes: ['SELECT'], usuarios: ['SELECT'], carga_status: ['SELECT'],
-    linhas_torre: ['SELECT'], email_config: ['SELECT'], email_destinatarios: ['SELECT'], email_fila: ['SELECT'], ...monitor(['SELECT', 'INSERT', 'UPDATE']),
+    linhas_torre: ['SELECT'], email_config: ['SELECT'], email_destinatarios: ['SELECT'], email_fila: ['SELECT'], ...monitor(['SELECT', 'INSERT', 'UPDATE']), monitor_licitacoes_auditoria: ['SELECT', 'INSERT'],
   },
   radar_planner: {
     oportunidades: ['SELECT'], usuarios: ['SELECT'], planner_marco: ['SELECT', 'UPDATE'], planner_exportacao: ['SELECT', 'INSERT', 'UPDATE'],

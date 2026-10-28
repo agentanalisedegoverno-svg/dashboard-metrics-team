@@ -29,6 +29,32 @@ describe('migrações', () => {
   }, 60_000)
 })
 
+describe('monitoramento de licitações', () => {
+  it('inclui automaticamente etapas elegíveis e pausa/reativa conforme status', async () => {
+    const o = await criar(db, opp({ status: 'Go', site: 'https://pncp.gov.br/app/editais/00000000000191/2026/1' }))
+    const inicial = await um<{ habilitado: boolean; estado_vinculo: string }>(
+      'select habilitado, estado_vinculo from monitor_licitacoes where oportunidade_id = $1', [o.id])
+    expect(inicial).toEqual({ habilitado: true, estado_vinculo: 'pendente' })
+
+    await db.query('update oportunidades set status = $1 where id = $2', ['Lost', o.id])
+    const pausado = await um<{ habilitado: boolean; estado_vinculo: string }>(
+      'select habilitado, estado_vinculo from monitor_licitacoes where oportunidade_id = $1', [o.id])
+    expect(pausado).toEqual({ habilitado: false, estado_vinculo: 'pausado' })
+
+    await db.query('update oportunidades set status = $1 where id = $2', ['Go', o.id])
+    const reativado = await um<{ habilitado: boolean; estado_vinculo: string }>(
+      'select habilitado, estado_vinculo from monitor_licitacoes where oportunidade_id = $1', [o.id])
+    expect(reativado).toEqual({ habilitado: true, estado_vinculo: 'pendente' })
+  })
+
+  it('inclui Onboarding mesmo quando o status não fazia parte das opções originais', async () => {
+    const o = await criar(db, opp({ status: 'Onboarding' }))
+    const registro = await um<{ oportunidade_id: string }>(
+      'select oportunidade_id::text from monitor_licitacoes where oportunidade_id = $1', [o.id])
+    expect(registro.oportunidade_id).toBe(String(o.id))
+  })
+})
+
 describe('código AAAA-NNNN', () => {
   it('numera por ano da data do pregão, em sequência, sem repetir', async () => {
     const a = await criar(db, opp({ data_pregao_dt: '2041-01-10' }))
