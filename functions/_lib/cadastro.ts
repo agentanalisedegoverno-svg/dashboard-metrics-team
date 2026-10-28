@@ -76,7 +76,7 @@ async function aplicaEmpresa(
 }
 
 /** Criação pela API externa: usa criar_oportunidade_api (autoria `api:<cliente>`, solicitante e idempotência). */
-export type ExternoCriar = { cliente: string; solicitante: string | null; idem: string | null }
+export type ExternoCriar = { cliente: string; solicitante: string | null; idem: string | null; /** Só valida e mostra como ficaria: nada é gravado. */ simular?: boolean }
 
 export async function criar(sql: Sql, email: string, corpo: unknown, consultar: Consulta = consultaCnpj, externo?: ExternoCriar) {
   const parsed = oportunidadeInput.safeParse(corpo)
@@ -94,10 +94,12 @@ export async function criar(sql: Sql, email: string, corpo: unknown, consultar: 
           limit 5`
       : []
     const [{ o }] = externo
-      ? await sql`select criar_oportunidade_api(${JSON.stringify(d)}::jsonb, ${externo.cliente}, ${externo.solicitante}, ${externo.idem}) as o`
+      ? externo.simular
+        ? await sql`select simular_oportunidade_api(${JSON.stringify(d)}::jsonb, ${externo.cliente}, ${externo.solicitante}) as o`
+        : await sql`select criar_oportunidade_api(${JSON.stringify(d)}::jsonb, ${externo.cliente}, ${externo.solicitante}, ${externo.idem}) as o`
       : await sql`select criar_oportunidade(${JSON.stringify(d)}::jsonb, ${email}) as o`
     const avisos = [...(duplicadas.length ? [{ regra: 'possivel_duplicata', ids: duplicadas.map((x: { id: number }) => x.id) }] : []), ...emp.avisos]
-    return send(o.idempotente ? 200 : 201, { ...o, avisos })
+    return send(o.idempotente || o.simulado ? 200 : 201, { ...o, avisos })
   } catch (e) {
     return erroBanco(e)
   }

@@ -113,3 +113,41 @@ describe('idempotência (Idempotency-Key)', () => {
     expect(camposComErro(await falha(api(opp(), 'sistema-x', null, 'x'.repeat(101))))).toContain('Idempotency-Key')
   })
 })
+
+describe('simular_oportunidade_api: testa sem sujar a base', () => {
+  const simular = async (p: Record<string, unknown>, cliente = 'sistema-x', solicitante: string | null = null) =>
+    (await db.query<{ o: Record<string, unknown> }>('select simular_oportunidade_api($1::jsonb, $2, $3) as o', [JSON.stringify(p), cliente, solicitante])).rows[0].o
+  const contagens = async () =>
+    (
+      await db.query<Record<string, string>>(`select
+        (select count(*) from oportunidades) oportunidades,
+        (select count(*) from oportunidades_historico) historico,
+        (select count(*) from email_fila) fila,
+        (select count(*) from api_idempotencia) idem,
+        (select coalesce(sum(ultimo), 0) from codigo_sequencia) sequencia`)
+    ).rows[0]
+
+  it('devolve a oportunidade como ficaria, marcada como simulada, e não grava nada (nem histórico, e-mail, chave de idempotência ou número do código)', async () => {
+    await db.query(`select salvar_email_config(true, ARRAY['Prospect'], '[{"email":"a@x.com"}]'::jsonb, $1, false)`, [ADMIN])
+    const antes = await contagens()
+    const o = await simular(opp({ status: 'Prospect', data_pregao_dt: '2098-05-05' }), 'sistema-x', 'Maria')
+    expect(o).toMatchObject({ simulado: true, fonte: 'web', criado_por: 'api:sistema-x', solicitante: 'Maria', versao: 1 })
+    expect(String(o.codigo)).toMatch(/^2098-\d{4}$/)
+    expect(await contagens()).toEqual(antes)
+  })
+
+  it('o código mostrado na simulação é o mesmo que a criação de verdade recebe em seguida', async () => {
+    const dados = opp({ data_pregao_dt: '2097-03-03' })
+    const simulada = await simular(dados)
+    const real = await api(dados)
+    expect(real.codigo).toBe(simulada.codigo)
+    expect(real.simulado).toBeUndefined()
+  })
+
+  it('erros de validação saem iguais aos da criação de verdade e também não deixam rastro', async () => {
+    const antes = await contagens()
+    expect(camposComErro(await falha(simular({ status: 'Go' })))).toEqual(expect.arrayContaining(['orgao', 'descritivo', 'data_pregao_dt']))
+    expect(camposComErro(await falha(simular(opp({ status: 'No Go' }))))).toContain('motivo_no_go')
+    expect(await contagens()).toEqual(antes)
+  })
+})

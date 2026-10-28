@@ -65,7 +65,7 @@ export default function AdminTab() {
         {secao === 'listas' && <ListasAdmin opcoes={opcoes.data} />}
         {secao === 'linhas' && <LinhasTorre opcoes={opcoes.data} />}
         {secao === 'emails' && <EmailsAdmin opcoes={opcoes.data} />}
-        {secao === 'api' && <ApiAdmin />}
+        {secao === 'api' && <ApiAdmin opcoes={opcoes.data} />}
       </div>
     </section>
   )

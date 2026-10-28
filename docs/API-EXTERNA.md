@@ -21,7 +21,8 @@ Uma aplicação externa cria oportunidades no Radar Pré-Vendas **como se fosse 
 | **Sucesso** | `201` com `id`, `codigo` (`AAAA-NNNN`) e `versao`. Guarde o `codigo`: é a chave da oportunidade no Radar e no Planner |
 | **Erros** | `401` chave inválida ou revogada · `422` dados inválidos (lista `erros` com `campo` e `mensagem`; corrija e repita com a mesma `Idempotency-Key`) · `413` corpo > 64 KB · `5xx` falha nossa (repita com a mesma `Idempotency-Key`) |
 | **Especificação** | [api-externa.openapi.json](api-externa.openapi.json) (OpenAPI 3, gerada dos campos do formulário; importe no Postman/Insomnia ou gere um cliente) |
-| **Ambiente de teste** | não existe: toda chamada cria uma oportunidade **real** (e-mail e cartão no Planner). Para testar, use `orgao` = "TESTE ..." e `data_pregao_dt` em 2099 e avise o time do Radar |
+| **Testar sem sujar a base** | `POST /oportunidades?simular=true`: valida tudo e devolve como ficaria, com a prévia do e-mail e do cartão do Planner, **sem gravar nada, sem enviar e-mail e sem criar cartão**. Não existe ambiente de teste separado: sem `?simular`, toda chamada cria uma oportunidade **real** |
+| **Documentação interativa** | No Radar: *Administração → API → Como chamar* (campos e listas sempre atuais, exemplos de `curl` e um painel para testar a simulação) |
 | **Chamar de onde** | sempre de servidor (nunca do navegador: a chave ficaria exposta) |
 
 ## Teste ponta a ponta e entrada em produção
@@ -34,11 +35,12 @@ Uma aplicação externa cria oportunidades no Radar Pré-Vendas **como se fosse 
 
 ### Falta (precisa de uma pessoa)
 1. **Criar a chave** de teste (`teste-api`) em *Administração → API* e guardá-la.
-2. **Rodar o roteiro automático** (cria 1 oportunidade de teste; avise o time):
+2. **Rodar o roteiro automático.** Comece pela **simulação** (`--simular`), que não grava nada e mostra a prévia do e-mail e do cartão. Só rode o modo completo (cria 1 oportunidade de teste, com e-mail e cartão reais; avise o time) quando quiser provar o fluxo de ponta a ponta:
    ```powershell
    $env:RADAR_API_CHAVE = Read-Host "Cole a chave"
-   node scripts/teste-api-externa.mjs             # completo
+   node scripts/teste-api-externa.mjs --simular   # RECOMENDADO: tudo sem gravar nada (nem e-mail, nem cartão)
    node scripts/teste-api-externa.mjs --sem-criar # só leitura (não cria nada)
+   node scripts/teste-api-externa.mjs             # completo: CRIA 1 oportunidade de teste de verdade
    ```
    O script confere: 401 sem chave, catálogo, validações (422/400), criação (201, código, `api:<cliente>`, solicitante, `fonte = web`) e a repetição com a mesma `Idempotency-Key` (200, mesma oportunidade). No fim lista o que conferir no e-mail e no Planner.
 3. **Conferir o e-mail e o cartão:** o e-mail "Nova oportunidade" chegou com *Cadastrada por: api:...* e *Solicitante (via API)*; em cerca de 1 minuto surgiu **um** cartão no Planner (plano ITS, coluna PROSPECT). Peça a conferência do banco a quem mantém o Radar (consulta abaixo).
@@ -74,6 +76,7 @@ select nome, ativo, criado_por, ultimo_uso_em, revogado_em from api_clientes ord
 - **Corpo (JSON):** os campos da oportunidade (tabela abaixo; só os obrigatórios são exigidos) mais, opcionalmente, `solicitante` (texto, até 120 caracteres).
 - **Cabeçalho opcional `Idempotency-Key`** (1 a 100 caracteres): se a aplicação repetir a chamada com a mesma chave (por timeout, por exemplo), o Radar devolve **a mesma oportunidade, sem duplicar** nem reenviar e-mail/cartão. Use um identificador do pedido na origem.
 - **Limite do corpo:** 64 KB.
+- **Simulação (testar sem sujar a base):** com `?simular=true` na URL, o Radar executa a criação inteira (mesmas validações, regras, código `AAAA-NNNN`) e **desfaz tudo no fim**: não grava a oportunidade, o histórico, a chave de idempotência nem o número do código, **não envia e-mail e não cria cartão no Planner**. A resposta é `200` com `"simulado": true`, os dados como ficariam e uma `previa` do **e-mail** (assunto e texto) e do **cartão do Planner** (título e anotação). Os erros de validação (`422`) saem iguais aos da criação de verdade. Use a simulação para homologar a integração; a `Idempotency-Key` é ignorada nela.
 
 Exemplo:
 

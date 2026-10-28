@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { ApiError, useApiClientes, useCriarApiCliente, useRevogarApiCliente } from '../oportunidades/api'
+import { ApiError, useApiClientes, useCriarApiCliente, useRevogarApiCliente, type Opcoes } from '../oportunidades/api'
+import { ApiDocs } from './ApiDocs'
 import { dataHoraBr } from '../oportunidades/formato'
 
 const campo = 'rounded-lg border border-line bg-surface px-2.5 py-[7px] text-[13px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-gold/40 disabled:opacity-60'
@@ -12,8 +13,40 @@ const NOME_OK = /^[a-z0-9][a-z0-9_-]{2,39}$/
 const mensagemErro = (e: unknown) =>
   e instanceof ApiError && e.erros.length ? e.erros.map((x) => x.mensagem).join(' · ') : e instanceof Error ? e.message : 'Não foi possível concluir.'
 
-/** Administração → API: aplicações externas autorizadas a criar oportunidades (uma chave por aplicação). */
-export function ApiAdmin() {
+/** Administração → API: chaves das aplicações externas e a documentação de como chamar. */
+export function ApiAdmin({ opcoes }: { opcoes: Opcoes }) {
+  const [aba, setAba] = useState<'chaves' | 'docs'>('chaves')
+  return (
+    <div>
+      <div role="tablist" aria-label="API" className="mb-4 flex gap-1 border-b border-line">
+        {(
+          [
+            ['chaves', 'Chaves'],
+            ['docs', 'Como chamar (documentação)'],
+          ] as const
+        ).map(([id, rotulo]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={aba === id}
+            onClick={() => setAba(id)}
+            className={cn(
+              '-mb-px cursor-pointer border-b-2 px-3 py-2 text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-gold',
+              aba === id ? 'border-gold text-ink' : 'border-transparent text-muted hover:text-ink',
+            )}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
+      {aba === 'chaves' ? <ChavesApi /> : <ApiDocs opcoes={opcoes} />}
+    </div>
+  )
+}
+
+/** Aplicações externas autorizadas a criar oportunidades (uma chave por aplicação). */
+function ChavesApi() {
   const { data, isPending, error } = useApiClientes()
   const criar = useCriarApiCliente()
   const revogar = useRevogarApiCliente()

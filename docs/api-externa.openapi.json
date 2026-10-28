@@ -249,6 +249,15 @@
               "maxLength": 100
             },
             "description": "Repetir com a mesma chave devolve a oportunidade já criada, sem duplicar."
+          },
+          {
+            "name": "simular",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true: só valida e devolve como ficaria (campo \"simulado\": true e \"previa\" do e-mail e do cartão do Planner). NÃO grava, não envia e-mail e não cria cartão."
           }
         ],
         "requestBody": {
@@ -263,7 +272,7 @@
         },
         "responses": {
           "200": {
-            "description": "Repetição com a mesma Idempotency-Key: a oportunidade já criada, com \"idempotente\": true."
+            "description": "Repetição com a mesma Idempotency-Key (\"idempotente\": true) ou simulação com ?simular=true (\"simulado\": true e \"previa\")."
           },
           "201": {
             "description": "Criada (o corpo é a oportunidade, com id, codigo AAAA-NNNN, versao, criado_por, solicitante e avisos)."

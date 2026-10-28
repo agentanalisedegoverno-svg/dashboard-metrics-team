@@ -8,6 +8,11 @@ const dispararPlanner = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 vi.mock('./dispararEmails.ts', () => ({ dispararEnvioEmails: dispararEmails }))
 vi.mock('./dispararPlanner.ts', () => ({ dispararPlanner }))
 
+const REGISTRO = vi.hoisted(() => ({
+  id: 7, codigo: '2026-0001', versao: 1, fonte: 'web', criado_por: 'api:sistema-x', solicitante: 'Maria', status: 'Prospect', orgao: 'Órgão de teste', descritivo: 'Descrição',
+  torre: 'ITS', data_pregao_dt: '2026-12-10', orcamento: 1000, orcamento_sigiloso: false, pendencias: [],
+}))
+
 // Banco de mentira: o SQL vem como template; reconhecemos pelo texto.
 const chamadas = vi.hoisted(() => ({ sql: [] as string[], valores: [] as unknown[][], nomeDaChave: 'sistema-x' as string | null }))
 vi.mock('./http.ts', async (importOriginal) => ({
@@ -17,13 +22,16 @@ vi.mock('./http.ts', async (importOriginal) => ({
     chamadas.sql.push(texto)
     chamadas.valores.push(valores)
     if (texto.includes('autenticar_api_cliente')) return [{ nome: chamadas.nomeDaChave }]
-    if (texto.includes('criar_oportunidade_api')) return [{ o: { id: 7, codigo: '2026-0001', versao: 1, fonte: 'web', criado_por: 'api:sistema-x' } }]
+    if (texto.includes('simular_oportunidade_api')) return [{ o: { ...REGISTRO, simulado: true } }]
+    if (texto.includes('criar_oportunidade_api')) return [{ o: REGISTRO }]
     return []
   },
 }))
 
 import { catalogoCampos, chaveDaRequisicao, chaveIdempotencia, gerarChave, hashChave, openApi, rotaExterna, separarSolicitante } from './apiExterna.ts'
 import { criar } from './cadastro.ts'
+import { onRequest as rotaOportunidades } from '../api/externo/oportunidades.ts'
+import { previa, querSimular } from './apiExterna.ts'
 
 const CHAVE = 'rdr_' + 'A'.repeat(43)
 const req = (metodo: string, corpo?: unknown, cab: Record<string, string> = { authorization: `Bearer ${CHAVE}` }) =>
@@ -154,5 +162,55 @@ describe('especificação OpenAPI (docs/api-externa.openapi.json)', () => {
     expect(esq.required).toEqual(['status', 'orgao', 'descritivo', 'data_pregao_dt'])
     for (const c of TODOS_CAMPOS) expect(esq.properties, c.nome).toHaveProperty(c.nome)
     expect(esq.properties).toHaveProperty('solicitante')
+  })
+})
+
+describe('modo de simulação (?simular=true): testa sem gravar, sem e-mail e sem cartão', () => {
+  const env = { DATABASE_URL_APP: 'postgres://x' }
+  const corpo = { status: 'Prospect', orgao: 'Órgão de teste', descritivo: 'Descrição', torre: 'ITS', data_pregao_dt: '2026-12-10', solicitante: 'Maria' }
+  const chamarComUrl = (url: string) =>
+    rotaOportunidades({ request: new Request(url, { method: 'POST', headers: { authorization: `Bearer ${CHAVE}`, 'content-type': 'application/json' }, body: JSON.stringify(corpo) }), env, params: {}, waitUntil: vi.fn() } as never)
+
+  it('reconhece ?simular=true e ?simular=1 (e nada além disso)', () => {
+    expect(querSimular(new Request('https://x/api?simular=true'))).toBe(true)
+    expect(querSimular(new Request('https://x/api?simular=1'))).toBe(true)
+    expect(querSimular(new Request('https://x/api?simular=TRUE'))).toBe(true)
+    for (const u of ['https://x/api', 'https://x/api?simular=false', 'https://x/api?simular=0', 'https://x/api?simular=']) expect(querSimular(new Request(u))).toBe(false)
+  })
+
+  it('simulação: 200 simulado, usa a função de simulação, devolve a prévia do e-mail e do Planner e NÃO aciona e-mail nem Planner', async () => {
+    dispararEmails.mockClear()
+    dispararPlanner.mockClear()
+    chamadas.sql.length = 0
+    const r = await chamarComUrl('https://radar.test/api/externo/oportunidades?simular=true')
+    const j = (await r.json()) as { simulado: boolean; codigo: string; previa: { email: { assunto: string; texto: string }; planner: { titulo: string; anotacao: string } } }
+    expect(r.status).toBe(200)
+    expect(j.simulado).toBe(true)
+    expect(j.previa.email.assunto).toContain('2026-0001')
+    expect(j.previa.email.texto).toContain('Solicitante (via API): Maria')
+    expect(j.previa.email.texto).toContain('Cadastrada por: api:sistema-x')
+    expect(j.previa.planner.titulo).toMatch(/^\[RADAR 2026-0001\]/)
+    expect(j.previa.planner.anotacao).toContain('Solicitante (via API): Maria')
+    expect(chamadas.sql.some((x) => x.includes('simular_oportunidade_api'))).toBe(true)
+    expect(chamadas.sql.some((x) => x.includes('criar_oportunidade_api'))).toBe(false)
+    expect(dispararEmails).not.toHaveBeenCalled()
+    expect(dispararPlanner).not.toHaveBeenCalled()
+  })
+
+  it('sem ?simular: cria de verdade (201) e aciona e-mail e Planner', async () => {
+    dispararEmails.mockClear()
+    dispararPlanner.mockClear()
+    const r = await chamarComUrl('https://radar.test/api/externo/oportunidades')
+    expect(r.status).toBe(201)
+    expect(((await r.json()) as { simulado?: boolean }).simulado).toBeUndefined()
+    expect(dispararEmails).toHaveBeenCalledTimes(1)
+    expect(dispararPlanner).toHaveBeenCalledTimes(1)
+  })
+
+  it('previa() usa os mesmos textos de produção (assunto, anotação do Planner, orçamento sigiloso escondido)', () => {
+    const p = previa({ ...REGISTRO, orcamento_sigiloso: true })
+    expect(p.email.texto).toContain('Orçamento (R$): Sigiloso')
+    expect(p.email.texto).not.toMatch(/1\.000/)
+    expect(p.planner.anotacao).toContain('Radar 2026-0001 (v1)')
   })
 })

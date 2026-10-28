@@ -14,7 +14,7 @@ A bateria completa roda **sem tocar na produção**: o banco dos testes é um Po
 | `npm run test:banco` | só o banco (regressão + segurança) | ao mexer em migração |
 | `npm run test:seguranca` | segurança: banco, API, estática e navegador | ao mexer em permissão/API |
 | `npm run test:desempenho` | desempenho do front (1 navegador por vez, tempos mais fiéis) | ao mexer na grade |
-| `node scripts/teste-api-externa.mjs` | roteiro ponta a ponta da API externa contra o ambiente real (precisa de `RADAR_API_CHAVE`; `--sem-criar` não cria nada) | antes de liberar uma aplicação nova |
+| `node scripts/teste-api-externa.mjs` | roteiro ponta a ponta da API externa contra o ambiente real (precisa de `RADAR_API_CHAVE`; **`--simular` não grava nada**, `--sem-criar` só lê) | antes de liberar uma aplicação nova |
 | `npm run test:carga` | carga do banco e da API (leva ~1 min) | semanal (workflow) e sob demanda |
 | `npm run test:seguranca:externo` | sondagem do site em produção, **sem login** | semanal (workflow) e após mudar o Access |
 | `npm run medir:banco` | latência do banco real (só leitura; precisa `DATABASE_URL`) | sob demanda |
