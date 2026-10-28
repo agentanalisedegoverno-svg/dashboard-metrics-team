@@ -114,10 +114,11 @@ function pontuar(o: Oportunidade, c: PncpItem): Resultado | null {
   if (!score) return null
   return { item: c, score, motivos, url: c.url || pncpUrl(c.numeroControlePNCP) }
 }
-function alertaNoc(o: Oportunidade, matches: Resultado[], consulta: { isError?: boolean } | undefined, comprasGov: { isError?: boolean }, conlicitacao?: { isError?: boolean }) {
+function alertaNoc(o: Oportunidade, matches: Resultado[], consulta: { isError?: boolean; isPending?: boolean } | undefined, comprasGov: { isError?: boolean; isPending?: boolean }, conlicitacao?: { isError?: boolean; isPending?: boolean }) {
   const uf = (o.uf ?? '').trim().toUpperCase()
   if (!uf) return { nivel: 'critico', titulo: 'Cadastro incompleto', acao: 'Corrija a UF desta oportunidade no Radar e execute a consulta novamente.' }
   if (consulta?.isError && comprasGov.isError && conlicitacao?.isError) return { nivel: 'critico', titulo: 'Fontes indisponíveis', acao: 'Não tome decisão com dados desatualizados. Reexecute as consultas e valide os portais oficiais.' }
+  if (consulta?.isPending || !consulta || comprasGov.isPending || conlicitacao?.isPending) return { nivel: 'atencao', titulo: 'Consulta em andamento', acao: 'Aguarde a conclusão das fontes antes de decidir se há ou não correspondência.' }
   if (matches.some(m => m.score >= 100)) return { nivel: 'atencao', titulo: 'Correspondência forte — confirmar', acao: 'Confira processo, UASG e órgão. Confirme o vínculo oficial antes de agir sobre o certame.' }
   if (matches.length) return { nivel: 'atencao', titulo: 'Possível correspondência', acao: 'Revise os candidatos abaixo e confirme se algum corresponde à oportunidade cadastrada.' }
   if (consulta?.isError || comprasGov.isError || conlicitacao?.isError) return { nivel: 'atencao', titulo: 'Consulta parcial', acao: 'Consulte novamente a fonte com erro e verifique o portal oficial antes de concluir que não há certame.' }
@@ -186,7 +187,7 @@ export default function MonitorLicitaçõesTab() {
     return (q?.data || comprasGov.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])]).length > 0
   }).length
   const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='critico' }).length
-  const atencao = Math.max(0, elegiveis.length - criticos - totalComCandidato)
+  const atencao = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='atencao' }).length
   return <section className="mt-5 space-y-5" aria-label="Monitoramento de licitações">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Módulo de inteligência de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento de licitações</h1><p className="mt-1 max-w-3xl text-sm text-muted">Central de comando de certames: dados da contratação, nível de atenção e próxima ação diretamente no Radar. Consulta somente leitura; sem alteração no banco do Radar.</p></div>
