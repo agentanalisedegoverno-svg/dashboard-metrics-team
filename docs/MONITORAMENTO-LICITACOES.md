@@ -62,3 +62,12 @@ Após selecionar um candidato, confirme o identificador PNCP e a URL gerada ante
 ### Habilitar a rotina agendada
 
 O workflow tem uma proteção de ativação: a agenda de 30 minutos só consulta fontes quando a variável de repositório `MONITOR_LICITACOES_ENABLED` estiver definida como `true`. Isso evita executar uma rotina sem migração/credenciais. Para liberar a agenda, primeiro aplique a migração e valide a coleta manual; depois configure o secret `DATABASE_URL_MONITOR` e a variável `MONITOR_LICITACOES_ENABLED=true`. O disparo manual permanece disponível para testes e falha explicitamente se o secret estiver ausente.
+
+
+### Elegibilidade e vínculo automático
+
+A fila inclui oportunidades não arquivadas com status Prospect, Go, Onboarding, On going/Ongoing e Suspended/Suspenso. A rotina pausa oportunidades que saem desse conjunto e as reativa quando retornam.
+
+Quando o campo Site contém uma URL oficial canônica do PNCP (`/app/editais/{CNPJ}/{ano}/{sequencial}`), a migração/trigger extrai o identificador e cria o vínculo automaticamente. Quando há somente número de processo ou uma página genérica do portal, o registro permanece pendente para evitar associação errada; a busca de candidatos atual é uma descoberta auxiliar e não cobre todos os certames, especialmente processos encerrados/suspensos.
+
+A coleta automática continua protegida por `MONITOR_LICITACOES_ENABLED=true` e requer `DATABASE_URL_MONITOR` com privilégio mínimo. Habilitar a variável somente depois de aplicar e validar a migração no ambiente alvo.

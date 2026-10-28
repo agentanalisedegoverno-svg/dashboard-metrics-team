@@ -120,8 +120,8 @@ BEGIN
 
   v_identificador := NULL;
   IF v_portal = 'PNCP' THEN
-    v_match := regexp_match(v_url, '/app/editais/(\\d{14})/(\\d{4})/(\\d+)');
-    IF v_match IS NULL THEN v_match := regexp_match(v_url, '/orgaos/(\\d{14})/compras/(\\d{4})/(\\d+)'); END IF;
+    v_match := regexp_match(v_url, '/app/editais/(\d{14})/(\d{4})/(\d+)');
+    IF v_match IS NULL THEN v_match := regexp_match(v_url, '/orgaos/(\d{14})/compras/(\d{4})/(\d+)'); END IF;
     IF v_match IS NOT NULL THEN v_identificador := v_match[1] || '-1-' || v_match[3] || '/' || v_match[2]; END IF;
   END IF;
 
@@ -131,7 +131,6 @@ BEGIN
       CASE WHEN v_identificador IS NOT NULL THEN 'vinculado' ELSE 'pendente' END, true)
     ON CONFLICT (oportunidade_id) DO UPDATE SET
       habilitado = true,
-      estado_vinculo = CASE WHEN monitor_licitacoes.identificador_externo IS NOT NULL THEN 'vinculado' ELSE 'pendente' END,
       portal = coalesce(EXCLUDED.portal, monitor_licitacoes.portal),
       identificador_externo = coalesce(EXCLUDED.identificador_externo, monitor_licitacoes.identificador_externo),
       url_oficial = coalesce(EXCLUDED.url_oficial, monitor_licitacoes.url_oficial),
@@ -160,6 +159,26 @@ FROM oportunidades o
 WHERE o.arquivado_em IS NULL
   AND lower(btrim(coalesce(o.status, ''))) IN ('prospect', 'go', 'onboarding', 'on going', 'ongoing', 'suspenso', 'suspensa', 'suspended')
 ON CONFLICT (oportunidade_id) DO NOTHING;;
+
+-- Atualiza registros preexistentes: URLs oficiais PNCP canônicas podem ser vinculadas sem intervenção.
+WITH candidatos AS (
+  SELECT m.id AS monitor_id, o.site,
+    regexp_match(coalesce(o.site, ''), '/app/editais/(\d{14})/(\d{4})/(\d+)') AS p
+  FROM monitor_licitacoes m
+  JOIN oportunidades o ON o.id = m.oportunidade_id
+  WHERE o.arquivado_em IS NULL
+    AND lower(btrim(coalesce(o.status, ''))) IN ('prospect','go','onboarding','on going','ongoing','suspenso','suspensa','suspended')
+    AND coalesce(o.site, '') ~* 'pncp\.gov\.br'
+)
+UPDATE monitor_licitacoes m SET
+  portal = 'PNCP',
+  url_oficial = c.site,
+  identificador_externo = c.p[1] || '-1-' || c.p[3] || '/' || c.p[2],
+  estado_vinculo = 'vinculado',
+  habilitado = true,
+  atualizado_em = now()
+FROM candidatos c
+WHERE m.id = c.monitor_id AND c.p IS NOT NULL;;
 
 COMMENT ON TABLE monitor_licitacoes IS 'Fila e configuração de acompanhamento de licitações vinculadas a oportunidades do Radar.';
 COMMENT ON TABLE monitor_licitacoes_snapshots IS 'Histórico imutável das observações normalizadas das fontes oficiais.';
