@@ -20,6 +20,8 @@ concurrency:
 
 jobs:
   consultar-fontes:
+    # A agenda fica protegida até a migração e a credencial restrita estarem preparadas.
+    if: github.event_name == 'workflow_dispatch' || vars.MONITOR_LICITACOES_ENABLED == 'true'
     name: Consultar fontes públicas vinculadas
     runs-on: ubuntu-latest
     timeout-minutes: 10
