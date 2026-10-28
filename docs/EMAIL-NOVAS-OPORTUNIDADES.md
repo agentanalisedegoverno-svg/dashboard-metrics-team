@@ -4,11 +4,11 @@ Aviso por e-mail quando uma oportunidade é **cadastrada pelo Radar**. Quem rece
 
 ## Como funciona
 
-1. Ao cadastrar uma oportunidade pela web, um gatilho do banco confere as regras. Se o módulo está **ligado** e o status da oportunidade está entre os **marcados**, grava um pedido na fila (`email_fila`). O cadastro nunca espera nem falha por causa do e-mail.
+1. Ao cadastrar uma oportunidade pela web (ou mudar o status de qualquer uma), um gatilho do banco confere as regras. Se o módulo está **ligado** e o status da oportunidade está entre os **marcados**, grava um pedido na fila (`email_fila`). O cadastro nunca espera nem falha por causa do e-mail.
 2. O envio ([`scripts/enviar-emails.mjs`](../scripts/enviar-emails.mjs)) lê a fila e manda pelo **SMTP do Gmail**, **sem depender de nenhuma máquina do time**. O workflow do GitHub ([`Enviar e-mails`](../.github/workflows/enviar-emails.yml)) é acionado de três formas: (a) **na hora em que a oportunidade é cadastrada** (o Radar chama a API do GitHub; o aviso sai em cerca de um minuto), (b) de **15 em 15 minutos, seg a sex, 08h às 19h**, e (c) de hora em hora à noite e nos fins de semana, como rede de segurança (o agendamento do GitHub é "melhor esforço": atrasa ou pula, por isso o disparo ao cadastrar é o caminho principal). A rotina do Windows (a cada 5 minutos) também envia, se tiver as variáveis; é opcional. Se vários rodarem ao mesmo tempo, o banco garante que cada e-mail sai **uma vez só**.
 3. As regras valem **na hora do envio**: se o módulo for desligado, ou ficar sem destinatário, depois de o pedido entrar na fila, o pedido é marcado como "Não enviado".
 
-Só entram na fila oportunidades **criadas pela web**. A carga automática da planilha **nunca** envia e-mail, e editar uma oportunidade também não.
+Só entram na fila oportunidades **criadas pela web**. A carga da planilha (descontinuada em 27/10/2026) nunca enviou e-mail. Editar outros campos não gera e-mail; **mudar o status** gera o aviso de mudança de status (seção abaixo).
 
 ## Configuração na tela (só administradores)
 
@@ -44,7 +44,7 @@ Código, órgão, objeto, status, torre, linha de serviço, UF, data e hora do p
 
    E, opcionalmente, a variável (não segredo) `APP_URL` com o endereço do Radar para o link do e-mail (padrão `https://radar-prevendas.pages.dev`).
 3. **Disparo ao cadastrar e ao salvar (recomendado; já configurado em 27/10/2026)**: a função aciona o envio de e-mails e o ciclo do Planner. Como criar o token: no **Cloudflare Pages** do Radar (Settings → Variables and Secrets, produção) crie o segredo `GITHUB_DISPATCH_TOKEN` com um *fine-grained personal access token* do GitHub restrito a **este repositório**, com a única permissão **Actions: Read and write**. Opcional: variável `GITHUB_REPO` (`dono/repositório`; o padrão é este). Sem o token, o disparo é ignorado e o e-mail sai pelos agendamentos (até 15 minutos de espera no horário comercial). O token só aciona o workflow; não lê código nem segredos.
-4. **(Opcional) Variáveis na máquina do time**, para a rotina do Windows também enviar a cada 5 minutos (não é necessário: o GitHub já cobre). No Windows, como **variáveis de usuário** (fora do Git; a tarefa as enxerga no próximo login): `DATABASE_URL_EMAIL`, `SMTP_USER`, `SMTP_PASS` e, opcionalmente, `SMTP_FROM` e `APP_URL`, com os mesmos valores dos segredos do passo 2. Exemplo, no PowerShell: `[Environment]::SetEnvironmentVariable("SMTP_PASS", "<valor>", "User")`. A etapa de e-mail do `rodar-integracao.cmd` só roda se `SMTP_PASS` existir. Detalhes em [OPERACAO.md](OPERACAO.md) §2.3.
+4. **(Contingência, não usar com o GitHub ativo) Variáveis na máquina do time**, para a rotina do Windows (desativada em 28/10/2026) também enviar a cada 5 minutos. No Windows, como **variáveis de usuário** (fora do Git; a tarefa as enxerga no próximo login): `DATABASE_URL_EMAIL`, `SMTP_USER`, `SMTP_PASS` e, opcionalmente, `SMTP_FROM` e `APP_URL`, com os mesmos valores dos segredos do passo 2. Exemplo, no PowerShell: `[Environment]::SetEnvironmentVariable("SMTP_PASS", "<valor>", "User")`. A etapa de e-mail do `rodar-integracao.cmd` só roda se `SMTP_PASS` existir. Detalhes em [OPERACAO.md](OPERACAO.md) §2.3.
 5. Na tela, **Administração → E-mails**: cadastre os destinatários, marque os status, ligue o módulo e use **Enviar e-mail de teste para mim**.
 
 Enquanto os segredos não existirem, o workflow apenas registra um aviso e não faz nada (não falha).

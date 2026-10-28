@@ -2,7 +2,7 @@
 
 A bateria completa roda **sem tocar na produção**: o banco dos testes é um Postgres em memória (PGlite) criado do zero com `db/schema.sql` e as migrações `db/migrations/*.sql`, na mesma ordem e com o mesmo separador (`;;`) usados em produção. Isso também prova, a cada execução, que o banco pode ser reconstruído do zero.
 
-> **Estado (24/10/2026):** 323 testes unitários e de banco, 84 e2e (desktop e celular) e 15 de carga, todos passando. Dependências de produção: 0 vulnerabilidades.
+> **Estado (28/10/2026):** 441 testes unitários e de banco, os e2e (desktop e celular) e os 15 de carga, todos passando. O banco de teste aplica as migrações 001 a 019. A verificação do Planner na nuvem (`planner-integracao.yml` com *verificar*) confere o login e as colunas sem gravar. Dependências de produção: 0 vulnerabilidades.
 
 ## Como rodar
 

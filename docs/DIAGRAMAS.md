@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Propósito** | Catálogo visual de todos os fluxos da aplicação, do contexto ao detalhe, para quem desenvolve, opera, audita ou aprova mudanças |
-| **Versão / atualização** | 1.1 · 25/10/2026 · cobre as migrações 001 a 011 |
+| **Versão / atualização** | 1.2 · 28/10/2026 · cobre as migrações 001 a 019 |
 | **Fonte** | Mermaid, neste arquivo (o GitHub desenha sozinho). Todo diagrama foi validado no conector do Mermaid antes de entrar. Versões em SVG em [diagramas/](diagramas/), geradas por `npm run diagramas` |
 | **Padrão adotado** | Guia *Architecture design diagrams* da Microsoft (Well-Architected): camadas **contexto → contêiner → componente**, mais implantação, fluxo de dados com fronteiras de confiança (STRIDE), sequência por caso de uso, jornada do usuário, estado, ER e fluxo de identidade; vocabulário do **C4** (contexto/contêiner/componente) e do **UML** (sequência/estado) |
 | **Relacionados** | [ARQUITETURA.md](ARQUITETURA.md) (decisões e narrativa), [OPERACAO.md](OPERACAO.md), [TESTES.md](TESTES.md) |
@@ -42,7 +42,7 @@ flowchart LR
 | **Visão geral** | [D1 Contexto](#d1--contexto-c4-nível-1) · [D2 Contêineres](#d2--contêineres-c4-nível-2) · [D3 Implantação](#d3--implantação-onde-cada-coisa-roda) · [D4 Componentes](#d4--componentes-c4-nível-3) |
 | **Usuário e acesso** | [D5 Jornada do usuário](#d5--jornada-do-usuário) · [D6 Perfis e permissões](#d6--perfis-e-permissões-identidade-e-acesso) |
 | **Cadastro** | [D7 Cadastro](#d7--cadastro-de-oportunidade) · [D8 Edição concorrente](#d8--edição-concorrente-versão-otimista) · [D9 Regras de validação](#d9--regras-de-validação) · [D10 Estados](#d10--ciclo-de-vida-estados) · [D11 Consulta de CNPJ](#d11--consulta-de-cnpj) |
-| **Integrações** | [D12 Carga da planilha](#d12--carga-automática-da-planilha) · [D13 Planner](#d13--integração-com-o-microsoft-planner) · [D14 E-mail](#d14--e-mail-de-nova-oportunidade) |
+| **Integrações** | [D12 Carga da planilha (descontinuada)](#d12--carga-da-planilha-descontinuada) · [D13 Planner](#d13--integração-com-o-microsoft-planner) · [D14 E-mail](#d14--e-mail-de-nova-oportunidade) |
 | **Confiabilidade** | [D15 Backup e resiliência](#d15--backup-restauração-e-resiliência) · [D16 CI/CD e testes](#d16--entrega-e-testes-cicd) |
 | **Segurança e dados** | [D17 Fluxo de dados e STRIDE](#d17--fluxo-de-dados-e-fronteiras-de-confiança-stride) · [D18 Papéis do banco](#d18--papéis-do-banco-e-privilégios) · [D19 Modelo de dados](#d19--modelo-de-dados-er) |
 
@@ -63,30 +63,32 @@ flowchart TB
   adm(["Administrador<br/>gerencia perfis, listas, e-mails<br/>e arquiva"]):::pessoa
   edt(["Editor (pré-vendas)<br/>cadastra e edita"]):::pessoa
   vis(["Visualizador<br/>somente consulta"]):::pessoa
-  dest(["Destinatários do aviso<br/>de nova oportunidade"]):::pessoa
+  dest(["Destinatários dos avisos<br/>nova oportunidade e mudança de status"]):::pessoa
 
   access["Cloudflare Access<br/>login por código no e-mail<br/>@ctctech.com.br"]:::externo
 
   subgraph fronteira["Fronteira do sistema"]
-    radar["<b>Radar Pré-Vendas</b><br/>painel de métricas e cadastro de oportunidades<br/>de licitações do governo"]:::interno
+    radar["<b>Radar Pré-Vendas</b><br/>painel de métricas e cadastro de oportunidades<br/>de licitações do governo<br/>(o banco é alimentado só pelo Radar web)"]:::interno
   end
 
-  xls["Planilha BaseLicitacao.xlsx<br/>SharePoint / OneDrive"]:::externo
+  gh["GitHub Actions<br/>rotinas na nuvem, sem máquina de pessoa"]:::externo
   planner["Microsoft Planner<br/>planos ITS e Digital e Health"]:::externo
   gmail["Gmail (SMTP)"]:::externo
   receita["APIs públicas de CNPJ<br/>dados da Receita Federal"]:::externo
   drive["Google Drive<br/>backups criptografados"]:::externo
+  supa["Supabase<br/>espelho diário do banco"]:::externo
 
   adm --> access
   edt --> access
   vis --> access
   access -->|"sessão autenticada"| radar
-  radar -.->|"carga agendada lê (somente leitura)"| xls
-  radar -.->|"cria e atualiza cartões (sentido único)"| planner
-  radar -.->|"envia o aviso"| gmail
-  gmail -.->|"entrega o e-mail"| dest
   radar -->|"consulta razão social e matriz/filial"| receita
-  radar -.->|"dump diário criptografado"| drive
+  radar -.->|"ao salvar: aciona na hora"| gh
+  gh -.->|"cria e atualiza cartões (sentido único)"| planner
+  gh -.->|"envia os avisos"| gmail
+  gmail -.->|"entrega o e-mail"| dest
+  gh -.->|"dump diário criptografado"| drive
+  gh -.->|"restaura o espelho diário"| supa
 ```
 
 ### D2 · Contêineres (C4 nível 2)
@@ -113,19 +115,19 @@ flowchart LR
     DB[("tabelas, funções SECURITY DEFINER<br/>e gatilhos")]:::dados
   end
 
-  subgraph win["Máquina Windows (Agendador de Tarefas)"]
-    CARGA{{"Radar-Carga-Planilha<br/>dias úteis 07:30<br/>Python + Node"}}:::agenda
-    PLN{{"Rotina de 5 em 5 min<br/>Planner e e-mails<br/>Node + Python"}}:::agenda
-  end
-
-  subgraph gh["GitHub Actions (runners Ubuntu)"]
+  subgraph gh["GitHub Actions (runners Ubuntu, sem máquina de pessoa)"]
+    PLN{{"Planner integração<br/>disparo ao salvar + 5 min, seg a sex<br/>Node + Python"}}:::agenda
+    MAIL{{"Enviar e-mails<br/>disparo ao salvar + 15 min<br/>nodemailer"}}:::agenda
     WF{{"Pipeline CI/CD"}}:::agenda
     BKP{{"Backup diário, restauração mensal e vigia"}}:::agenda
-    MAIL{{"Enviar e-mails (rede de segurança)<br/>de hora em hora, à noite e nos fins de semana<br/>nodemailer"}}:::agenda
+    ESP{{"Espelho no Supabase<br/>diário"}}:::agenda
     NF{{"Testes de carga e segurança<br/>semanal"}}:::agenda
   end
 
-  XLS["BaseLicitacao.xlsx<br/>OneDrive sincronizado"]:::externo
+  subgraph sb["Supabase (us-east-1)"]
+    DB2[("espelho do banco<br/>projeto radar-backup")]:::dados
+  end
+
   PL["Microsoft Planner<br/>Graph API"]:::externo
   GM["Gmail SMTP 465"]:::externo
   RC["APIs de CNPJ<br/>BrasilAPI e outras"]:::externo
@@ -135,16 +137,16 @@ flowchart LR
   SPA -->|"fetch JSON com JWT e x-radar-csrf"| API
   API -->|"radar_leitor (painel)<br/>radar_app (cadastro)"| DB
   API -->|"HTTPS (servidor consulta)"| RC
-  CARGA -->|"lê cópia"| XLS
-  CARGA -->|"radar_escritor: sincronizar_planilha"| DB
-  PLN -->|"radar_planner (leitura)"| DB
+  API -.->|"workflow_dispatch ao cadastrar ou salvar<br/>(token restrito a Actions)"| PLN
+  API -.->|"workflow_dispatch ao cadastrar ou salvar"| MAIL
+  PLN -->|"radar_planner: lê oportunidades,<br/>grava exportação e estado cifrado"| DB
   PLN -->|"MS Graph (delegado)"| PL
-  PLN -->|"radar_email (fila de e-mails)"| DB
-  PLN -->|"SMTP TLS"| GM
   MAIL -->|"radar_email (lê + atualiza a fila)"| DB
   MAIL -->|"SMTP TLS"| GM
   BKP -->|"radar_backup (pg_dump)"| DB
   BKP -->|"rclone + AES-256"| DRV
+  ESP -->|"radar_backup (pg_dump)"| DB
+  ESP -->|"pg_restore (projeto dedicado)"| DB2
   WF -->|"wrangler deploy"| cf
   NF -->|"leitura e sondagem"| cf
 ```
@@ -173,35 +175,38 @@ flowchart TB
     TESTE[("branch teste-restauracao<br/>banco restore_drill<br/>reescrito a cada drill mensal")]:::dados
   end
 
+  subgraph sbx["Supabase (us-east-1, plano Free)"]
+    ESPELHO[("projeto radar-backup<br/>espelho do estado mais recente")]:::dados
+  end
+
   subgraph ghr["GitHub (runners efêmeros)"]
+    P1{{"Planner integração<br/>ao salvar + 5 min, seg a sex 08h às 19h BRT"}}:::agenda
+    S3{{"Enviar e-mails<br/>ao salvar + 15 min (dia), de hora em hora (noite e fins de semana)"}}:::agenda
     S1{{"Backup diário 03:00 BRT<br/>(na prática ~08:30)"}}:::agenda
+    S7{{"Espelho no Supabase<br/>diário 04:30 BRT"}}:::agenda
     S2{{"Vigia 12:00 BRT"}}:::agenda
-    S3{{"Enviar e-mails: hora em hora,<br/>só à noite e nos fins de semana"}}:::agenda
     S4{{"Restauração: dia 1 do mês"}}:::agenda
     S5{{"Carga e segurança: segunda 06:00 BRT"}}:::agenda
     S6{{"CodeQL: segunda"}}:::agenda
   end
 
-  subgraph pc["Máquina Windows do time"]
-    T1{{"Radar-Carga-Planilha<br/>dias úteis 07:30<br/>(ou assim que ligar)"}}:::agenda
-    T2{{"Planner e e-mails<br/>seg a sex 08h às 19h, de 5 em 5 min"}}:::agenda
-    FS[("eventos/ entrada, processados, erros<br/>logs")]:::dados
-  end
-
+  WIN["Tarefas do Windows (planilha e Planner)<br/>DESATIVADAS em 28/10/2026<br/>só contingência"]:::externo
   DRIVE[("Google Drive<br/>diario/ 14 dias · semanal/ 12 semanas")]:::externo
 
   ACCESS --> PROD
   ACCESS --> PRV
   PROD -->|"radar_leitor / radar_app"| MAIN
+  PROD -.->|"workflow_dispatch ao salvar"| P1
+  PROD -.->|"workflow_dispatch ao salvar"| S3
+  P1 -->|"radar_planner"| MAIN
+  S3 -->|"radar_email"| MAIN
   S1 -->|"radar_backup"| MAIN
   S1 --> DRIVE
+  S7 -->|"radar_backup"| MAIN
+  S7 --> ESPELHO
   S4 --> DRIVE
   S4 -->|"radar_restore (isolado)"| TESTE
-  S2 -.->|"confere idade do backup, do teste e da carga"| MAIN
-  S3 -->|"radar_email"| MAIN
-  T1 -->|"radar_escritor"| MAIN
-  T2 -->|"radar_planner"| MAIN
-  T2 --> FS
+  S2 -.->|"confere idade do backup e do teste de restauração"| MAIN
 ```
 
 ### D4 · Componentes (C4 nível 3)
@@ -216,8 +221,8 @@ flowchart LR
 
   subgraph spa["SPA (src/)"]
     APP["App.tsx<br/>abas e rota por #hash"]:::interno
-    PNL["features/exec, inter, ops, meta, plano<br/>painéis de métricas"]:::interno
-    OPT["features/oportunidades<br/>Tab, Grid virtualizada, Drawer, campos, formato, api.ts"]:::interno
+    PNL["features/exec, inter, ops, meta, plano<br/>painéis de métricas<br/>(CardGrafico: clique amplia o gráfico)"]:::interno
+    OPT["features/oportunidades<br/>Tab, Grid virtualizada, Drawer, campos, formato (máscara em R$), api.ts"]:::interno
     ADM["features/admin<br/>Usuários, Listas, Linha→Torre, E-mails"]:::interno
     DOM["domain/<br/>oportunidade.ts (Zod + regras), cnpj.ts, email.ts"]:::comum
   end
@@ -227,19 +232,19 @@ flowchart LR
     CAD["_lib/cadastro<br/>oportunidades, opções, usuários, me"]:::interno
     EMC["_lib/emailConfig<br/>regras de e-mail (admin)"]:::interno
     CNP["_lib/cnpj<br/>4 fontes em sequência"]:::interno
+    DSP["_lib/dispararEmails + dispararPlanner<br/>acionam os workflows ao salvar"]:::interno
     ROWS["api/[[path]] + _lib/rows<br/>leitura do painel"]:::interno
   end
 
-  subgraph scr["Scripts (scripts/ e _lib/)"]
-    PLA["_lib/planilha + sync-db.mjs"]:::interno
-    PLE["_lib/planner + planner-eventos.mjs"]:::interno
-    EMF["_lib/emailFila + emailMsg<br/>+ enviar-emails.mjs"]:::interno
+  subgraph scr["Rotinas (GitHub Actions)"]
+    PLE["_lib/planner + plannerNota + planner-eventos.mjs<br/>planner-auto: planner_auto.py, estado_db.py"]:::interno
+    EMF["_lib/emailFila + emailMsg (e-mail completo)<br/>+ enviar-emails.mjs"]:::interno
   end
 
   subgraph bd["Banco (db/migrations)"]
-    FUN["funções: criar, atualizar, arquivar,<br/>salvar_usuario, salvar_opcao, salvar_email_config,<br/>sincronizar_planilha"]:::dados
-    TRG["gatilhos: derivar, torre, código,<br/>auditar, e-mail"]:::dados
-    TAB[("tabelas")]:::dados
+    FUN["funções: criar, atualizar, arquivar,<br/>salvar_usuario, salvar_opcao, salvar_email_config"]:::dados
+    TRG["gatilhos: derivar, torre, código,<br/>auditar, e-mail (nova e mudança de status)"]:::dados
+    TAB[("tabelas<br/>inclui planner_auto_estado")]:::dados
   end
 
   APP --> PNL
@@ -253,6 +258,7 @@ flowchart LR
   HTTP --> CAD
   HTTP --> EMC
   HTTP --> CNP
+  HTTP -.->|"após 201 ou 200"| DSP
   CAD --> DOM
   EMC --> DOM
   CAD -->|"radar_app"| FUN
@@ -260,7 +266,8 @@ flowchart LR
   ROWS -->|"radar_leitor"| TAB
   FUN --> TAB
   TRG --> TAB
-  PLA -->|"radar_escritor"| FUN
+  DSP -.->|"workflow_dispatch"| PLE
+  DSP -.->|"workflow_dispatch"| EMF
   PLE -->|"radar_planner"| TAB
   EMF -->|"radar_email"| TAB
 ```
@@ -460,20 +467,14 @@ flowchart TB
 ```mermaid
 stateDiagram-v2
   direction LR
-  [*] --> Vigente: criada na web ou importada da planilha
+  [*] --> Vigente: criada na web (as antigas vieram da planilha)
   Vigente --> Arquivada: administrador arquiva
   Arquivada --> Vigente: administrador restaura
-  Vigente --> AusenteNaPlanilha: sumiu da planilha (só linhas da planilha)
-  AusenteNaPlanilha --> Vigente: voltou a aparecer na planilha
   Arquivada --> [*]
   note right of Arquivada
     nunca é apagada:
     sai da grade e do painel,
     o histórico permanece
-  end note
-  note right of AusenteNaPlanilha
-    o painel e a grade ignoram,
-    mas o registro e o histórico ficam
   end note
 ```
 
@@ -536,38 +537,24 @@ flowchart TB
 
 ## Integrações
 
-### D12 · Carga automática da planilha
+### D12 · Carga da planilha (descontinuada)
 
-*Tipo: sequência · Caso de uso: planilha → banco, sem IA, por merge · Pergunta: **como a planilha entra sem sobrescrever o que foi editado na web?***
+*Tipo: fluxo (histórico) · Escopo: o fim da carga da planilha · Pergunta: **a planilha ainda alimenta o banco?** Não: desde 27/10/2026 o Radar web é a única porta de entrada ([decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)).*
 
 ```mermaid
-sequenceDiagram
-  autonumber
-  participant AG as Agendador do Windows
-  participant CMD as carga-planilha.cmd
-  participant PY as exportar_planilha.py
-  participant XLS as BaseLicitacao.xlsx
-  participant SY as sync-db.mjs
-  participant DB as sincronizar_planilha
-  participant V as Vigia (GitHub)
+flowchart LR
+  classDef pessoa fill:#fff4d6,stroke:#8a6d00,color:#1a1a1a
+  classDef dados fill:#e6f6e6,stroke:#2d7a2d,color:#1a1a1a
+  classDef externo fill:#f2f2f2,stroke:#555555,stroke-dasharray:4 3,color:#1a1a1a
+  classDef erro fill:#fde1e1,stroke:#a61f1f,color:#1a1a1a
 
-  AG->>CMD: dias úteis 07:30 (ou assim que o computador ligar)
-  CMD->>PY: exporta a aba Base Governo
-  PY->>XLS: copia o arquivo (nunca abre o original)
-  PY->>PY: recusa arquivo pequeno (espaço reservado do OneDrive)
-  PY->>PY: confere o cabeçalho (Status e Data Pregão)
-  PY-->>CMD: aba.json em pasta temporária
-  CMD->>SY: sincroniza (fonte agendador)
-  SY->>SY: mapeia as 34 colunas, normaliza listas, converte margens, gera a chave
-  SY->>SY: recusa se vierem menos de 400 linhas
-  SY->>DB: sincronizar_planilha(linhas) como radar_escritor
-  DB->>DB: insere novas
-  DB->>DB: atualiza só o que mudou e não foi editado na web
-  DB->>DB: o que sumiu vira ausente (não apaga)
-  DB->>DB: registra carga_status (quando, quantas, fonte)
-  DB-->>SY: inseridas, atualizadas, protegidas, ausentes
-  CMD->>CMD: apaga a cópia e o aba.json, grava carga.log
-  V-->>DB: diariamente: última carga com mais de 80 h falha o workflow e o GitHub avisa
+  WEB(["Radar web<br/>cadastro e edição<br/>única porta de entrada"]):::pessoa -->|"criar, atualizar, arquivar"| DB[("Neon Postgres<br/>fonte da verdade")]:::dados
+  XLS["BaseLicitacao.xlsx<br/>deixou de alimentar o banco"]:::externo
+  OLD["Tarefa Radar-Carga-Planilha<br/>DESATIVADA em 27/10/2026<br/>scripts removidos"]:::erro
+  LEG["Legado no banco, sem uso:<br/>sincronizar_planilha, carga_status,<br/>chave_planilha, ausente_na_planilha"]:::externo
+  XLS --- OLD
+  OLD -.->|"não roda mais"| DB
+  DB --- LEG
 ```
 
 ### D13 · Integração com o Microsoft Planner
@@ -578,30 +565,32 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor U as Usuário
+  participant CF as Radar (Cloudflare)
   participant DB as Banco
-  participant AG as Agendador (5 min, seg a sex, 08h às 19h)
+  participant GH as Workflow planner-integracao (GitHub Actions)
   participant EX as planner-eventos.mjs
-  participant FS as eventos/entrada
   participant PA as planner_auto.py
   participant PL as Microsoft Planner
 
-  U->>DB: cadastra ou edita pela web
-  AG->>EX: rodar-integracao.cmd
+  U->>CF: cadastra ou salva pela web
+  CF->>DB: criar ou atualizar (a versão aumenta)
+  CF-->>GH: workflow_dispatch na hora (e agendamento de 5 em 5 min, seg a sex 08h às 19h, como rede de segurança)
+  GH->>DB: restaura o estado cifrado (token Microsoft e versões aplicadas)
+  GH->>EX: exporta
   EX->>DB: lê (radar_planner) as criadas pela web depois do marco, não arquivadas, com versão nova
-  EX->>EX: monta o evento v2: torre define o plano, status define o bucket, pré-vendas vira responsável
-  EX->>FS: grava o JSON do evento
+  EX->>EX: monta o evento v2: torre define o plano, status define a coluna, pré-vendas vira responsável
   EX->>DB: registra planner_exportacao (versão exportada, chave)
-  AG->>PA: processar-eventos
-  PA->>FS: lê os eventos pendentes
+  GH->>PA: processar-eventos (pasta temporária do runner)
   PA->>PL: Graph delegado: procura o cartão pela chave AAAA-NNNN
   alt cartão não existe
-    PA->>PL: cria no plano e no bucket certos
+    PA->>PL: cria no plano e na coluna certos
   else existe e o evento é mais novo
     PA->>PL: atualiza (responsável vazio não altera)
   else evento mais antigo
     PA->>PA: ignora
   end
-  PA->>FS: move para processados, ou para erros com o motivo
+  GH->>DB: guarda o estado cifrado (planner_auto_estado)
+  Note over GH: o log público mostra só contagens
 ```
 
 *Sentido único (Radar → Planner). Nunca apaga cartão nem arquivo. As oportunidades vindas da planilha nunca são enviadas. **O que muda em cada campo do cartão a cada salvamento** (e o desenho da decisão) está em [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md#regra-de-atualização-o-que-acontece-no-cartão).*
@@ -617,7 +606,7 @@ sequenceDiagram
   actor U as Usuário
   participant S as SPA e API
   participant DB as Banco
-  participant GA as Rotina de envio (máquina do time a cada 5 min, GitHub à noite)
+  participant GA as Workflow enviar-emails (GitHub Actions)
   participant SMTP as Gmail SMTP
 
   Note over ADM,DB: Configuração (Administração, aba E-mails)
@@ -626,24 +615,25 @@ sequenceDiagram
   ADM->>S: Enviar e-mail de teste para mim
   S->>DB: enfileirar_email_teste (vai só ao próprio administrador)
 
-  Note over U,DB: Cadastro (não espera o e-mail)
-  U->>S: cadastra uma oportunidade pela web
-  S->>DB: criar_oportunidade
-  DB->>DB: gatilho: é da web, o módulo está ligado e o status está marcado?
-  DB-->>DB: sim, grava pedido pendente em email_fila (um por oportunidade)
-  DB-->>S: 201 (o cadastro nunca falha por causa do e-mail)
+  Note over U,DB: Cadastro ou mudança de status (não espera o e-mail)
+  U->>S: cadastra uma oportunidade ou muda o status pela web
+  S->>DB: criar_oportunidade ou atualizar_oportunidade
+  DB->>DB: gatilho: nova (só da web) ou mudança de status (qualquer oportunidade, fora da carga), módulo ligado e status marcado?
+  DB-->>DB: sim, grava pedido pendente em email_fila (tipo nova ou status, com de, para e quem alterou)
+  DB-->>S: 201 ou 200 (a gravação nunca falha por causa do e-mail)
+  S-->>GA: workflow_dispatch na hora (em segundo plano)
 
-  Note over GA,SMTP: Envio assíncrono
+  Note over GA,SMTP: Envio assíncrono (também a cada 15 min como rede de segurança)
   GA->>DB: lê até 50 pedidos pendentes (radar_email)
   GA->>GA: regras valem agora: módulo ligado? tem destinatário Para?
   GA->>GA: destinatários = lista Para e Cc, mais o pré-vendas da oportunidade se a opção estiver ligada e ele tiver e-mail
   GA->>DB: pega o pedido e conta a tentativa (se outro processo já pegou, pula)
-  GA->>SMTP: envia (TLS, porta 465)
+  GA->>SMTP: envia o e-mail completo, com todas as informações da oportunidade (TLS, porta 465)
   alt enviado
     GA->>DB: situação enviado
   else erro
     GA->>DB: volta a pendente com o motivo, até 5 tentativas
-    GA->>GA: na 5ª falha: situação erro (aparece na aba E-mails), e pelo GitHub o workflow também falha e o GitHub avisa
+    GA->>GA: na 5ª falha: situação erro (aparece na aba E-mails) e o workflow falha, com aviso do GitHub
   end
 ```
 
@@ -654,8 +644,8 @@ flowchart TB
   classDef erro fill:#fde1e1,stroke:#a61f1f,color:#1a1a1a
   classDef ok fill:#e6f6e6,stroke:#2d7a2d,color:#1a1a1a
 
-  N(["Nova oportunidade"]):::passo --> W{"Criada pela web?"}:::decisao
-  W -->|"não (planilha ou edição)"| X1["Nunca envia"]:::erro
+  N(["Oportunidade nova<br/>ou mudança de status"]):::passo --> W{"Nova: criada pela web?<br/>Status: qualquer oportunidade,<br/>fora da carga"}:::decisao
+  W -->|"não"| X1["Nunca envia"]:::erro
   W -->|"sim"| L{"Módulo ligado?"}:::decisao
   L -->|"não"| X1
   L -->|"sim"| ST{"Status está entre os marcados?"}:::decisao
@@ -663,7 +653,7 @@ flowchart TB
   ST -->|"sim"| Q["Entra na fila (pendente)"]:::ok
   Q --> E{"No envio: ainda ligado<br/>e há destinatário Para<br/>(ou pré-vendas com e-mail)?"}:::decisao
   E -->|"não"| IG["Marcado como não enviado, com o motivo"]:::erro
-  E -->|"sim"| ENV["Envia o e-mail"]:::passo
+  E -->|"sim"| ENV["Envia o e-mail<br/>(todas as informações da oportunidade)"]:::passo
   ENV --> R{"Resultado"}:::decisao
   R -->|"ok"| OK["Enviado"]:::ok
   R -->|"falha"| T{"Já foram 5 tentativas?"}:::decisao
@@ -693,6 +683,10 @@ flowchart LR
   DUMP --> CHK["verifica tamanho e tabelas"]:::passo --> ENC["AES-256 + PBKDF2<br/>+ hash SHA-256"]:::passo
   ENC --> DR[("Google Drive<br/>diario/ 14 dias<br/>semanal/ 12 semanas")]:::dados
 
+  ESP{{"Espelho no Supabase<br/>diário 04:30 BRT"}}:::agenda --> DUMP2["pg_dump + guarda do destino<br/>(só projeto dedicado ao Radar)"]:::passo
+  DB --> DUMP2
+  DUMP2 --> SUPA[("Supabase radar-backup<br/>estado mais recente<br/>falha se a contagem não bater")]:::dados
+
   MES{{"Teste mensal<br/>dia 1"}}:::agenda --> DL["baixa o último, confere o hash, descriptografa"]:::passo
   DR --> DL
   DL --> R1["restaura em Postgres temporário"]:::passo
@@ -703,11 +697,10 @@ flowchart LR
   VIG{{"Vigia diário 12:00 BRT"}}:::agenda
   VIG -.-> A1["backup com mais de 30 h?"]:::alerta
   VIG -.-> A2["teste de restauração com mais de 40 dias?"]:::alerta
-  VIG -.-> A3["carga da planilha com mais de 80 h?"]:::alerta
-  A1 & A2 & A3 -.->|"falha do workflow: e-mail do GitHub"| N(["Quem administra é avisado"]):::alerta
+  A1 & A2 -.->|"falha do workflow: e-mail do GitHub"| N(["Quem administra é avisado"]):::alerta
 
   M1["RPO: até ~24 h pelo backup diário (o vigia tolera 30 h)<br/>e até 6 h para engano recente, pelo histórico do Neon"]:::meta
-  M2["RTO: ainda não definido formalmente"]:::meta
+  M2["RTO: ainda não definido formalmente<br/>(o espelho do Supabase encurta a recuperação, mas ainda não foi testado como banco ativo)"]:::meta
 ```
 
 ### D16 · Entrega e testes (CI/CD)
@@ -739,7 +732,9 @@ flowchart LR
   DEP -.->|"rollback: rodar o pipeline com o commit anterior"| PIPE
 
   SEM{{"Semanal: carga e segurança"}}:::agenda --> NF["Carga do banco e da API<br/>sondagem de segurança do site (de fora)<br/>latência do banco real"]:::passo
-  DIA{{"Diário: vigia"}}:::agenda --> VG["backup, restauração e carga em dia"]:::passo
+  DIA{{"Diário: vigia"}}:::agenda --> VG["backup e teste de restauração em dia"]:::passo
+  INT{{"Ao salvar na web + agenda<br/>Planner integração e Enviar e-mails"}}:::agenda --> RT["cartão no Planner e e-mail em cerca de 1 minuto<br/>(verificar: confere login e colunas sem gravar)"]:::passo
+  ESD{{"Diário: espelho no Supabase"}}:::agenda --> ES["restaura o banco no projeto dedicado"]:::passo
 ```
 
 ---
@@ -776,11 +771,10 @@ flowchart LR
   end
 
   subgraph z4["Zona 4: Rotinas confiáveis com credencial própria"]
-    WIN["Máquina Windows<br/>carga e Planner"]:::proc
-    GHA["GitHub Actions<br/>backup, e-mail, testes"]:::proc
+    GHA["GitHub Actions<br/>Planner, e-mail, backup, espelho, testes<br/>(sem máquina de pessoa)"]:::proc
   end
 
-  EXT["Serviços externos<br/>Receita, Planner, Gmail, Drive"]:::externo
+  EXT["Serviços externos<br/>Receita, Planner, Gmail, Drive, Supabase"]:::externo
 
   ATK -.->|"sem login: 302 para o Access (testado de fora)"| ACC
   U -->|"HTTPS: e-mail e código"| ACC
@@ -788,10 +782,10 @@ flowchart LR
   SPA -->|"HTTPS JSON + x-radar-csrf [dados internos e e-mails]"| API
   API -->|"TLS, radar_app ou radar_leitor [dados internos]"| DB
   API -->|"HTTPS, só 14 dígitos vão na URL [CNPJ público]"| EXT
-  WIN -->|"TLS, radar_escritor ou radar_planner"| DB
-  WIN -->|"Graph delegado [título e responsável do cartão]"| EXT
-  GHA -->|"TLS, radar_backup e radar_email"| DB
-  GHA -->|"AES-256 [dump cifrado] e SMTP TLS [aviso]"| EXT
+  API -.->|"workflow_dispatch, token só de Actions [aciona a rotina]"| GHA
+  GHA -->|"TLS, radar_planner, radar_email e radar_backup"| DB
+  GHA -->|"Graph delegado [título e responsável do cartão]"| EXT
+  GHA -->|"AES-256 [dump cifrado], SMTP TLS [aviso] e pg_restore [espelho]"| EXT
 ```
 
 | STRIDE | Ameaça no Radar | Controle | Onde é verificado |
@@ -816,7 +810,7 @@ flowchart LR
 
   LEI["radar_leitor<br/>API do painel"]:::papel
   APP["radar_app<br/>API do cadastro"]:::papel
-  ESC["radar_escritor<br/>carga agendada"]:::papel
+  ESC["radar_escritor<br/>sem uso: carga descontinuada"]:::papel
   PLN["radar_planner<br/>exportador do Planner"]:::papel
   EML["radar_email<br/>envio de e-mail"]:::papel
   BKP["radar_backup<br/>backup"]:::papel
@@ -825,9 +819,9 @@ flowchart LR
   T2[("oportunidades_historico")]:::tab
   T3[("email_config<br/>email_destinatarios")]:::tab
   T4[("email_fila")]:::tab
-  T5[("planner_marco<br/>planner_exportacao")]:::tab
+  T5[("planner_marco<br/>planner_exportacao<br/>planner_auto_estado (cifrado)")]:::tab
   F1["criar, atualizar, arquivar<br/>salvar_usuario, salvar_opcao<br/>salvar_email_config, enfileirar_email_teste, eh_admin"]:::fun
-  F2["sincronizar_planilha"]:::fun
+  F2["sincronizar_planilha<br/>(legado)"]:::fun
   N["Ninguém tem DELETE ou TRUNCATE.<br/>A carga total antiga foi revogada."]:::nega
 
   LEI -->|"SELECT"| T1
@@ -866,7 +860,9 @@ erDiagram
     text linha_servico
     text orgao
     text descritivo "sem limite"
+    text sigla "até 20 caracteres, fora da planilha"
     text objeto "o que se contrata, fora da planilha"
+    int duracao_contrato_meses "1 a 600, opcional"
     date data_pregao_dt
     time hora_pregao "opcional, horário de Brasília, fora da planilha"
     text analista "pré-vendas"
@@ -878,7 +874,7 @@ erDiagram
     text empresa_vencedora_cnpj "14 dígitos"
     text empresa_vencedora_razao "da Receita"
     text empresa_vencedora_tipo "Matriz ou Filial"
-    text fonte "planilha ou web"
+    text fonte "web (planilha: legado)"
     text chave_planilha
     bool editado_na_web
     bool ausente_na_planilha
@@ -933,6 +929,11 @@ erDiagram
     int versao_exportada
     text chave
   }
+  planner_auto_estado {
+    text nome PK "token_cache.json ou estado_radar.json"
+    text conteudo "cifrado (Fernet)"
+    timestamptz atualizado_em
+  }
   email_config {
     int id PK "sempre 1"
     bool ativo
@@ -947,7 +948,10 @@ erDiagram
   }
   email_fila {
     bigint id PK
-    text tipo "nova ou teste"
+    text tipo "nova, status ou teste"
+    text status_anterior
+    text status_novo
+    text alterado_por
     bigint oportunidade_id FK
     text situacao "pendente enviado erro ignorado"
     int tentativas
@@ -976,7 +980,7 @@ Os mesmos diagramas como imagens, para abrir no navegador, colar em apresentaç�
 | D10a Estados do registro | [diagramas/D10a-estados-do-registro.svg](diagramas/D10a-estados-do-registro.svg) |
 | D10b Status de negócio | [diagramas/D10b-status-de-negocio.svg](diagramas/D10b-status-de-negocio.svg) |
 | D11 Consulta de CNPJ | [diagramas/D11-consulta-de-cnpj.svg](diagramas/D11-consulta-de-cnpj.svg) |
-| D12 Carga da planilha | [diagramas/D12-carga-da-planilha.svg](diagramas/D12-carga-da-planilha.svg) |
+| D12 Carga da planilha (descontinuada) | [diagramas/D12-carga-da-planilha.svg](diagramas/D12-carga-da-planilha.svg) |
 | D13 Integração com o Planner | [diagramas/D13-planner.svg](diagramas/D13-planner.svg) |
 | D14a E-mail: sequência | [diagramas/D14a-email-sequencia.svg](diagramas/D14a-email-sequencia.svg) |
 | D14b E-mail: decisão | [diagramas/D14b-email-decisao.svg](diagramas/D14b-email-decisao.svg) |
@@ -1002,5 +1006,6 @@ Para regenerar depois de mudar um diagrama: `npm run diagramas` (usa o Chromium 
 
 | Versão | Data | Mudança |
 |---|---|---|
+| 1.2 | 28/10/2026 | Rotinas na nuvem (GitHub Actions disparado pelo Radar ao salvar; sem máquina de pessoa); fim da carga da planilha (D12); espelho diário no Supabase (D2, D3, D15, D17); e-mail também na mudança de status e com todas as informações (D14); estado do Planner cifrado no banco (D13, D18, D19); novos campos (sigla, duração do contrato) |
 | 1.1 | 25/10/2026 | D10b deixa de sugerir um ciclo de status e passa a mostrar só o que o sistema faz: lista fechada sem ordem imposta, exigências por status e efeitos do status (Planner, e-mail, painel) |
 | 1.0 | 25/10/2026 | Catálogo inicial com 19 diagramas (D1 a D19), cobrindo contexto, contêineres, implantação, componentes, jornada, perfis, cadastro, concorrência, validação, estados, CNPJ, carga, Planner, e-mail, backup, CI/CD, STRIDE, papéis do banco e ER |

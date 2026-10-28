@@ -16,11 +16,11 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 | [docs/TESTES.md](docs/TESTES.md) | Bateria de testes: regressão, segurança, carga e desempenho; como rodar e achados |
 | [docs/BACKUP.md](docs/BACKUP.md) | Backup diário criptografado no Drive, restauração e teste |
 | [docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md](docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md) | **Decisão (27/10/2026): o banco não é mais alimentado pela planilha do Excel** (a carga foi desativada e removida) |
-| [docs/AGENTE-DE-CARGA.md](docs/AGENTE-DE-CARGA.md) | Prompt do agente e agendamento a cada 2 dias |
+| [docs/AGENTE-DE-CARGA.md](docs/AGENTE-DE-CARGA.md) | Histórico da carga automática da planilha (**descontinuada**) |
 | [planner-auto/](planner-auto/README.md) | Ferramenta que aplica os eventos do Radar no Planner |
 | [db/migrations/](db/migrations/) | Esquema, funções e privilégios do banco (migrações aditivas) |
 
-**Em uma frase:** o Postgres (Neon) é a fonte da verdade — o time cadastra oportunidades na aba **Oportunidades** e um agente sincroniza a planilha por merge a cada 2 dias; o painel de métricas, o backup diário e o Microsoft Planner leem desse banco, tudo atrás do Cloudflare Access (login por código no e-mail `@ctctech.com.br`).
+**Em uma frase:** o Postgres (Neon) é a fonte da verdade — o time cadastra oportunidades na aba **Oportunidades** (a planilha deixou de alimentar o banco em 27/10/2026); o painel de métricas, o Microsoft Planner, os e-mails de aviso, o backup diário e o espelho no Supabase leem desse banco. As rotinas rodam no **GitHub Actions**, acionadas pelo Radar ao salvar, sem depender de computador de pessoa. Tudo atrás do Cloudflare Access (login por código no e-mail `@ctctech.com.br`).
 
 ## Rodar
 
@@ -90,7 +90,7 @@ scripts/
 
 ## Dados: Postgres (Neon) como fonte da verdade
 
-**Entradas:** (1) cadastro e edição na aba **Oportunidades** (API `functions/api/oportunidades/*`, regras no banco, histórico e bloqueio otimista); (2) carga da planilha `BaseLicitacao.xlsx` por **merge** (`scripts/sync-db.mjs` → `sincronizar_planilha`), que nunca sobrescreve o que foi editado na web. **Saídas:** painel de métricas (`GET /api/rows`), backup diário no Drive e integração com o Planner. Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md).
+**Entradas:** (1) cadastro e edição na aba **Oportunidades** (API `functions/api/oportunidades/*`, regras no banco, histórico e bloqueio otimista); (a planilha `BaseLicitacao.xlsx` deixou de ser entrada em 27/10/2026).mjs` → `sincronizar_planilha`), que nunca sobrescreve o que foi editado na web. **Saídas:** painel de métricas (`GET /api/rows`), backup diário no Drive e integração com o Planner. Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md).
 
 **Proteção:** a API **falha fechada**: só responde com um JWT válido do **Cloudflare Access**. Sem Access configurado, devolve 503. Escritas exigem ainda o cabeçalho anti-CSRF.
 
@@ -133,4 +133,4 @@ scripts/
 
 ## Lacunas / próximos passos
 
-O estado atual e as melhorias planejadas estão em [docs/ROADMAP.md](docs/ROADMAP.md). Destaques: trava final da carga antiga (migração 002), correção das pendências migradas, chave estável na planilha, encerramento da convivência com a planilha e alertas de falha.
+O estado atual e as melhorias planejadas estão em [docs/ROADMAP.md](docs/ROADMAP.md). Destaques: login do Planner sem depender de pessoa (app do Entra), alertas de falha, teste de uso do espelho do Supabase como banco ativo e propagar arquivamento e mudança de torre ao Planner.

@@ -14,8 +14,8 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `ACESSO_PUBLICO` | `wrangler.toml` (ausente = API protegida) | público | Pull request (**não usar**) |
 | ~~`DATABASE_URL_WRITER`~~ (papel `radar_escritor`) | **Descontinuada em 27/10/2026** (fim da carga da planilha); pode ser removida da máquina | — | Administrador |
 | `SUPABASE_DB_URL` (espelho do banco no Supabase) e, opcional, `SUPABASE_URL` (variável) / `SUPABASE_ANON_KEY` | GitHub (Actions) | **Secret** (a URL é variável) | Administrador |
-| `DATABASE_URL_PLANNER` (papel `radar_planner`) | variável de ambiente do usuário Windows da máquina da integração | **Segredo** | Administrador |
-| `PLANNER_EVENTOS_DIR` | variável de ambiente do usuário Windows (`...\planner-auto\eventos\entrada`) | caminho | Administrador |
+| `DATABASE_URL_PLANNER` (papel `radar_planner`) | **GitHub (Actions)** (e, só para a contingência no Windows, variável de usuário da máquina) | **Segredo** | Administrador |
+| `PLANNER_EVENTOS_DIR` | só na contingência do Windows (`...\planner-auto\eventos\entrada`); na nuvem é uma pasta temporária | caminho | Administrador |
 | `DATABASE_URL_BACKUP` (papel `radar_backup`) | GitHub → Settings → Secrets and variables → Actions | **Secret** | Administrador |
 | `DATABASE_URL_RESTORE` (papel `radar_restore`, só no branch `teste-restauracao`) | GitHub (Actions) | **Secret** | Administrador |
 | `DATABASE_URL_EMAIL` (papel `radar_email`), `SMTP_USER`, `SMTP_PASS` (senha de app do Gmail), `SMTP_FROM` (opcional) e variável `APP_URL` | GitHub (Actions) | **Secret** (`APP_URL` é variável) | Administrador |
@@ -137,12 +137,12 @@ Papéis com senha: `radar_leitor`, `radar_app`, `radar_escritor`, `radar_planner
 |---|---|
 | `radar_leitor` | secret `DATABASE_URL` no Pages + redeploy |
 | `radar_app` | secret `DATABASE_URL_APP` no Pages + redeploy |
-| `radar_escritor` | `DATABASE_URL_WRITER` na máquina do agente |
-| `radar_planner` | `DATABASE_URL_PLANNER` na máquina da integração |
+| `radar_escritor` | sem uso (carga da planilha descontinuada) |
+| `radar_planner` | secret `DATABASE_URL_PLANNER` no GitHub (Actions) |
 | `radar_backup` | secret `DATABASE_URL_BACKUP` no GitHub |
 | `radar_email` | secret `DATABASE_URL_EMAIL` no GitHub |
 
-3. Conferir: o painel carrega, o cadastro salva, a próxima carga/integração/backup funciona.
+3. Conferir: o painel carrega, o cadastro salva, a próxima integração, e-mail, backup e espelho funcionam.
 
 ### 4.2 Trocar o token de deploy da Cloudflare
 1. Cloudflare → Manage Account → Account API Tokens → *Create Token* → **Cloudflare Pages → Edit**, sem filtro de IP, com validade.
