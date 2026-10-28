@@ -1,7 +1,6 @@
-import { rota, comCorpo } from '../../_lib/rota.ts'
-import { listarMonitoramento, vincularMonitoramento } from '../../_lib/monitorLicitacoes.ts'
+import { rota } from '../../_lib/rota.ts'
+import { listarMonitoramento } from '../../_lib/monitorLicitacoes.ts'
 
 export const onRequest = rota({
   GET: ({ sql }) => listarMonitoramento(sql),
-  PUT: ({ sql, email, params, corpo }) => comCorpo(corpo, (j) => vincularMonitoramento(sql, email, String(params.id ?? ''), j)),
 })
