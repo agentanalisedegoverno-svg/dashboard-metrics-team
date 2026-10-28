@@ -64,7 +64,6 @@ export default function MonitorLicitaçõesTab() {
   const [filtro, setFiltro] = useState<'todos'|'pendentes'|'vinculados'|'falhas'>('todos')
   const qc = useQueryClient()
   const query = useQuery({ queryKey: ['monitor-licitacoes'], queryFn: ({ signal }) => request<Payload>('/monitor-licitacoes', { signal }), staleTime: 15_000, refetchInterval: 60_000, retry: false })
-  const sincronizar = useMutation({ mutationFn: () => request('/monitor-licitacoes/sincronizar', { method: 'POST', body: '{}' }), onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['monitor-licitacoes'] }); toast.success('Solicitação de consulta enviada') }, onError: e => toast.error(e instanceof Error ? e.message : 'Falha ao solicitar consulta') })
   const rows = query.data?.rows ?? []
   const filtradas = useMemo(() => rows.filter(m => filtro === 'todos' || (filtro === 'pendentes' && m.estado_vinculo !== 'vinculado') || (filtro === 'vinculados' && m.estado_vinculo === 'vinculado') || (filtro === 'falhas' && m.estado_coleta === 'falha')), [rows, filtro])
   const resumo = query.data?.resumo
