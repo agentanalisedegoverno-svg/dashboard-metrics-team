@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQueries, useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Activity, ExternalLink, RefreshCw, Search, ShieldAlert } from 'lucide-react'
 import { useOportunidades } from '@/features/oportunidades/api'
 import type { Oportunidade } from '@/domain/oportunidade'
@@ -9,8 +9,15 @@ type PncpItem = {
   dataPublicacaoPncp?: string; dataEncerramentoProposta?: string; modalidadeNome?: string; situacaoCompraNome?: string
   orgaoEntidade?: { cnpj?: string; razaoSocial?: string }
   unidadeOrgao?: { codigoUnidade?: string; nomeUnidade?: string; ufSigla?: string }
+  id_compra?: string; co_processo?: string; co_uasg?: number; no_ausg?: string; no_orgao?: string
+  numero?: number; ds_situacao_pregao?: string; ds_tipo_pregao?: string; ds_tipo_pregao_compra?: string
+  tx_objeto?: string; dt_data_edital?: string; dt_inicio_proposta?: string; dt_fim_proposta?: string
+  situacao_aviso?: string; nome_modalidade?: string; objeto?: string; data_publicacao?: string
+  data_abertura_proposta?: string; data_entrega_proposta?: string; numero_aviso?: number; uasg?: number
+  orgaoEntidadeRazaoSocial?: string; unidadeOrgaoUfSigla?: string; valor_estimado_total?: number | string
+  source?: string
 }
-type PncpResponse = { data?: PncpItem[]; items?: PncpItem[]; content?: PncpItem[]; resultado?: PncpItem[] }
+type PncpResponse = { data?: PncpItem[]; items?: PncpItem[]; content?: PncpItem[]; resultado?: PncpItem[]; totalPaginas?: number }
 type Resultado = { item: PncpItem; score: number; motivos: string[]; url: string | null }
 
 const STATUS = new Set(['prospect', 'go', 'on going', 'ongoing', 'suspended', 'suspenso', 'suspensa', 'onboarding'])
@@ -38,6 +45,45 @@ async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem
   if (Array.isArray(json)) return json
   return json.data ?? json.items ?? json.content ?? json.resultado ?? []
 }
+
+const dataISO = (date: Date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
+async function consultarComprasGov(): Promise<PncpItem[]> {
+  const fim = new Date()
+  const inicio = new Date(fim)
+  inicio.setDate(inicio.getDate() - 45)
+  const de = dataISO(inicio), ate = dataISO(fim)
+  const consultas = [
+    { path: 'modulo-legado/3_consultarPregoes', params: { dt_data_edital_inicial: de, dt_data_edital_final: ate } },
+    { path: 'modulo-legado/1_consultarLicitacao', params: { data_publicacao_inicial: de, data_publicacao_final: ate } },
+  ]
+  const resultados = await Promise.all(consultas.map(async ({ path, params }) => {
+    const url = new URL('/comprasgov/' + path, window.location.origin)
+    url.searchParams.set('pagina', '1')
+    url.searchParams.set('tamanhoPagina', '100')
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value))
+    const response = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(22_000) })
+    if (!response.ok) throw new Error('Compras.gov.br respondeu HTTP ' + response.status + ' em ' + path)
+    const json = await response.json() as PncpResponse
+    return (json.resultado ?? []).map((item): PncpItem => ({
+      ...item,
+      processo: item.co_processo ?? item.numero_processo ?? (item.numero != null ? String(item.numero) : undefined),
+      numeroCompra: item.numero != null ? String(item.numero) : item.numero_aviso != null ? String(item.numero_aviso) : undefined,
+      objetoCompra: item.tx_objeto ?? item.objeto,
+      situacaoCompraNome: item.ds_situacao_pregao ?? item.situacao_aviso,
+      dataPublicacaoPncp: item.data_publicacao ?? item.dt_data_edital,
+      dataEncerramentoProposta: item.dt_fim_proposta ?? item.data_entrega_proposta,
+      modalidadeNome: item.ds_tipo_pregao ?? item.nome_modalidade,
+      orgaoEntidade: { razaoSocial: item.no_orgao ?? item.orgaoEntidadeRazaoSocial },
+      unidadeOrgao: { codigoUnidade: item.co_uasg != null ? String(item.co_uasg) : item.uasg != null ? String(item.uasg) : undefined, nomeUnidade: item.no_ausg, ufSigla: item.unidadeOrgaoUfSigla },
+      numeroControlePNCP: item.id_compra,
+      source: 'Compras.gov.br — legado',
+    }))
+  }))
+  const unique = new Map<string, PncpItem>()
+  resultados.flat().forEach((item, index) => unique.set(item.id_compra ?? [item.processo, item.numeroCompra, item.objetoCompra, index].join('|'), item))
+  return [...unique.values()]
+}
+
 function pontuar(o: Oportunidade, c: PncpItem): Resultado | null {
   const processo = fold(o.processo), processoPncp = fold(c.processo)
   const uasg = fold(o.uasg), unidade = fold([c.unidadeOrgao?.codigoUnidade, c.unidadeOrgao?.nomeUnidade].join(' '))
@@ -70,12 +116,13 @@ export default function MonitorLicitaçõesTab() {
   const [busca, setBusca] = useState('')
   const elegiveis = useMemo(() => (lista.data ?? []).filter(o => STATUS.has(fold(o.status)) && !o.arquivado_em), [lista.data])
   const ufs = useMemo(() => [...new Set(elegiveis.map(o => (o.uf ?? '').trim().toUpperCase()).filter(uf => /^[A-Z]{2}$/.test(uf)))].sort(), [elegiveis])
+  const comprasGov = useQuery({ queryKey: ['comprasgov-licitacoes-front'], queryFn: consultarComprasGov, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
   const consultas = useQueries({ queries: ufs.map(uf => ({
     queryKey: ['pncp-licitacoes-front', uf],
     queryFn: ({ signal }: { signal: AbortSignal }) => consultarPncp(uf, signal),
     staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false,
   })) })
-  const atualizando = lista.isFetching || consultas.some(q => q.isFetching)
+  const atualizando = lista.isFetching || comprasGov.isFetching || consultas.some(q => q.isFetching)
   const porUf = useMemo(() => new Map(ufs.map((uf, i) => [uf, consultas[i]])), [ufs, consultas])
   const linhas = useMemo(() => {
     const q = fold(busca)
@@ -97,18 +144,20 @@ export default function MonitorLicitaçõesTab() {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ['oportunidades'] }),
       qc.invalidateQueries({ queryKey: ['pncp-licitacoes-front'] }),
+      qc.invalidateQueries({ queryKey: ['comprasgov-licitacoes-front'] }),
     ])
     await Promise.all([
       qc.refetchQueries({ queryKey: ['pncp-licitacoes-front'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['comprasgov-licitacoes-front'], type: 'active' }),
       lista.refetch(),
     ])
   }
   const fontesFalharam = consultas.filter(q => q.isError).length
   const fontesOk = consultas.filter(q => q.isSuccess).length
-  const totalResultados = consultas.reduce((n, q) => n + (q.data?.length ?? 0), 0)
+  const totalResultados = consultas.reduce((n, q) => n + (q.data?.length ?? 0), 0) + (comprasGov.data?.length ?? 0)
   const totalComCandidato = elegiveis.filter(o => {
     const q = porUf.get((o.uf ?? '').trim().toUpperCase())
-    return q?.data && candidatos(o, q.data).length > 0
+    return (q?.data || comprasGov.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? [])]).length > 0
   }).length
   return <section className="mt-5 space-y-5" aria-label="Monitoramento de licitações">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -128,18 +177,18 @@ export default function MonitorLicitaçõesTab() {
       {lista.isPending ? <p className="py-10 text-center text-sm text-muted">Carregando oportunidades…</p> : linhas.length===0 ? <p className="py-10 text-center text-sm text-muted">Nenhuma oportunidade encontrada para este filtro.</p> : <div className="mt-4 space-y-3">{linhas.map(o=>{
         const uf=(o.uf??'').trim().toUpperCase()
         const consulta=porUf.get(uf)
-        const matches=consulta?.data ? candidatos(o,consulta.data) : []
+        const matches=candidatos(o,[...(consulta?.data ?? []), ...(comprasGov.data ?? [])])
         return <article key={o.id} className="rounded-lg border border-line p-3">
           <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-semibold text-ink">{(o.codigo ?? '#'+o.id) + ' · ' + o.orgao}</p><p className="mt-1 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p><p className="mt-1 text-xs text-muted">Processo/pregão: {o.processo || 'Não informado'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}</p><p className="mt-1 text-xs text-muted">Portal informado: {o.site || 'Não informado'} · Pregão: {data(o.data_pregao_dt)}</p></div><span className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs text-ink">{o.status}</span></div>
           <div className="mt-3 border-t border-line pt-3">
             {!uf ? <p className="text-xs text-muted">Consulta não executada: esta oportunidade está sem UF válida no cadastro.</p> : consulta?.isPending || !consulta ? <p className="text-xs text-muted">Aguardando consulta do PNCP ({uf})… A consulta será encerrada automaticamente após 12 segundos se a fonte não responder.</p> :
             consulta.isError ? <div className="text-xs text-st-critical"><p>Consulta PNCP indisponível nesta sessão (tempo limite de 12 s ou falha da fonte).</p><p className="mt-1 break-words text-muted">Detalhe técnico: {(consulta.error as Error)?.message || 'Falha de rede ou bloqueio CORS.'}</p><button type="button" onClick={() => qc.refetchQueries({ queryKey: ['pncp-licitacoes-front', uf], type: 'active' })} className="mt-1 font-semibold underline">Tentar novamente nesta UF</button></div> :
             matches.length===0 ? <p className="text-xs text-muted">Nenhum candidato compatível entre os resultados abertos consultados para {uf}. Isso não significa que o certame não exista.</p> :
-            <div className="space-y-2"><p className="text-xs font-semibold text-ink"><Activity className="mr-1 inline size-3.5"/>Possíveis correspondências no PNCP</p>{matches.map((m,i)=><div key={m.item.numeroControlePNCP || i} className="rounded-md bg-surface-2 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-medium text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'}</p><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">Compatibilidade {m.score}</span></div><p className="mt-1 text-xs text-ink-soft">{(m.item.processo ? 'Processo '+m.item.processo+' · ' : '')+(m.item.objetoCompra || m.item.informacaoComplementar || 'Objeto não informado')}</p><p className="mt-1 text-xs text-muted">{m.motivos.join(' · ')} · Situação: {m.item.situacaoCompraNome || 'Não informada'} · Encerramento: {data(m.item.dataEncerramentoProposta)}</p>{m.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer">Abrir contratação no PNCP <ExternalLink className="size-3"/></a>}</div>)}</div>}
+            <div className="space-y-2"><p className="text-xs font-semibold text-ink"><Activity className="mr-1 inline size-3.5"/>Possíveis correspondências no PNCP</p>{matches.map((m,i)=><div key={m.item.numeroControlePNCP || i} className="rounded-md bg-surface-2 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-medium text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'}</p><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">Compatibilidade {m.score}</span></div><p className="mt-1 text-xs text-ink-soft">{(m.item.processo ? 'Processo '+m.item.processo+' · ' : '')+(m.item.objetoCompra || m.item.informacaoComplementar || 'Objeto não informado')}</p><p className="mt-1 text-xs text-muted">{m.motivos.join(' · ')} · Fonte: {m.item.source || 'PNCP'} · Situação: {m.item.situacaoCompraNome || 'Não informada'} · Encerramento: {data(m.item.dataEncerramentoProposta)}</p>{m.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer">Abrir contratação no PNCP <ExternalLink className="size-3"/></a>}</div>)}</div>}
           </div>
         </article>
       })}</div>}
-      <p className="mt-4 text-xs text-muted">Fontes consultadas: {fontesOk}/{ufs.length} UFs com resposta · {totalResultados} registros recebidos · Cache de 5 minutos · {fontesFalharam ? fontesFalharam+' consulta(s) com erro' : 'Sem falhas registradas'}.</p>
+      <p className="mt-4 text-xs text-muted">Fontes consultadas: PNCP {fontesOk}/{ufs.length} UFs · Compras.gov.br {comprasGov.isSuccess ? 'OK' : comprasGov.isError ? 'com erro' : 'consultando'} · {totalResultados} registros recebidos · Cache de 5 minutos · {fontesFalharam ? fontesFalharam+' consulta(s) PNCP com erro' : 'PNCP sem falhas registradas'}.</p>
     </div>
   </section>
 }
