@@ -123,7 +123,7 @@ END $$;;
 
 DROP TRIGGER IF EXISTS oportunidades_monitor_licitacoes_tg ON oportunidades;;
 CREATE TRIGGER oportunidades_monitor_licitacoes_tg
-AFTER INSERT OR UPDATE OF status, site, processo, uasg, arquivado_em ON oportunidades
+AFTER INSERT OR UPDATE ON oportunidades
 FOR EACH ROW EXECUTE FUNCTION monitor_licitacoes_sincronizar_oportunidade();;
 
 -- Semeia registros existentes; não inventa identificadores nem inicia consulta sem vínculo oficial.
