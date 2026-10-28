@@ -24,15 +24,21 @@ Estado em 28/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 
 | Etapa | Estado | Escopo / critério de conclusão |
 |---|---|---|
-| Consulta inicial do PNCP na aba Licitações | 🟡 Em validação | Somente leitura no navegador e cache em memória React Query. Implementado limite de 12 s por consulta, sem repetição automática e indicação explícita quando falta UF; validar no ambiente publicado com oportunidades reais. Sem novas tabelas ou APIs do Radar. |
+| Consulta PNCP na aba Licitações | 🟡 Em validação | Proxy de mesma origem com timeout; painel exibe dados encontrados, nível de atenção e próxima ação. Ainda exige validação com oportunidades reais em produção. Sem novas tabelas ou APIs do Radar. |
 | Ampliar a cobertura de descoberta | 🟡 Próxima prioridade | Revisar paginação e filtros do PNCP para reduzir falsos negativos. Inventário atual: 22 oportunidades ativas em Comprasnet (Gov.br), 11 em Compras.gov.br / PNCP, 4 em Petronect, 2 em Compras SC e 2 em bbmnet; existem registros sem portal identificado. A contagem é por cadastro atual, não prova que cada fonte tenha API pública utilizável. |
-| Outras fontes públicas | 🟡 Em avaliação | Prioridade 1: API oficial de Dados Abertos do Compras.gov.br, por concentrar a maior parte das oportunidades ativas no Comprasnet (Gov.br). Prioridade 2: portais estaduais abertos relacionados às oportunidades ativas (Compras SC; Compras MS e Seplag/MT, após confirmar volume e acesso técnico). Petronect e bbmnet ficam para avaliação posterior de endpoints e condições de uso. Manter PNCP como primeira fonte e não presumir que portal sem autenticação tenha API aberta estável. |
+| Compras.gov.br — dados abertos | 🟡 Implementação inicial | Proxy de mesma origem restrito a endpoints oficiais; consultas aos módulos legados de licitação/pregão e ao módulo de contratações da Lei 14.133. A cobertura e os parâmetros precisam ser validados com respostas reais antes de declarar concluído. |
+| Portais estaduais abertos | ⬜ Próxima etapa | Priorizar Compras SC, Compras MS e Seplag/MT. Confirmar endpoints oficiais, parâmetros, limites e termos de uso; manter conectores isolados e somente leitura. |
 | Acompanhamento de certames em que participamos | ⬜ Futuro | Evoluir de descoberta para acompanhamento de oportunidades confirmadas: vínculo por identificador oficial, prazos/sessões, mudanças publicadas, resultado/andamento e links oficiais. Definir o fluxo operacional com o time antes de persistir qualquer dado novo. |
 | Alertas de prazo e mudança | ⬜ Futuro | Após validar a etapa de acompanhamento, definir alertas para prazos e alterações relevantes com fonte e data da última verificação visíveis. |
 
 **Limite da fase atual:** o módulo é um paliativo de consulta. Não registra participação, não confirma automaticamente vínculos e não altera banco/back-end. As etapas futuras precisam de decisão explícita antes de introduzir persistência ou automações.
 
-## 2. Próximos passos (curto prazo)\n\n1. **Licitações — validar a correção de timeout no ambiente publicado** e conferir as oportunidades com maior prioridade.\n2. **Licitações — avaliar integração somente leitura com a API oficial de Dados Abertos do Compras.gov.br**, usando o inventário de portais ativos como critério e sem persistência nova.\n
+## 2. Próximos passos (curto prazo)
+
+1. **Licitações — validar em produção** a resposta do PNCP e a cobertura de campos no painel.
+2. **Compras.gov.br — validar os três endpoints oficiais** e ajustar os filtros conforme o contrato real da API.
+3. **Portais estaduais — implementar conectores** após validar cada endpoint oficial e as condições de uso.
+4. **NOC — planejar snapshots persistentes** para detectar alterações históricas entre consultas; o painel atual sinaliza a situação da consulta corrente, não compara versões históricas.
 
 | # | Item | Por quê | Tam. |
 |---|---|---|---|
