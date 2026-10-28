@@ -56,7 +56,7 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
     { path: 'modulo-legado/3_consultarPregoes', params: { dt_data_edital_inicial: de, dt_data_edital_final: ate } },
     { path: 'modulo-legado/1_consultarLicitacao', params: { data_publicacao_inicial: de, data_publicacao_final: ate } },
   ]
-  const resultados = await Promise.all(consultas.map(async ({ path, params }) => {
+  const tentativas = await Promise.allSettled(consultas.map(async ({ path, params }) => {
     const url = new URL('/comprasgov/' + path, window.location.origin)
     url.searchParams.set('pagina', '1')
     url.searchParams.set('tamanhoPagina', '100')
@@ -79,6 +79,8 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
       source: 'Compras.gov.br — legado',
     }))
   }))
+  const resultados = tentativas.filter((r): r is PromiseFulfilledResult<PncpItem[]> => r.status === 'fulfilled').map(r => r.value)
+  if (resultados.length === 0) throw new Error(tentativas.map(r => r.status === 'rejected' ? String(r.reason) : '').filter(Boolean).join(' | ') || 'Nenhuma fonte respondeu')
   const unique = new Map<string, PncpItem>()
   resultados.flat().forEach((item, index) => unique.set(item.id_compra ?? [item.processo, item.numeroCompra, item.objetoCompra, index].join('|'), item))
   return [...unique.values()]
@@ -170,6 +172,10 @@ export default function MonitorLicitaçõesTab() {
     </div>
     <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted"/><p>O PNCP consultado retorna contratações com recebimento de propostas. Não garante cobertura de processos encerrados, suspensos ou de portais privados. Compatibilidade é sugestão automática, não confirmação de vínculo oficial.</p></div>
     <div className="rounded-xl border border-line bg-surface p-4">
+    <div className="rounded-xl border border-line bg-surface p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">Teste da fonte alternativa · Compras.gov.br</h2><p className="text-xs text-muted">Pregões e licitações legadas publicados nos últimos 45 dias · somente leitura</p></div><span className="rounded-md border border-line px-2 py-1 text-xs text-muted">{comprasGov.isSuccess ? (comprasGov.data?.length ?? 0)+' registros' : comprasGov.isError ? 'Fonte indisponível' : 'Consultando…'}</span></div>
+      {comprasGov.isPending ? <p className="py-4 text-sm text-muted">Consultando a API oficial de Dados Abertos do Compras.gov.br…</p> : comprasGov.isError ? <div role="alert" className="py-3 text-sm text-st-critical">Falha na consulta Compras.gov.br: {(comprasGov.error as Error)?.message || 'erro desconhecido'}</div> : (comprasGov.data ?? []).length === 0 ? <p className="py-4 text-sm text-muted">A API respondeu, mas não retornou registros no período consultado.</p> : <div className="mt-3 space-y-2">{(comprasGov.data ?? []).slice(0,8).map((item,i)=><div key={item.id_compra || item.numeroControlePNCP || i} className="rounded-lg border border-line p-3"><p className="text-sm font-semibold text-ink">{item.orgaoEntidade?.razaoSocial || item.unidadeOrgao?.nomeUnidade || 'Órgão não informado'} · {item.modalidadeNome || 'Pregão/licitação'}</p><p className="mt-1 text-xs text-ink-soft">{item.processo ? 'Processo/pregão '+item.processo+' · ' : ''}{item.objetoCompra || 'Objeto não informado'}</p><p className="mt-1 text-xs text-muted">Situação: {item.situacaoCompraNome || 'Não informada'} · Publicação: {data(item.dataPublicacaoPncp)} · Encerramento: {data(item.dataEncerramentoProposta)} · UASG: {item.unidadeOrgao?.codigoUnidade || 'Não informada'}</p></div>)}</div>}
+    </div>
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">Oportunidades em acompanhamento</h2><p className="text-xs text-muted">Fonte: cadastro existente do Radar · Sem escrita no banco</p></div>
         <div className="flex flex-wrap gap-2">{['Todos','Prospect','Go','On going','Suspended'].map(s=><button key={s} onClick={()=>setFiltroStatus(s)} className={'rounded-lg border px-3 py-1.5 text-xs font-semibold '+(filtroStatus===s?'border-gold bg-gold-soft text-ink':'border-line text-muted hover:bg-surface-2')}>{s}</button>)}</div>
       </div>
