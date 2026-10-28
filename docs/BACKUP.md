@@ -33,6 +33,17 @@ Em cada destino o teste confere: número de oportunidades (igual à produção),
 ### Vigia
 Todo dia confere (a) se há backup bem-sucedido nas últimas 30 horas e (b) se o último teste de restauração tem menos de 40 dias. Se não, o workflow falha e o GitHub envia e-mail. Para testar o alerta: *Actions → Vigia do backup → Run workflow* com `max_horas_backup = 0` (deve falhar de propósito).
 
+## Espelho no Supabase (segunda redundância)
+
+Além do backup criptografado no Drive, o workflow [`backup-supabase.yml`](../.github/workflows/backup-supabase.yml) (*Backup no Supabase*) restaura o banco do Neon, **uma vez por dia (04:30 Brasília, com atraso normal do GitHub)**, num Postgres do **Supabase**. É uma cópia viva, pronta para consulta ou para virar o banco se o Neon cair. O Drive continua sendo o backup principal (histórico de 14 dias e 12 semanas); o Supabase guarda só o **estado mais recente**.
+
+- **Como funciona:** `pg_dump` do Neon (papel somente leitura `radar_backup`) → confere tamanho e tabelas → restaura no Supabase com `pg_restore --clean --if-exists` → compara o número de oportunidades (tolerância de 10) e **falha** se não bater.
+- **Projeto dedicado:** use um projeto do Supabase só para o Radar. O workflow **recusa restaurar** se o schema `public` do destino tiver tabelas que não são do Radar (proteção contra apagar outro app, como o de `players`).
+- **Mantém o projeto ativo:** o plano gratuito do Supabase pausa após 7 dias sem atividade. A restauração diária já é atividade; opcionalmente o workflow também chama a API REST (`SUPABASE_URL` + `SUPABASE_ANON_KEY`). Não é preciso o cron-job.org nem criar conta externa.
+- **O que o espelho NÃO leva:** privilégios e papéis (`radar_*`), como no backup comum. Para usar de verdade, rode as migrações/papéis (ver "Restaurar de verdade").
+- **Segurança:** o log do GitHub é público; o workflow só imprime contagens. A senha do banco do Supabase fica só no segredo `SUPABASE_DB_URL`. Os dados do Radar passam a existir em mais um provedor: mantenha o acesso ao projeto restrito.
+- **Ligar:** crie os segredos abaixo e rode *Backup no Supabase* manualmente uma vez. Sem `SUPABASE_DB_URL` o workflow só avisa e não faz nada.
+
 ## Segredos necessários (GitHub → Settings → Secrets and variables → Actions)
 
 | Segredo | O que é |
@@ -40,6 +51,8 @@ Todo dia confere (a) se há backup bem-sucedido nas últimas 30 horas e (b) se o
 | `DATABASE_URL_BACKUP` | Connection string do papel `radar_backup` (somente leitura) |
 | `BACKUP_PASSPHRASE` | Senha de criptografia dos dumps. **Guarde também no cofre de senhas da empresa: sem ela o backup não abre.** |
 | `RCLONE_DRIVE_TOKEN` | Token OAuth do Drive (JSON), gerado uma vez com `rclone authorize "drive"` |
+| `SUPABASE_DB_URL` | Connection string do banco do projeto **dedicado** no Supabase (Settings → Database → Connection string, modo *Session pooler* ou direta, com a senha do banco). Só o espelho usa |
+| `SUPABASE_URL` (variável) e `SUPABASE_ANON_KEY` (segredo) | **Opcionais:** URL e chave `anon` do mesmo projeto, para o ping que o mantém ativo |
 | `DATABASE_URL_RESTORE` | Connection string do papel `radar_restore` **do branch `teste-restauracao`** (banco administrativo `neondb`; o teste usa o banco `restore_drill`). Não dá acesso à produção |
 
 ## Restaurar de verdade (desastre)
