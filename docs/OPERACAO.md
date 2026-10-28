@@ -13,6 +13,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | `wrangler.toml` `[vars]` | público | Pull request |
 | `ACESSO_PUBLICO` | `wrangler.toml` (ausente = API protegida) | público | Pull request (**não usar**) |
 | ~~`DATABASE_URL_WRITER`~~ (papel `radar_escritor`) | **Descontinuada em 27/10/2026** (fim da carga da planilha); pode ser removida da máquina | — | Administrador |
+| `SUPABASE_DB_URL` (espelho do banco no Supabase) e, opcional, `SUPABASE_URL` (variável) / `SUPABASE_ANON_KEY` | GitHub (Actions) | **Secret** (a URL é variável) | Administrador |
 | `DATABASE_URL_PLANNER` (papel `radar_planner`) | variável de ambiente do usuário Windows da máquina da integração | **Segredo** | Administrador |
 | `PLANNER_EVENTOS_DIR` | variável de ambiente do usuário Windows (`...\planner-auto\eventos\entrada`) | caminho | Administrador |
 | `DATABASE_URL_BACKUP` (papel `radar_backup`) | GitHub → Settings → Secrets and variables → Actions | **Secret** | Administrador |
