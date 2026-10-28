@@ -69,6 +69,21 @@ async function api(page: Page, admin = false, forcarConflito = false, visualizad
     atualizado_em: null as string | null,
     recentes: [{ id: 7, tipo: 'nova', situacao: 'enviado', tentativas: 1, ultimo_erro: null, criado_em: '2026-10-23T12:00:00Z', enviado_em: '2026-10-23T12:05:00Z', codigo: '2026-0007', orgao: 'Órgão Sete' }],
   }
+  const clientesApi = [{ id: 1, nome: 'sistema-x', ativo: true, criado_em: '2026-10-28T12:00:00Z', criado_por: 'joao.henrique@ctctech.com.br', ultimo_uso_em: null, revogado_em: null }]
+  await page.route('**/api/api-clientes/*', (r) => {
+    const c = clientesApi.find((x) => x.id === Number(new URL(r.request().url()).pathname.split('/').pop()))
+    if (c) c.ativo = false
+    return r.fulfill({ json: { id: c?.id, ativo: false } })
+  })
+  await page.route('**/api/api-clientes', (r) => {
+    if (r.request().method() === 'POST') {
+      const { nome } = r.request().postDataJSON() as { nome: string }
+      enviados.push({ api_cliente: nome } as unknown as Reg)
+      clientesApi.push({ id: clientesApi.length + 1, nome, ativo: true, criado_em: '2026-10-28T13:00:00Z', criado_por: 'joao.henrique@ctctech.com.br', ultimo_uso_em: null, revogado_em: null })
+      return r.fulfill({ status: 201, json: { cliente: clientesApi.at(-1), chave: 'rdr_CHAVE_DE_TESTE_MOSTRADA_UMA_VEZ' } })
+    }
+    return r.fulfill({ json: { clientes: clientesApi } })
+  })
   await page.route('**/api/email-config/teste', (r) => {
     enviados.push({ teste: true } as unknown as Reg)
     return r.fulfill({ json: { ok: true } })
@@ -632,4 +647,26 @@ test('valores em reais com máscara (R$ 1.234,56) e Duração do contrato (meses
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
   expect(enviados[0]).toMatchObject({ duracao_contrato_meses: 24, orcamento: 1234.56, valor_ctc: 0.05, custo_total_ctc: 1000000, valor_vencedor: 99.99 })
+})
+
+test('Administração → API: cria a chave de uma aplicação (mostrada uma vez) e revoga', async ({ page }) => {
+  const { enviados } = await api(page, true)
+  await abrirAba(page)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await page.getByRole('button', { name: 'API', exact: true }).click()
+  expect(new URL(page.url()).hash).toBe('#admin/api')
+  await expect(page.getByRole('heading', { name: 'API para outras aplicações' })).toBeVisible()
+  await expect(page.getByText('sistema-x')).toBeVisible()
+  await page.getByLabel('Nome da aplicação').fill('Nome Inválido!')
+  await page.getByRole('button', { name: 'Criar chave' }).click()
+  await expect(page.getByRole('alert')).toContainText('letras minúsculas')
+  await page.getByLabel('Nome da aplicação').fill('sistema-contratos')
+  await page.getByRole('button', { name: 'Criar chave' }).click()
+  await expect(page.getByText('rdr_CHAVE_DE_TESTE_MOSTRADA_UMA_VEZ')).toBeVisible()
+  expect(enviados.at(-1)).toMatchObject({ api_cliente: 'sistema-contratos' })
+  await page.getByRole('button', { name: 'Já guardei' }).click()
+  await expect(page.getByText('rdr_CHAVE_DE_TESTE_MOSTRADA_UMA_VEZ')).toHaveCount(0) // some e não volta
+  page.once('dialog', (d) => d.accept())
+  await page.getByRole('button', { name: 'Revogar' }).first().click()
+  await expect(page.getByText('Chave revogada.')).toBeVisible()
 })

@@ -75,7 +75,10 @@ async function aplicaEmpresa(
   return { avisos: mantem ? [] : [{ regra: 'cnpj_nao_consultado' }] }
 }
 
-export async function criar(sql: Sql, email: string, corpo: unknown, consultar: Consulta = consultaCnpj) {
+/** Criação pela API externa: usa criar_oportunidade_api (autoria `api:<cliente>`, solicitante e idempotência). */
+export type ExternoCriar = { cliente: string; solicitante: string | null; idem: string | null }
+
+export async function criar(sql: Sql, email: string, corpo: unknown, consultar: Consulta = consultaCnpj, externo?: ExternoCriar) {
   const parsed = oportunidadeInput.safeParse(corpo)
   if (!parsed.success) return invalido(parsed.error)
   const d = parsed.data
@@ -90,9 +93,11 @@ export async function criar(sql: Sql, email: string, corpo: unknown, consultar: 
             and lower(coalesce(torre, '')) = lower(${d.torre ?? ''})
           limit 5`
       : []
-    const [{ o }] = await sql`select criar_oportunidade(${JSON.stringify(d)}::jsonb, ${email}) as o`
+    const [{ o }] = externo
+      ? await sql`select criar_oportunidade_api(${JSON.stringify(d)}::jsonb, ${externo.cliente}, ${externo.solicitante}, ${externo.idem}) as o`
+      : await sql`select criar_oportunidade(${JSON.stringify(d)}::jsonb, ${email}) as o`
     const avisos = [...(duplicadas.length ? [{ regra: 'possivel_duplicata', ids: duplicadas.map((x: { id: number }) => x.id) }] : []), ...emp.avisos]
-    return send(201, { ...o, avisos })
+    return send(o.idempotente ? 200 : 201, { ...o, avisos })
   } catch (e) {
     return erroBanco(e)
   }

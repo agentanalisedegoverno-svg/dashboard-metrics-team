@@ -58,6 +58,12 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 - **Consulta de CNPJ fora do ar:** o cadastro segue; a tela avisa e a razão social é consultada de novo ao salvar.
 - **Pendências da migração:** a grade tem o filtro "Só com pendências"; corrigir o registro e salvar remove a pendência.
 
+### 2.2 API externa (chaves e Cloudflare Access)
+- **Criar/revogar chaves:** *Administração → API* (só administrador). A chave aparece uma única vez; o banco guarda só o hash. Uma chave por aplicação; revogar tem efeito imediato.
+- **Cloudflare Access (uma vez):** em Zero Trust → Access → Applications, crie uma regra **Bypass** (*Include: Everyone*) **só para o caminho `/api/externo/*`** do domínio do Radar. Sem ela as chamadas recebem 302 para o login. Esse caminho passa a ser protegido pela chave; recomenda-se uma regra de **rate limiting** do Cloudflare para ele.
+- **Documentação para quem integra:** [API-EXTERNA.md](API-EXTERNA.md). **Ao mudar um campo da oportunidade, atualize esse documento** (um teste avisa) e avise as aplicações.
+- **Auditoria:** as oportunidades criadas pela API têm `criado_por = api:<aplicação>` e `solicitante`; o histórico registra o mesmo.
+
 ### 2.3 Integração com o Planner e e-mails
 
 > **Desde 27/10/2026 a rotina principal roda na nuvem** (GitHub Actions, workflow `planner-integracao.yml`, disparado pelo Radar ao salvar e a cada 5 minutos em dias úteis, 08h–19h). Detalhes e como conferir: [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md#rodar-na-nuvem-sem-depender-de-computador-github-actions). A tarefa do Windows abaixo vira **contingência**: com o workflow em produção ela deve ficar **desativada** (`Disable-ScheduledTask`), porque as duas rodando juntas podem duplicar cartões.

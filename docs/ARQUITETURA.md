@@ -85,6 +85,8 @@ Detalhes: [CADASTRO-OPORTUNIDADES.md](CADASTRO-OPORTUNIDADES.md). Histórico da 
 | Rota | Método | Quem | O que faz |
 |---|---|---|---|
 | `/api/rows`, `/api/status` | GET | qualquer usuário autenticado | dados do painel (papel `radar_leitor`) |
+| `/api/externo/oportunidades`, `/api/externo/campos` | POST, GET | **aplicação externa com chave** (sem Access: bypass só neste caminho) | cria oportunidade como o cadastro manual (autoria `api:<cliente>`, solicitante, idempotência) e lista os campos; ver [API-EXTERNA.md](API-EXTERNA.md) |
+| `/api/api-clientes` | GET, POST, DELETE | só administrador | cria e revoga as chaves das aplicações (Administração → API) |
 | (tela) **Administração** | — | só **administrador** | aba própria, em página inteira, com navegação lateral: *Usuários e perfis*, *Listas de opções* e *Linha → Torre* |
 | `/api/me` | GET | autenticado | e-mail, nome, perfil (administrador, editor ou visualizador) |
 | `/api/cnpj/:cnpj` | GET | autenticado | razão social e matriz/filial na Receita Federal, com 4 fontes públicas em sequência (BrasilAPI, minhareceita.org, publica.cnpj.ws, receitaws); não usa o banco |
@@ -313,6 +315,7 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 | Autenticação | Cloudflare Zero Trust (Free) | time `ctctech-radar`, *One-time PIN*, política `@ctctech.com.br` |
 | Código e CI/CD | GitHub | `agentanalisedegoverno-svg/dashboard-metrics-team` |
 | Backup | GitHub Actions → Google Drive | `Backup do banco` (diário), `Teste de restauração do backup` (mensal, 2 destinos, inclui o branch Neon `teste-restauracao`) e `Vigia do backup` (alerta diário) |
+| API externa | Cloudflare Pages Functions (`functions/api/externo/`) | chave por aplicação (hash no banco), `criar_oportunidade_api`; regra **Bypass** do Access só em `/api/externo/*`. Ver [API-EXTERNA.md](API-EXTERNA.md) |
 | Espelho do banco | Supabase (plano Free, `us-east-1`) | projeto dedicado `radar-backup`; workflow `Backup no Supabase` (diário). Ver [BACKUP.md](BACKUP.md) |
 | Planner | Microsoft 365 | planos *ITS Oportunidades* e *Digital e Health - Oportunidades* |
 
