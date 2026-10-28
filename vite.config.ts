@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     proxy: {
+      '/api/pncp/comprasgov': { target: 'https://dadosabertos.compras.gov.br', changeOrigin: true, rewrite: path => path.replace(/^\\/api\\/pncp\\/comprasgov/, '') },
+      '/api/pncp': { target: 'https://pncp.gov.br/api', changeOrigin: true, rewrite: path => path.replace(/^\\/api\\/pncp/, '') },
       '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
