@@ -15,7 +15,7 @@ type PncpItem = {
   situacao_aviso?: string; nome_modalidade?: string; objeto?: string; data_publicacao?: string
   data_abertura_proposta?: string; data_entrega_proposta?: string; numero_aviso?: number; uasg?: number
   orgaoEntidadeRazaoSocial?: string; unidadeOrgaoUfSigla?: string; valor_estimado_total?: number | string
-  source?: string
+  source?: string; url?: string
 }
 type PncpResponse = { data?: PncpItem[]; items?: PncpItem[]; content?: PncpItem[]; resultado?: PncpItem[]; totalPaginas?: number }
 type Resultado = { item: PncpItem; score: number; motivos: string[]; url: string | null }
@@ -47,6 +47,16 @@ async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem
 }
 
 const dataISO = (date: Date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
+async function consultarConlicitacao(): Promise<PncpItem[]> {
+  const response = await fetch(new URL('/api/pncp/conlicitacao', window.location.origin), {
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(45_000),
+  })
+  const json = await response.json() as PncpResponse & { error?: string }
+  if (!response.ok) throw new Error(json.error || 'ConLicitações respondeu HTTP ' + response.status)
+  return json.resultado ?? json.data ?? []
+}
+
 async function consultarComprasGov(): Promise<PncpItem[]> {
   const fim = new Date()
   const inicio = new Date(fim)
@@ -102,7 +112,7 @@ function pontuar(o: Oportunidade, c: PncpItem): Resultado | null {
   const overlap = tokens.length ? tokens.filter(t => objetoPncp.includes(t)).length / Math.min(tokens.length, 12) : 0
   if (overlap >= 0.25) { score += Math.round(overlap * 25); motivos.push('Objeto semelhante') }
   if (!score) return null
-  return { item: c, score, motivos, url: pncpUrl(c.numeroControlePNCP) }
+  return { item: c, score, motivos, url: c.url || pncpUrl(c.numeroControlePNCP) }
 }
 function alertaNoc(o: Oportunidade, matches: Resultado[], consulta: { isError?: boolean } | undefined, comprasGov: { isError?: boolean }) {
   const uf = (o.uf ?? '').trim().toUpperCase()
@@ -131,12 +141,13 @@ export default function MonitorLicitaçõesTab() {
   const elegiveis = useMemo(() => (lista.data ?? []).filter(o => STATUS.has(fold(o.status)) && !o.arquivado_em), [lista.data])
   const ufs = useMemo(() => [...new Set(elegiveis.map(o => (o.uf ?? '').trim().toUpperCase()).filter(uf => /^[A-Z]{2}$/.test(uf)))].sort(), [elegiveis])
   const comprasGov = useQuery({ queryKey: ['comprasgov-licitacoes-front'], queryFn: consultarComprasGov, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
+  const conlicitacao = useQuery({ queryKey: ['conlicitacao-licitacoes-front'], queryFn: consultarConlicitacao, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
   const consultas = useQueries({ queries: ufs.map(uf => ({
     queryKey: ['pncp-licitacoes-front', uf],
     queryFn: ({ signal }: { signal: AbortSignal }) => consultarPncp(uf, signal),
     staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false,
   })) })
-  const atualizando = lista.isFetching || comprasGov.isFetching || consultas.some(q => q.isFetching)
+  const atualizando = lista.isFetching || comprasGov.isFetching || conlicitacao.isFetching || consultas.some(q => q.isFetching)
   const porUf = useMemo(() => new Map(ufs.map((uf, i) => [uf, consultas[i]])), [ufs, consultas])
   const linhas = useMemo(() => {
     const q = fold(busca)
@@ -159,20 +170,22 @@ export default function MonitorLicitaçõesTab() {
       qc.invalidateQueries({ queryKey: ['oportunidades'] }),
       qc.invalidateQueries({ queryKey: ['pncp-licitacoes-front'] }),
       qc.invalidateQueries({ queryKey: ['comprasgov-licitacoes-front'] }),
+      qc.invalidateQueries({ queryKey: ['conlicitacao-licitacoes-front'] }),
     ])
     await Promise.all([
       qc.refetchQueries({ queryKey: ['pncp-licitacoes-front'], type: 'active' }),
       qc.refetchQueries({ queryKey: ['comprasgov-licitacoes-front'], type: 'active' }),
+      qc.refetchQueries({ queryKey: ['conlicitacao-licitacoes-front'], type: 'active' }),
       lista.refetch(),
     ])
   }
   const fontesOk = consultas.filter(q => q.isSuccess).length
-  const totalResultados = consultas.reduce((n, q) => n + (q.data?.length ?? 0), 0) + (comprasGov.data?.length ?? 0)
+  const totalResultados = consultas.reduce((n, q) => n + (q.data?.length ?? 0), 0) + (comprasGov.data?.length ?? 0) + (conlicitacao.data?.length ?? 0)
   const totalComCandidato = elegiveis.filter(o => {
     const q = porUf.get((o.uf ?? '').trim().toUpperCase())
-    return (q?.data || comprasGov.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? [])]).length > 0
+    return (q?.data || comprasGov.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])]).length > 0
   }).length
-  const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[])]); return alertaNoc(o,ms,q,comprasGov).nivel==='critico' }).length
+  const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov).nivel==='critico' }).length
   const atencao = Math.max(0, elegiveis.length - criticos - totalComCandidato)
   return <section className="mt-5 space-y-5" aria-label="Monitoramento de licitações">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -194,6 +207,10 @@ export default function MonitorLicitaçõesTab() {
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">Teste da fonte alternativa · Compras.gov.br</h2><p className="text-xs text-muted">Pregões e licitações legadas publicados nos últimos 45 dias · somente leitura</p></div><span className="rounded-md border border-line px-2 py-1 text-xs text-muted">{comprasGov.isSuccess ? (comprasGov.data?.length ?? 0)+' registros' : comprasGov.isError ? 'Fonte indisponível' : 'Consultando…'}</span></div>
       {comprasGov.isPending ? <p className="py-4 text-sm text-muted">Consultando a API oficial de Dados Abertos do Compras.gov.br…</p> : comprasGov.isError ? <div role="alert" className="py-3 text-sm text-st-critical">Falha na consulta Compras.gov.br: {(comprasGov.error as Error)?.message || 'erro desconhecido'}</div> : (comprasGov.data ?? []).length === 0 ? <p className="py-4 text-sm text-muted">A API respondeu, mas não retornou registros no período consultado.</p> : <div className="mt-3 space-y-2">{(comprasGov.data ?? []).slice(0,8).map((item,i)=><div key={item.id_compra || item.numeroControlePNCP || i} className="rounded-lg border border-line p-3"><p className="text-sm font-semibold text-ink">{item.orgaoEntidade?.razaoSocial || item.unidadeOrgao?.nomeUnidade || 'Órgão não informado'} · {item.modalidadeNome || 'Pregão/licitação'}</p><p className="mt-1 text-xs text-ink-soft">{item.processo ? 'Processo/pregão '+item.processo+' · ' : ''}{item.objetoCompra || 'Objeto não informado'}</p><p className="mt-1 text-xs text-muted">Situação: {item.situacaoCompraNome || 'Não informada'} · Publicação: {data(item.dataPublicacaoPncp)} · Encerramento: {data(item.dataEncerramentoProposta)} · UASG: {item.unidadeOrgao?.codigoUnidade || 'Não informada'}</p></div>)}</div>}
     </div>
+      <div className="rounded-xl border border-line bg-surface p-4 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">ConLicitações · fonte autenticada</h2><p className="text-xs text-muted">Boletins associados à conta · credencial mantida somente no servidor</p></div><span className="rounded-md border border-line px-2 py-1 text-xs text-muted">{conlicitacao.isSuccess ? (conlicitacao.data?.length ?? 0)+' registros' : conlicitacao.isError ? 'Configuração/consulta pendente' : 'Consultando…'}</span></div>
+        {conlicitacao.isPending ? <p className="py-4 text-sm text-muted">Consultando boletins da ConLicitações…</p> : conlicitacao.isError ? <div role="alert" className="py-3 text-sm text-st-critical">{(conlicitacao.error as Error)?.message || 'ConLicitações indisponível'}. Configure CONLICITACAO_TOKEN no ambiente seguro do deploy e confirme a autorização do IP de saída.</div> : (conlicitacao.data ?? []).length === 0 ? <p className="py-4 text-sm text-muted">A API respondeu, mas não retornou licitações nos últimos boletins dos filtros configurados.</p> : <div className="mt-3 space-y-2">{(conlicitacao.data ?? []).slice(0,8).map((item,i)=><div key={item.numeroControlePNCP || item.processo || i} className="rounded-lg border border-line p-3"><p className="text-sm font-semibold text-ink">{item.orgaoEntidade?.razaoSocial || item.unidadeOrgao?.nomeUnidade || 'Órgão não informado'} · {item.modalidadeNome || 'Licitação'}</p><p className="mt-1 text-xs text-ink-soft">{item.processo ? 'Edital/processo '+item.processo+' · ' : ''}{item.objetoCompra || 'Objeto não informado'}</p><p className="mt-1 text-xs text-muted">Situação: {item.situacaoCompraNome || 'Não informada'} · Abertura: {data(item.dataEncerramentoProposta)} · UF: {item.unidadeOrgao?.ufSigla || '—'} · Fonte: ConLicitações</p>{item.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={item.url} target="_blank" rel="noreferrer">Ver fonte original <ExternalLink className="size-3"/></a>}</div>)}</div>}
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">Oportunidades em acompanhamento</h2><p className="text-xs text-muted">Fonte: cadastro existente do Radar · Sem escrita no banco</p></div>
         <div className="flex flex-wrap gap-2">{['Todos','Prospect','Go','On going','Suspended'].map(s=><button key={s} onClick={()=>setFiltroStatus(s)} className={'rounded-lg border px-3 py-1.5 text-xs font-semibold '+(filtroStatus===s?'border-gold bg-gold-soft text-ink':'border-line text-muted hover:bg-surface-2')}>{s}</button>)}</div>
       </div>
@@ -201,7 +218,7 @@ export default function MonitorLicitaçõesTab() {
       {lista.isPending ? <p className="py-10 text-center text-sm text-muted">Carregando oportunidades…</p> : linhas.length===0 ? <p className="py-10 text-center text-sm text-muted">Nenhuma oportunidade encontrada para este filtro.</p> : <div className="mt-4 space-y-3">{linhas.map(o=>{
         const uf=(o.uf??'').trim().toUpperCase()
         const consulta=porUf.get(uf)
-        const matches=candidatos(o,[...(consulta?.data ?? []), ...(comprasGov.data ?? [])])
+        const matches=candidatos(o,[...(consulta?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])])
         return <article key={o.id} className="rounded-lg border border-line p-3">
           <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-semibold text-ink">{(o.codigo ?? '#'+o.id) + ' · ' + o.orgao}</p><p className="mt-1 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p><p className="mt-1 text-xs text-muted">Processo/pregão: {o.processo || 'Não informado'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}</p><p className="mt-1 text-xs text-muted">Portal informado: {o.site || 'Não informado'} · Pregão: {data(o.data_pregao_dt)}</p></div><span className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs text-ink">{o.status}</span></div>
           {(() => { const alerta = alertaNoc(o, matches, consulta, comprasGov); const cor = alerta.nivel==='critico' ? 'border-st-critical/30 bg-st-critical/5' : 'border-st-warning/30 bg-st-warning/5'; return <div className={'mt-3 rounded-lg border p-3 '+cor}><div className="flex items-center gap-2 text-sm font-semibold text-ink">{alerta.nivel==='critico' ? <AlertTriangle className="size-4 text-st-critical"/> : <Clock3 className="size-4 text-st-warning"/>}{alerta.titulo}</div><p className="mt-1 text-sm text-ink-soft"><strong>Próxima ação:</strong> {alerta.acao}</p></div> })()}
@@ -213,7 +230,7 @@ export default function MonitorLicitaçõesTab() {
           </div>          </div>
         </article>
       })}</div>}
-      <p className="mt-4 text-xs text-muted">Fontes consultadas: PNCP {fontesOk}/{ufs.length} UFs · Compras.gov.br {comprasGov.isSuccess ? 'OK' : comprasGov.isError ? 'com erro' : 'consultando'} · {totalResultados} registros recebidos · Cache de 5 minutos. A interface mostra o estado da consulta atual; detecção histórica de alterações exige snapshots persistentes, ainda não habilitados nesta etapa.</p>
+      <p className="mt-4 text-xs text-muted">Fontes consultadas: PNCP {fontesOk}/{ufs.length} UFs · Compras.gov.br {comprasGov.isSuccess ? 'OK' : comprasGov.isError ? 'com erro' : 'consultando'} · ConLicitações {conlicitacao.isSuccess ? 'OK' : conlicitacao.isError ? 'com erro/configuração pendente' : 'consultando'} · {totalResultados} registros recebidos · Cache de 5 minutos. A interface mostra o estado da consulta atual; detecção histórica de alterações exige snapshots persistentes, ainda não habilitados nesta etapa.</p>
     </div>
   </section>
 }
