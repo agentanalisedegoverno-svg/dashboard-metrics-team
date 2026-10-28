@@ -153,3 +153,15 @@ ON CONFLICT (oportunidade_id) DO NOTHING;;
 COMMENT ON TABLE monitor_licitacoes IS 'Fila e configuração de acompanhamento de licitações vinculadas a oportunidades do Radar.';
 COMMENT ON TABLE monitor_licitacoes_snapshots IS 'Histórico imutável das observações normalizadas das fontes oficiais.';
 COMMENT ON TABLE monitor_licitacoes_eventos IS 'Eventos deduplicados; fato publicado separado de comparação e item a validar.';
+
+
+-- Permissões mínimas para a API autenticada do Radar e para o coletor agendado.
+-- DATABASE_URL_MONITOR deve usar o papel radar_app (ou papel dedicado equivalente), nunca o proprietário.
+GRANT SELECT, INSERT, UPDATE ON monitor_licitacoes, monitor_licitacoes_coletas,
+  monitor_licitacoes_snapshots, monitor_licitacoes_eventos, monitor_licitacoes_alertas TO radar_app;;
+GRANT USAGE, SELECT ON SEQUENCE monitor_licitacoes_id_seq, monitor_licitacoes_coletas_id_seq,
+  monitor_licitacoes_snapshots_id_seq, monitor_licitacoes_eventos_id_seq, monitor_licitacoes_alertas_id_seq TO radar_app;;
+GRANT INSERT ON oportunidades_historico TO radar_app;;
+GRANT USAGE, SELECT ON SEQUENCE oportunidades_historico_id_seq TO radar_app;;
+GRANT SELECT ON monitor_licitacoes, monitor_licitacoes_coletas, monitor_licitacoes_snapshots,
+  monitor_licitacoes_eventos, monitor_licitacoes_alertas TO radar_leitor;;
