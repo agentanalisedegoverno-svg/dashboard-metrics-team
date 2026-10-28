@@ -50,3 +50,15 @@ O módulo não infere convocação, vitória, contratação ou posição ao vivo
 - [ ] Falha da API preserva snapshot anterior e deixa erro visível.
 - [ ] Acesso anônimo à API continua bloqueado pelo middleware atual do Radar.
 - [ ] Build, testes, segurança e E2E passam antes do merge/publicação.
+
+## Descoberta assistida de candidatos PNCP
+
+Na janela de vínculo, o botão **Buscar candidatos no PNCP** consulta o endpoint público `GET /api/consulta/v1/contratacoes/proposta` com `dataFinal`, paginação e, quando disponível, UF. A API oficial documenta essa consulta como contratações com recebimento de propostas aberto.
+
+A lista é ordenada por correspondência heurística entre número do processo, UASG/unidade, órgão e tokens do objeto. A pontuação é apenas uma sugestão, não uma probabilidade estatística. O usuário precisa selecionar explicitamente o candidato e salvar o vínculo; nenhuma associação é feita só com base no score. Certames encerrados podem não aparecer nessa busca, portanto um resultado vazio não comprova ausência no PNCP.
+
+Após selecionar um candidato, confirme o identificador PNCP e a URL gerada antes de salvar. A coleta posterior passa a monitorar contratação, itens e histórico quando os endpoints correspondentes respondem com sucesso. Falha de itens/histórico deixa a coleta como parcial, sem apagar o snapshot anterior.
+
+### Habilitar a rotina agendada
+
+O workflow tem uma proteção de ativação: a agenda de 30 minutos só consulta fontes quando a variável de repositório `MONITOR_LICITACOES_ENABLED` estiver definida como `true`. Isso evita executar uma rotina sem migração/credenciais. Para liberar a agenda, primeiro aplique a migração e valide a coleta manual; depois configure o secret `DATABASE_URL_MONITOR` e a variável `MONITOR_LICITACOES_ENABLED=true`. O disparo manual permanece disponível para testes e falha explicitamente se o secret estiver ausente.

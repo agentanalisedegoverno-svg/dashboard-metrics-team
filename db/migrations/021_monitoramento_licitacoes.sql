@@ -155,6 +155,18 @@ COMMENT ON TABLE monitor_licitacoes_snapshots IS 'Histórico imutável das obser
 COMMENT ON TABLE monitor_licitacoes_eventos IS 'Eventos deduplicados; fato publicado separado de comparação e item a validar.';
 
 
+CREATE TABLE IF NOT EXISTS monitor_licitacoes_auditoria (
+  id bigserial PRIMARY KEY,
+  monitor_id bigint NOT NULL REFERENCES monitor_licitacoes(id) ON DELETE CASCADE,
+  acao text NOT NULL,
+  por text NOT NULL,
+  detalhes jsonb NOT NULL DEFAULT '{}'::jsonb,
+  criado_em timestamptz NOT NULL DEFAULT now()
+);;
+
+CREATE INDEX IF NOT EXISTS monitor_licitacoes_auditoria_hist_idx
+  ON monitor_licitacoes_auditoria (monitor_id, criado_em DESC);;
+
 -- Permissões mínimas para a API autenticada do Radar e para o coletor agendado.
 -- DATABASE_URL_MONITOR deve usar o papel radar_app (ou papel dedicado equivalente), nunca o proprietário.
 GRANT SELECT, INSERT, UPDATE ON monitor_licitacoes, monitor_licitacoes_coletas,

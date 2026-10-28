@@ -80,6 +80,7 @@ describe('descoberta de rotas', () => {
       './me.ts',
       './monitor-licitacoes/[id].ts',
       './monitor-licitacoes/alertas/[id].ts',
+      './monitor-licitacoes/candidatos/[id].ts',
       './monitor-licitacoes/index.ts',
       './opcoes.ts',
       './oportunidades/[id].ts',
