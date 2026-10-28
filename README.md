@@ -132,6 +132,13 @@ scripts/
 - Os testes de paridade com o HTML legado (`parity.test.ts`) só rodam se `../radar-pre-vendas.html` existir; a regressão contínua vem dos snapshots em `src/domain/__snapshots__` (mudou regra → `vitest -u` e revisar o diff).
 - ESLint não foi adicionado: `typescript-eslint` ainda não suporta TypeScript 7 (o gate de tipos é o `tsc`).
 
+## Fontes de licitações
+
+- As consultas públicas usam proxy server-side restrito e somente GET para evitar expor detalhes de rede no navegador.
+- Para habilitar a fonte privada ConLicitações, configure `CONLICITACAO_TOKEN` como variável de ambiente **Production** no projeto Vercel. Não coloque o token no código, em `VITE_*`, em arquivos versionados ou no navegador.
+- A documentação local da integração indica restrição por IP. Se a API responder HTTP 403, o fornecedor precisa autorizar o IP de saída do runtime usado pela aplicação; não contorne essa restrição. Se o token já apareceu em um arquivo compartilhado, rotacione-o e configure o novo valor diretamente no cofre de variáveis do deploy.
+- A fonte ConLicitações consulta os filtros e os boletins mais recentes disponíveis para a conta. O painel sinaliza falha de credencial ou IP; cobertura e correspondência precisam ser validadas com processos reais.
+
 ## Lacunas / próximos passos
 
 O estado atual e as melhorias planejadas estão em [docs/ROADMAP.md](docs/ROADMAP.md). Destaques: login do Planner sem depender de pessoa (app do Entra), alertas de falha, teste de uso do espelho do Supabase como banco ativo e propagar arquivamento e mudança de torre ao Planner.
