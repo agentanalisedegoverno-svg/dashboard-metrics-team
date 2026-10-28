@@ -2,6 +2,9 @@
 -- Oportunidades em Prospect, Go, Onboarding ou On going entram automaticamente na fila de triagem.
 -- A consulta externa só é ativada depois de confirmar portal e identificador oficial; não inferimos IDs.
 
+-- 'Onboarding' passa a ser uma etapa válida para a regra de elegibilidade deste módulo.
+INSERT INTO opcoes (lista, valor, ordem, ativo) VALUES ('status', 'Onboarding', 4, true) ON CONFLICT (lista, valor) DO NOTHING;;
+
 CREATE TABLE IF NOT EXISTS monitor_licitacoes (
   id bigserial PRIMARY KEY,
   oportunidade_id bigint NOT NULL UNIQUE REFERENCES oportunidades(id) ON DELETE CASCADE,
