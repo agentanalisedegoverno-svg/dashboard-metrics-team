@@ -24,7 +24,7 @@ const pncpUrl = (control?: string) => {
   return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[3] + '/' + m[2] : null
 }
 async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
-  const url = new URL('https://pncp.gov.br/api/consulta/v1/contratacoes/proposta')
+  const url = new URL('/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
   url.searchParams.set('dataFinal', hoje())
   url.searchParams.set('pagina', '1')
   url.searchParams.set('tamanhoPagina', '50')
