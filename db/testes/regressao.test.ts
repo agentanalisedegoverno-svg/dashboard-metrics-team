@@ -31,7 +31,8 @@ describe('migrações', () => {
 
 describe('monitoramento de licitações', () => {
   it('inclui automaticamente etapas elegíveis e pausa/reativa conforme status', async () => {
-    const o = await criar(db, opp({ status: 'Go', site: 'https://pncp.gov.br/app/editais/00000000000191/2026/1' }))
+    const o = await criar(db, opp({ status: 'Go', site: 'Comprasnet (Gov.br)' }))
+    await db.query('update oportunidades set site = $1 where id = $2', ['https://pncp.gov.br/app/editais/00000000000191/2026/1', o.id])
     const inicial = await um<{ habilitado: boolean; estado_vinculo: string }>(
       'select habilitado, estado_vinculo from monitor_licitacoes where oportunidade_id = $1', [o.id])
     expect(inicial).toEqual({ habilitado: true, estado_vinculo: 'vinculado' })
@@ -48,7 +49,8 @@ describe('monitoramento de licitações', () => {
   })
 
   it('mantém oportunidades Suspended no monitor e vincula URL oficial PNCP', async () => {
-    const o = await criar(db, opp({ status: 'Suspended', site: 'https://pncp.gov.br/app/editais/00000000000191/2026/123' }))
+    const o = await criar(db, opp({ status: 'Suspended', site: 'Comprasnet (Gov.br)' }))
+    await db.query('update oportunidades set site = $1 where id = $2', ['https://pncp.gov.br/app/editais/00000000000191/2026/123', o.id])
     const registro = await um<{ habilitado: boolean; portal: string; identificador_externo: string; estado_vinculo: string }>(
       'select habilitado, portal, identificador_externo, estado_vinculo from monitor_licitacoes where oportunidade_id = $1', [o.id])
     expect(registro).toEqual({
