@@ -26,11 +26,11 @@ const hoje = () => {
   const d = new Date()
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('')
 }
-const pncpUrl = (control?: string) => {
+export const pncpUrl = (control?: string) => {
   const m = control?.match(/^(\d{14})-\d+-(\d+)\/(\d{4})$/)
   return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[4] + '/' + m[3] : null
 }
-async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
+export async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
   const url = new URL('/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
   url.searchParams.set('dataFinal', hoje())
   // A API do PNCP exige codigoModalidadeContratacao; esta consulta cobre pregões (código 1).
@@ -59,7 +59,7 @@ async function consultarConlicitacao(): Promise<PncpItem[]> {
   return json.resultado ?? json.data ?? []
 }
 
-async function consultarComprasGov(): Promise<PncpItem[]> {
+export async function consultarComprasGov(): Promise<PncpItem[]> {
   const fim = new Date()
   const inicio = new Date(fim)
   inicio.setDate(inicio.getDate() - 45)
