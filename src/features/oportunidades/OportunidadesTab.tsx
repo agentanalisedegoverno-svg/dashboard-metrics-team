@@ -7,7 +7,7 @@ import { OportunidadesGrid } from './OportunidadesGrid'
 import { baixarCsv } from './exportarCsv'
 import { SEGMENTOS } from '@/domain/oportunidade'
 import { nomesPreVendas } from '@/domain/preVendas'
-import { anosDisponiveis, MESES, mesesDoQuarter, noPeriodo, QUARTERS } from './periodo'
+import { anosDisponiveis, intervaloInvertido, MESES, mesDe, mesesDoQuarter, noPeriodo, QUARTERS, semanaDe } from './periodo'
 
 const fold = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
@@ -38,7 +38,7 @@ export default function OportunidadesTab() {
   const [linha, setLinha] = useState('')
   const [analista, setAnalista] = useState('')
   const [soPendencias, setSoPendencias] = useState(false)
-  const [periodo, setPeriodo] = useState({ ano: '', quarter: '', mes: '' })
+  const [periodo, setPeriodo] = useState({ ano: '', quarter: '', mes: '', de: '', ate: '' })
   const [editando, setEditando] = useState<Oportunidade | null | undefined>(undefined)
   const compacto = useMenorQue(768)
 
@@ -67,8 +67,16 @@ export default function OportunidadesTab() {
   }
   if (!me.data || !opcoes.data || !lista.data) return <p className="mt-6 text-[13px] text-muted">Carregando cadastro…</p>
 
+  // Arquivada não entra em nenhuma conta: contadores e pendências olham só as ativas (a arquivada aparece na lista, se o admin pedir).
+  const ativas = lista.data.filter((o) => !o.arquivado_em)
+  const arquivadasNaLista = lista.data.length - ativas.length
+  const dadosAtivos = dados.filter((o) => !o.arquivado_em).length
+  const intervaloRuim = intervaloInvertido(periodo)
+  const atalho = (de: string, ate: string) => setPeriodo((p) => ({ ...p, de, ate }))
+  const hoje = new Date()
+
   const valores = (nome: string) => (opcoes.data.listas[nome] ?? []).map((o) => o.valor)
-  const pendentes = (lista.data ?? []).filter((o) => (o.pendencias?.length ?? 0) > 0).length
+  const pendentes = ativas.filter((o) => (o.pendencias?.length ?? 0) > 0).length
 
   return (
     <section className="mt-5" aria-label="Cadastro de oportunidades">
@@ -118,6 +126,22 @@ export default function OportunidadesTab() {
           <option value="">Mês</option>
           {mesesDoQuarter(periodo.quarter).map((m) => <option key={m} value={m}>{MESES[m - 1]}</option>)}
         </select>
+        <fieldset className="flex flex-wrap items-center gap-1.5 border-0 p-0" aria-label="Intervalo da data do pregão">
+          <label className="flex items-center gap-1 text-[13px] text-ink-soft">
+            Pregão de
+            <input type="date" aria-label="Pregão a partir de" className={selectCls} value={periodo.de} max={periodo.ate || undefined} onChange={(e) => setPeriodo((p) => ({ ...p, de: e.target.value }))} />
+          </label>
+          <label className="flex items-center gap-1 text-[13px] text-ink-soft">
+            até
+            <input type="date" aria-label="Pregão até" className={selectCls} value={periodo.ate} min={periodo.de || undefined} onChange={(e) => setPeriodo((p) => ({ ...p, ate: e.target.value }))} />
+          </label>
+          <button type="button" className={`${selectCls} cursor-pointer hover:bg-surface-2`} onClick={() => { const s = semanaDe(hoje); atalho(s.de, s.ate) }}>Esta semana</button>
+          <button type="button" className={`${selectCls} cursor-pointer hover:bg-surface-2`} onClick={() => { const s = semanaDe(hoje, 1); atalho(s.de, s.ate) }}>Próxima semana</button>
+          <button type="button" className={`${selectCls} cursor-pointer hover:bg-surface-2`} onClick={() => { const m = mesDe(hoje); atalho(m.de, m.ate) }}>Este mês</button>
+          {(periodo.de || periodo.ate) && (
+            <button type="button" className={`${selectCls} cursor-pointer hover:bg-surface-2`} onClick={() => atalho('', '')}>Limpar datas</button>
+          )}
+        </fieldset>
         <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-ink-soft">
           <input type="checkbox" className="size-4 accent-[var(--gold)]" checked={soPendencias} onChange={(e) => setSoPendencias(e.target.checked)} />
           Só com pendências ({pendentes})
@@ -149,9 +173,12 @@ export default function OportunidadesTab() {
         </div>
       </div>
       <p className="mb-2 mt-3 text-xs text-muted" aria-live="polite">
-        {dados.length} de {lista.data.length} oportunidades · logado como {me.data.nome ?? me.data.email} ({me.data.perfil})
+        {dadosAtivos} de {ativas.length} oportunidades{arquivadasNaLista > 0 ? ` (+${arquivadasNaLista} arquivadas na lista, fora das contas)` : ''} · logado como {me.data.nome ?? me.data.email} ({me.data.perfil})
         {me.data.somenteLeitura ? ' — somente consulta' : ''}
       </p>
+      {intervaloRuim && (
+        <p role="alert" className="mb-2 text-xs font-semibold text-st-critical">A data inicial é depois da final: nenhuma oportunidade cabe nesse intervalo.</p>
+      )}
       <OportunidadesGrid dados={dados} onAbrir={setEditando} compacto={compacto} />
       <OportunidadeDrawer aberto={editando !== undefined} onFechar={() => setEditando(undefined)} registro={editando ?? null} opcoes={opcoes.data} me={me.data} />
     </section>
