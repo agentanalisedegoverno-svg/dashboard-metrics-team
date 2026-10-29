@@ -26,13 +26,15 @@ const hoje = () => {
   const d = new Date()
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('')
 }
-const pncpUrl = (control?: string) => {
+export const pncpUrl = (control?: string) => {
   const m = control?.match(/^(\d{14})-\d+-(\d+)\/(\d{4})$/)
-  return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[3] + '/' + m[2] : null
+  return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[4] + '/' + m[3] : null
 }
-async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
+export async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
   const url = new URL('/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
   url.searchParams.set('dataFinal', hoje())
+  // A API do PNCP exige codigoModalidadeContratacao; esta consulta cobre pregões (código 1).
+  url.searchParams.set('codigoModalidadeContratacao', '1')
   url.searchParams.set('pagina', '1')
   url.searchParams.set('tamanhoPagina', '50')
   url.searchParams.set('uf', uf)
@@ -57,7 +59,7 @@ async function consultarConlicitacao(): Promise<PncpItem[]> {
   return json.resultado ?? json.data ?? []
 }
 
-async function consultarComprasGov(): Promise<PncpItem[]> {
+export async function consultarComprasGov(): Promise<PncpItem[]> {
   const fim = new Date()
   const inicio = new Date(fim)
   inicio.setDate(inicio.getDate() - 45)
@@ -65,7 +67,7 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
   const consultas = [
     { path: 'modulo-legado/3_consultarPregoes', params: { dt_data_edital_inicial: de, dt_data_edital_final: ate } },
     { path: 'modulo-legado/1_consultarLicitacao', params: { data_publicacao_inicial: de, data_publicacao_final: ate } },
-    { path: 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133', params: {} },
+    { path: 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133', params: { dataPublicacaoPncpInicial: de, dataPublicacaoPncpFinal: ate, codigoModalidade: '1' } },
   ]
   const tentativas = await Promise.allSettled(consultas.map(async ({ path, params }) => {
     const url = new URL('/comprasgov/' + path, window.location.origin)
@@ -184,7 +186,7 @@ export default function MonitorLicitaçõesTab() {
   const totalResultados = consultas.reduce((n, q) => n + (q.data?.length ?? 0), 0) + (comprasGov.data?.length ?? 0) + (conlicitacao.data?.length ?? 0)
   const totalComCandidato = elegiveis.filter(o => {
     const q = porUf.get((o.uf ?? '').trim().toUpperCase())
-    return (q?.data || comprasGov.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])]).length > 0
+    return (q?.data || comprasGov.data || conlicitacao.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])]).length > 0
   }).length
   const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='critico' }).length
   const atencao = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='atencao' }).length
@@ -202,7 +204,7 @@ export default function MonitorLicitaçõesTab() {
       <div className="rounded-xl border border-st-warning/30 bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><Clock3 className="size-4 text-st-warning"/>Em revisão</div><p className="mt-1 text-xs text-muted">{atencao} oportunidade(s) precisam de conferência operacional.</p></div>
       <div className="rounded-xl border border-st-success/30 bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><CheckCircle2 className="size-4 text-st-success"/>Correspondências candidatas</div><p className="mt-1 text-xs text-muted">{totalComCandidato} oportunidade(s) têm registros para conferir nas fontes consultadas.</p></div>
     </div>
-    <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted"/><p>O PNCP retorna contratações com propostas abertas nesta consulta. Isso não cobre, por si só, sessões encerradas, alterações em tempo real ou todos os portais. Correspondência automática é hipótese e precisa ser confirmada com o identificador oficial.</p></div>
+    <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted"/><p>O PNCP retorna pregões com recebimento de propostas aberto nesta consulta. Isso não cobre, por si só, sessões encerradas, alterações em tempo real ou todos os portais. Correspondência automática é hipótese e precisa ser confirmada com o identificador oficial.</p></div>
     <div className="rounded-xl border border-line bg-surface p-4">
     <div className="rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">Teste da fonte alternativa · Compras.gov.br</h2><p className="text-xs text-muted">Pregões e licitações legadas publicados nos últimos 45 dias · somente leitura</p></div><span className="rounded-md border border-line px-2 py-1 text-xs text-muted">{comprasGov.isSuccess ? (comprasGov.data?.length ?? 0)+' registros' : comprasGov.isError ? 'Fonte indisponível' : 'Consultando…'}</span></div>
