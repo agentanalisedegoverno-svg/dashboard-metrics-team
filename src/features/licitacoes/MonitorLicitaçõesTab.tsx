@@ -28,7 +28,7 @@ const hoje = () => {
 }
 export const pncpUrl = (control?: string) => {
   const m = control?.match(/^(\d{14})-\d+-(\d+)\/(\d{4})$/)
-  return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[4] + '/' + m[3] : null
+  return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[3] + '/' + m[2] : null
 }
 export async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
   const url = new URL('/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
