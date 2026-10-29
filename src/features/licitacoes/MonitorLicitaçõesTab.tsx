@@ -28,11 +28,13 @@ const hoje = () => {
 }
 const pncpUrl = (control?: string) => {
   const m = control?.match(/^(\d{14})-\d+-(\d+)\/(\d{4})$/)
-  return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[3] + '/' + m[2] : null
+  return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[4] + '/' + m[3] : null
 }
 async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
   const url = new URL('/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
   url.searchParams.set('dataFinal', hoje())
+  // A API do PNCP exige codigoModalidadeContratacao; esta consulta cobre pregões (código 1).
+  url.searchParams.set('codigoModalidadeContratacao', '1')
   url.searchParams.set('pagina', '1')
   url.searchParams.set('tamanhoPagina', '50')
   url.searchParams.set('uf', uf)
@@ -65,7 +67,7 @@ async function consultarComprasGov(): Promise<PncpItem[]> {
   const consultas = [
     { path: 'modulo-legado/3_consultarPregoes', params: { dt_data_edital_inicial: de, dt_data_edital_final: ate } },
     { path: 'modulo-legado/1_consultarLicitacao', params: { data_publicacao_inicial: de, data_publicacao_final: ate } },
-    { path: 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133', params: {} },
+    { path: 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133', params: { dataPublicacaoPncpInicial: de, dataPublicacaoPncpFinal: ate, codigoModalidade: '1' } },
   ]
   const tentativas = await Promise.allSettled(consultas.map(async ({ path, params }) => {
     const url = new URL('/comprasgov/' + path, window.location.origin)
