@@ -24,7 +24,7 @@ describe('consultas públicas de licitações', () => {
     expect(requestUrl?.pathname).toBe('/pncp/consulta/v1/contratacoes/proposta')
     expect(requestUrl?.searchParams.get('codigoModalidadeContratacao')).toBe('1')
     expect(requestUrl?.searchParams.get('uf')).toBe('SP')
-    expect(requestUrl?.searchParams.get('dataFinal')).toMatch(/^\\d{8}$/)
+    expect(requestUrl?.searchParams.get('dataFinal')).toMatch(/^\d{8}$/)
   })
 
   it('envia filtros obrigatórios à consulta de contratações da Lei 14.133', async () => {
@@ -44,8 +44,8 @@ describe('consultas públicas de licitações', () => {
     const atual = urls.find(url => url.pathname.endsWith('1_consultarContratacoes_PNCP_14133'))
     expect(atual).toBeDefined()
     expect(atual?.searchParams.get('codigoModalidade')).toBe('1')
-    expect(atual?.searchParams.get('dataPublicacaoPncpInicial')).toMatch(/^\\d{4}-\\d{2}-\\d{2}$/)
-    expect(atual?.searchParams.get('dataPublicacaoPncpFinal')).toMatch(/^\\d{4}-\\d{2}-\\d{2}$/)
+    expect(atual?.searchParams.get('dataPublicacaoPncpInicial')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(atual?.searchParams.get('dataPublicacaoPncpFinal')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
   it('monta o link oficial do PNCP com ano e sequencial na ordem correta', () => {
