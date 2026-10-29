@@ -15,8 +15,8 @@ const um = async <T = unknown>(sql: string, p: unknown[] = []) => (await db.quer
 describe('migrações', () => {
   it('aplicam do zero, na ordem, e deixam as peças principais', async () => {
     const f = await db.query<{ proname: string }>(`select proname from pg_proc where proname in
-      ('criar_oportunidade','atualizar_oportunidade','arquivar_oportunidade','sincronizar_planilha','salvar_usuario','salvar_opcao','salvar_email_config','enfileirar_email_teste','eh_admin','eh_somente_leitura','torre_da_linha','proximo_codigo')`)
-    expect(new Set(f.rows.map((r) => r.proname)).size).toBe(12)
+      ('criar_oportunidade','atualizar_oportunidade','arquivar_oportunidade','sincronizar_planilha','salvar_usuario','salvar_opcao','salvar_email_config','enfileirar_email_teste','eh_admin','eh_somente_leitura','torre_da_linha','proximo_codigo','salvar_linha_torre')`)
+    expect(new Set(f.rows.map((r) => r.proname)).size).toBe(13)
     const t = await db.query<{ tgname: string }>(`select tgname from pg_trigger where not tgisinternal and tgname like 'oportunidades_%'`)
     expect(t.rows.map((r) => r.tgname).sort()).toEqual(
       ['oportunidades_auditar_tg', 'oportunidades_codigo_tg', 'oportunidades_derivar_tg', 'oportunidades_email_status_tg', 'oportunidades_email_tg', 'oportunidades_monitor_licitacoes_tg', 'oportunidades_solicitante_tg', 'oportunidades_torre_tg'],
@@ -96,6 +96,31 @@ describe('torre calculada pela linha de serviço', () => {
     await db.query(`insert into opcoes (lista, valor) values ('linha_servico', $1) on conflict do nothing`, [linha])
     const o = await criar(db, opp({ linha_servico: linha, torre: torre === 'HEALTH' ? 'ITS' : 'HEALTH' }))
     expect(o.torre).toBe(torre)
+  })
+})
+
+describe('linha → torre editável pela administração', () => {
+  it('administrador troca a torre de uma linha e cadastra linha nova; vale para os cadastros seguintes', async () => {
+    await db.query(`insert into opcoes (lista, valor) values ('linha_servico', 'Linha Editável') on conflict do nothing`)
+    expect((await criar(db, opp({ linha_servico: 'Linha Editável' }))).torre).toBe('ITS') // sem mapa: padrão ITS
+    await db.query(`select salvar_linha_torre('Linha Editável', 'DIGITAL', $1)`, [ADMIN])
+    expect((await criar(db, opp({ linha_servico: 'Linha Editável', torre: 'ITS' }))).torre).toBe('DIGITAL')
+    await db.query(`select salvar_linha_torre('Linha Editável', 'HEALTH', $1)`, [ADMIN])
+    expect((await criar(db, opp({ linha_servico: 'Linha Editável' }))).torre).toBe('HEALTH')
+    // torre nova cadastrada na lista já pode receber linhas (a restrição fixa foi removida)
+    await db.query(`insert into opcoes (lista, valor, ativo, ordem) values ('torre', 'CORPORATE', true, 4) on conflict do nothing`)
+    await db.query(`select salvar_linha_torre('Linha Editável', 'CORPORATE', $1)`, [ADMIN])
+    expect((await criar(db, opp({ linha_servico: 'Linha Editável', torre: 'ITS' }))).torre).toBe('CORPORATE')
+  })
+  it('só administrador; linha e torre precisam estar nas listas (e a torre ativa)', async () => {
+    await db.query(`insert into opcoes (lista, valor) values ('linha_servico', 'Linha Protegida') on conflict do nothing`)
+    expect((await falha(db.query(`select salvar_linha_torre('Linha Protegida', 'DIGITAL', $1)`, [EDITOR])))?.code).toBe('P0403')
+    expect((await falha(db.query(`select salvar_linha_torre('Linha Protegida', 'DIGITAL', $1)`, [VISUALIZADOR])))?.code).toBe('P0403')
+    expect(camposComErro(await falha(db.query(`select salvar_linha_torre('Linha que não existe', 'DIGITAL', $1)`, [ADMIN])))).toContain('linha')
+    expect(camposComErro(await falha(db.query(`select salvar_linha_torre('Linha Protegida', 'TORRE FANTASMA', $1)`, [ADMIN])))).toContain('torre')
+    await db.query(`insert into opcoes (lista, valor, ativo, ordem) values ('torre', 'INATIVA', false, 9) on conflict do nothing`)
+    expect(camposComErro(await falha(db.query(`select salvar_linha_torre('Linha Protegida', 'INATIVA', $1)`, [ADMIN])))).toContain('torre')
+    expect((await criar(db, opp({ linha_servico: 'Linha Protegida' }))).torre).toBe('ITS') // nada mudou
   })
 })
 

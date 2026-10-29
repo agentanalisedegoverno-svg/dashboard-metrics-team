@@ -347,6 +347,6 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 - **Backup no Google Drive:** o token do rclone tem acesso à conta Google que o gerou; ver [BACKUP.md](BACKUP.md).
 - **Domínio completo no Access:** quem tem e-mail `@ctctech.com.br` entra. Para restringir, trocar a regra por e-mails específicos.
 - **Consulta de CNPJ:** depende de um serviço público (BrasilAPI, dados abertos da Receita). Se estiver fora do ar, o cadastro continua e a razão social é consultada de novo no próximo salvamento.
-- **Nova linha de serviço:** o administrador pode criar a linha em *Administração → Listas de opções*, mas ela só vira DIGITAL/HEALTH se for incluída em `linhas_torre` (hoje por SQL); sem isso, resulta em ITS.
+- **Nova linha de serviço:** o administrador pode criar a linha em *Administração → Listas de opções*, mas ela só vira DIGITAL/HEALTH se for incluída em `linhas_torre` (agora pela tela *Administração → Linha → Torre*, migração 024); sem isso, resulta em ITS.
 - **Perfis de acesso:** administrador (tudo), editor (cadastra e edita; padrão do domínio) e visualizador (só consulta, aplicado pelo e-mail). Só o administrador gerencia os grupos; o banco recusa cadastro/edição do visualizador e a remoção do último administrador.
 - **Quem não está em `usuarios`** é tratado como editor (comportamento original). Para restringir de verdade o acesso ao Radar a uma lista nominal é preciso usar a política do Cloudflare Access.

@@ -437,8 +437,13 @@ test('usuários e perfis: tabela com perfil único, sem autobloqueio e menor pri
   await expect(page.getByRole('row').filter({ hasText: 'Rodrigo A' })).toHaveCount(0)
 })
 
-test('listas de opções e consulta linha → torre na Administração', async ({ page }) => {
+test('listas de opções e edição linha → torre na Administração', async ({ page }) => {
   const { enviados } = await api(page, true)
+  const linhasTorreEnviadas: Reg[] = []
+  await page.route('**/api/linhas-torre', (r) => {
+    linhasTorreEnviadas.push(r.request().postDataJSON() as Reg)
+    return r.fulfill({ json: { ok: true } })
+  })
   await abrirAba(page)
   await page.getByRole('tab', { name: 'Administração' }).click()
   await page.getByRole('button', { name: 'Listas de opções' }).click()
@@ -449,8 +454,17 @@ test('listas de opções e consulta linha → torre na Administração', async (
   await expect.poll(() => enviados.find((e) => e.valor === 'Licença')).toMatchObject({ lista: 'unidade_fornecimento', ativo: true })
   await page.getByRole('button', { name: 'Linha → Torre' }).click()
   const tabela = page.getByRole('table', { name: /Linha de serviço e a torre resultante/ })
-  await expect(tabela.getByRole('row').filter({ hasText: 'Software Development' })).toContainText('DIGITAL')
-  await expect(tabela.getByRole('row').filter({ hasText: 'Service Desk' })).toContainText('ITS')
+  await expect(tabela.getByLabel('Torre da linha Software Development')).toHaveValue('DIGITAL')
+  await expect(tabela.getByLabel('Torre da linha Service Desk')).toHaveValue('ITS')
+  // troca a torre de uma linha e cadastra uma linha nova já com torre
+  await tabela.getByLabel('Torre da linha Service Desk').selectOption('HEALTH')
+  await expect.poll(() => linhasTorreEnviadas.find((e) => e.linha === 'Service Desk')).toMatchObject({ torre: 'HEALTH' })
+  await page.getByLabel('Nova linha de serviço').fill('Linha Nova')
+  await page.getByLabel('Torre da nova linha').selectOption('DIGITAL')
+  await page.getByRole('button', { name: 'Cadastrar linha' }).click()
+  await expect.poll(() => enviados.find((e) => e.valor === 'Linha Nova')).toMatchObject({ lista: 'linha_servico', ativo: true })
+  await expect.poll(() => linhasTorreEnviadas.find((e) => e.linha === 'Linha Nova')).toMatchObject({ torre: 'DIGITAL' })
+  await page.screenshot({ path: 'test-results/zz-linha-torre.png' })
 })
 
 test('acessibilidade da área de administração', async ({ page }) => {

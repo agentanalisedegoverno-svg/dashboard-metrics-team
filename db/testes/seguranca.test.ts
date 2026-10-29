@@ -86,6 +86,7 @@ const FUNCAO_PERMITIDA: Record<string, string[] | 'PUBLIC'> = {
   atualizar_oportunidade: ['radar_app'],
   arquivar_oportunidade: ['radar_app'],
   salvar_opcao: ['radar_app'],
+  salvar_linha_torre: ['radar_app'],
   salvar_usuario: ['radar_app'],
   salvar_email_config: ['radar_app'],
   enfileirar_email_teste: ['radar_app'],
