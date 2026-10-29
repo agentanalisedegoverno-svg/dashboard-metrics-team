@@ -1,4 +1,6 @@
-type Context = { request: Request; params: { path?: string | string[] }; env: { CONLICITACAO_TOKEN?: string } }
+import { identificar, send, type Env } from '../../_lib/http.ts'
+
+type Context = { request: Request; params: { path?: string | string[] }; env: Env & { CONLICITACAO_TOKEN?: string } }
 
 const COMPRAS_ALLOWED = new Set([
   'modulo-legado/1_consultarLicitacao',
@@ -17,8 +19,11 @@ const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =
  */
 export const onRequest = async ({ request, params, env }: Context): Promise<Response> => {
   if (request.method !== 'GET') {
-    return new Response('Método não permitido', { status: 405, headers: { allow: 'GET' } })
+    return Response.json({ error: 'Método não permitido.' }, { status: 405, headers: { allow: 'GET', 'cache-control': 'private, no-store' } })
   }
+  // Mesma guarda das demais rotas: só passa com a identidade do Cloudflare Access (e falha fechada sem a configuração dele).
+  const id = await identificar(request, env)
+  if (id instanceof Response) return id
 
   const path = [params.path].flat().filter(Boolean).join('/')
   const incoming = new URL(request.url)
@@ -98,7 +103,7 @@ export const onRequest = async ({ request, params, env }: Context): Promise<Resp
   const allowed = isComprasGov
     ? COMPRAS_ALLOWED.has(upstreamPath)
     : upstreamPath === 'consulta/v1/contratacoes/proposta'
-  if (!allowed) return new Response('Rota de consulta não permitida', { status: 404 })
+  if (!allowed) return send(404, { error: 'Rota de consulta não permitida.' })
 
   const base = isComprasGov ? 'https://dadosabertos.compras.gov.br/' : 'https://pncp.gov.br/api/'
   const target = new URL(upstreamPath, base)
@@ -112,7 +117,7 @@ export const onRequest = async ({ request, params, env }: Context): Promise<Resp
     })
     const headers = new Headers()
     headers.set('content-type', upstream.headers.get('content-type') ?? 'application/json; charset=utf-8')
-    headers.set('cache-control', 'public, max-age=60, s-maxage=60')
+    headers.set('cache-control', 'private, max-age=60')
     headers.set('x-radar-source', isComprasGov ? 'compras-gov-dados-abertos' : 'pncp')
     return new Response(upstream.body, { status: upstream.status, headers })
   } catch {
