@@ -88,6 +88,7 @@ describe('descoberta de rotas', () => {
       './oportunidades/[id]/historico.ts',
       './oportunidades/[id]/restaurar.ts',
       './oportunidades/index.ts',
+      './pncp/[[path]].ts',
       './usuarios.ts',
     ])
   })
