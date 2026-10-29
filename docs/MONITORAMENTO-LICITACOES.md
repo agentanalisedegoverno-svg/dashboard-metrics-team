@@ -71,3 +71,15 @@ A fila inclui oportunidades não arquivadas com status Prospect, Go, Onboarding,
 Quando o campo Site contém uma URL oficial canônica do PNCP (`/app/editais/{CNPJ}/{ano}/{sequencial}`), a migração/trigger extrai o identificador e cria o vínculo automaticamente. Quando há somente número de processo ou uma página genérica do portal, o registro permanece pendente para evitar associação errada; a busca de candidatos atual é uma descoberta auxiliar e não cobre todos os certames, especialmente processos encerrados/suspensos.
 
 A coleta automática continua protegida por `MONITOR_LICITACOES_ENABLED=true` e requer `DATABASE_URL_MONITOR` com privilégio mínimo. Habilitar a variável somente depois de aplicar e validar a migração no ambiente alvo.
+
+## Painel de certames (aba Licitações)
+
+A aba abre como um painel de urgência, calculado só com os dados do cadastro do Radar (sem banco novo, sem consulta externa ao abrir):
+
+- **Certames (Prospect e Go):** agrupados por Pregão já passou, Hoje, Amanhã, Próximos 7 dias, Mais adiante e Sem data. Cada cartão mostra o título da situação, a **próxima ação** e o que falta no cadastro. Processo e UF ausentes sobem a urgência perto do pregão; UASG (não cobrada de Corporate) e link do edital só informam.
+- **Contratos (On going, Onboarding, Suspended):** visão separada, sem alerta de pregão; Suspended pede confirmação de retomada.
+- **Procurar edital no PNCP:** botão por cartão, sob demanda. Consulta pregões eletrônicos (código 6) com propostas abertas na UF, 50 por página, até 6 páginas (300), com cache de 10 minutos por UF. O resultado é sugestão por semelhança; confirme o processo.
+- **Fontes públicas (diagnóstico):** bloco recolhido (Compras.gov.br e ConLicitações); só consulta quando aberto.
+- Regras em `src/features/licitacoes/noc.ts` (funções puras, com testes).
+
+O acompanhamento automático com histórico e alertas de mudança (migração 021, secret `DATABASE_URL_MONITOR` e `MONITOR_LICITACOES_ENABLED=true`) continua desligado; é a Fase 2.
