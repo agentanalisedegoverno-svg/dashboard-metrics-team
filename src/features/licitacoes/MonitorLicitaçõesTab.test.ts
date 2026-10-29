@@ -23,8 +23,8 @@ describe('consultas públicas de licitações', () => {
 
     expect(requestUrl?.pathname).toBe('/pncp/consulta/v1/contratacoes/proposta')
     expect(requestUrl?.searchParams.get('codigoModalidadeContratacao')).toBe('1')
-    expect(requestUrl.searchParams.get('uf')).toBe('SP')
-    expect(requestUrl.searchParams.get('dataFinal')).toMatch(/^\\d{8}$/)
+    expect(requestUrl?.searchParams.get('uf')).toBe('SP')
+    expect(requestUrl?.searchParams.get('dataFinal')).toMatch(/^\\d{8}$/)
   })
 
   it('envia filtros obrigatórios à consulta de contratações da Lei 14.133', async () => {
