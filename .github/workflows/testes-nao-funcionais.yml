@@ -98,3 +98,30 @@ jobs:
           set -o pipefail
           node scripts/medir-banco.mjs --requisicoes 15 --simultaneas 1,5 | tee latencia.txt
           { echo '### Latência do banco (a partir do GitHub Actions)'; echo '```'; cat latencia.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  desempenho-front:
+    name: Desempenho do front (Playwright serial)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BUDGET_FATOR: ${{ inputs.fator || '2' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Instalar Chromium para medições reproduzíveis
+        run: npx playwright install --with-deps chromium
+      - name: Medir navegação, virtualização, busca, filtros, memória e peso do JavaScript
+        run: npm run test:desempenho
+      - name: Publicar relatório do navegador
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: resultados-desempenho-front
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
