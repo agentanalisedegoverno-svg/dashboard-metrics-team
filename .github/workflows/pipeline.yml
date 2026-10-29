@@ -65,7 +65,15 @@ jobs:
         run: npm ci && npm run build:demo && npm run check:dist
       - name: Deploy do preview
         if: steps.creds.outputs.ok == 'true'
-        run: npx wrangler pages deploy dist --project-name="$PAGES_PROJECT" --branch="pr-${{ github.event.number }}" --commit-hash="${{ github.event.pull_request.head.sha }}" --commit-dirty=true
+        run: |
+          # O Cloudflare às vezes recusa por excesso de operações simultâneas ("retry shortly"): tenta de novo antes de falhar.
+          for tentativa in 1 2 3 4; do
+            if npx wrangler pages deploy dist --project-name="$PAGES_PROJECT" --branch="pr-${{ github.event.number }}" --commit-hash="${{ github.event.pull_request.head.sha }}" --commit-dirty=true; then exit 0; fi
+            if [ "$tentativa" = 4 ]; then echo "::error::Deploy falhou após 4 tentativas."; exit 1; fi
+            espera=$((tentativa * 30))
+            echo "::warning::Deploy falhou (tentativa $tentativa de 4). Nova tentativa em ${espera}s."
+            sleep "$espera"
+          done
       - name: Comenta a URL no PR
         if: steps.creds.outputs.ok == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -126,7 +134,15 @@ jobs:
       - name: Garante que o projeto Pages existe
         run: npx wrangler pages project create "$PAGES_PROJECT" --production-branch=main || true
       - name: Deploy
-        run: npx wrangler pages deploy dist --project-name="$PAGES_PROJECT" --branch=main --commit-hash="$(git rev-parse HEAD)" --commit-dirty=true
+        run: |
+          # O Cloudflare às vezes recusa por excesso de operações simultâneas ("retry shortly"): tenta de novo antes de falhar.
+          for tentativa in 1 2 3 4; do
+            if npx wrangler pages deploy dist --project-name="$PAGES_PROJECT" --branch=main --commit-hash="$(git rev-parse HEAD)" --commit-dirty=true; then exit 0; fi
+            if [ "$tentativa" = 4 ]; then echo "::error::Deploy falhou após 4 tentativas."; exit 1; fi
+            espera=$((tentativa * 30))
+            echo "::warning::Deploy falhou (tentativa $tentativa de 4). Nova tentativa em ${espera}s."
+            sleep "$espera"
+          done
       - name: URL
         id: url
         run: echo "value=${SITE_URL:-https://$PAGES_PROJECT.pages.dev}" >> "$GITHUB_OUTPUT"
