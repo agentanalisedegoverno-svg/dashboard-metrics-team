@@ -131,6 +131,14 @@
             "description": "Pré-vendas. Marque um ou mais pré-vendas. texto: nome(s) de pré-vendas ativos, separados por vírgula",
             "type": "string"
           },
+          "documentos_nome": {
+            "description": "Documentação: nome da pasta. Até 80 caracteres (ex.: Pasta XPTO). texto",
+            "type": "string"
+          },
+          "documentos_url": {
+            "description": "Documentação: link da pasta. Link https da pasta (OneDrive, SharePoint ou outra) com a documentação já anexada. link que começa com https:// (sem espaços, até 2000 caracteres)",
+            "type": "string"
+          },
           "orcamento": {
             "description": "Orçamento (R$). número em reais, com ponto decimal (ex.: 1234.56)",
             "type": "number",
