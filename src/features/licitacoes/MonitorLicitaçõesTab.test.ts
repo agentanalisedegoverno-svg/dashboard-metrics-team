@@ -9,17 +9,20 @@ afterEach(() => {
 describe('consultas públicas de licitações', () => {
   it('envia a modalidade obrigatória ao PNCP', async () => {
     vi.stubGlobal('window', { location: { origin: 'https://radar.test' } })
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: [] }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }))
+    let requestUrl: URL | undefined
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      requestUrl = new URL(String(input))
+      return new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
     vi.stubGlobal('fetch', fetchMock)
 
     await consultarPncp('SP')
 
-    const requestUrl = new URL(String(fetchMock.mock.calls[0][0]))
-    expect(requestUrl.pathname).toBe('/pncp/consulta/v1/contratacoes/proposta')
-    expect(requestUrl.searchParams.get('codigoModalidadeContratacao')).toBe('1')
+    expect(requestUrl?.pathname).toBe('/pncp/consulta/v1/contratacoes/proposta')
+    expect(requestUrl?.searchParams.get('codigoModalidadeContratacao')).toBe('1')
     expect(requestUrl.searchParams.get('uf')).toBe('SP')
     expect(requestUrl.searchParams.get('dataFinal')).toMatch(/^\\d{8}$/)
   })
