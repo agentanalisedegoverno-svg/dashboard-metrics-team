@@ -564,14 +564,14 @@ test('filtro de período: Ano, Quarter e Mês (mês acompanha o quarter)', async
   const quarter = page.getByLabel('Filtrar por quarter do pregão')
   const mes = page.getByLabel('Filtrar por mês do pregão')
   await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
-  expect(await ano.locator('option').allInnerTexts()).toEqual(['Todos os anos', '2026']) // só anos que existem nos dados
+  expect(await ano.locator('option').allInnerTexts()).toEqual(['Ano', '2026']) // só anos que existem nos dados
   await ano.selectOption('2026')
   await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
   await quarter.selectOption('Q2')
   await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible() // as datas são de março (Q1)
-  expect(await mes.locator('option').allInnerTexts()).toEqual(['Todos os meses', 'Abril', 'Maio', 'Junho'])
+  expect(await mes.locator('option').allInnerTexts()).toEqual(['Mês', 'Abril', 'Maio', 'Junho'])
   await quarter.selectOption('Q1')
-  expect(await mes.locator('option').allInnerTexts()).toEqual(['Todos os meses', 'Janeiro', 'Fevereiro', 'Março'])
+  expect(await mes.locator('option').allInnerTexts()).toEqual(['Mês', 'Janeiro', 'Fevereiro', 'Março'])
   await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
   await mes.selectOption({ label: 'Fevereiro' })
   await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible()
@@ -586,7 +586,7 @@ test('filtro por linha de serviço traz as linhas novas (Governança e gestão d
   await abrirAba(page)
   const linha = page.getByLabel('Filtrar por linha de serviço')
   const opcoesLinha = await linha.locator('option').allInnerTexts()
-  expect(opcoesLinha).toEqual(expect.arrayContaining(['Todas as linhas de serviço', 'Governança e gestão da TI', 'Outros']))
+  expect(opcoesLinha).toEqual(expect.arrayContaining(['Linha de serviço', 'Governança e gestão da TI', 'Outros']))
   await linha.selectOption('Outros')
   await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible() // nenhuma da amostra tem essa linha
   await linha.selectOption('')
@@ -770,4 +770,35 @@ test('Documentação: nome sem link mostra o erro no campo do link e não envia'
   await page.getByRole('button', { name: 'Cadastrar' }).click()
   await expect(page.getByText('Informe o link da pasta de documentação')).toBeVisible()
   expect(enviados).toHaveLength(0)
+})
+
+test('Baixar CSV leva só o que está filtrado na tela, em formato que o Excel abre (BOM, ponto e vírgula)', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  const contagem = page.getByText(/^\d+ de \d+ oportunidades/)
+  const naTela = async () => Number((await contagem.innerText()).match(/^(\d+) de/)![1])
+  const todas = await naTela()
+  const botao = page.getByRole('button', { name: /^Baixar CSV/ })
+  await expect(botao).toHaveText(new RegExp(`\\(${todas}\\)`))
+
+  await page.screenshot({ path: 'test-results/zz-csv.png' })
+  await page.getByLabel('Filtrar por status').selectOption('Win')
+  const win = await naTela()
+  expect(win).toBeGreaterThan(0)
+  expect(win).toBeLessThan(todas)
+  await expect(botao).toHaveText(new RegExp(`\\(${win}\\)`))
+
+  const [download] = await Promise.all([page.waitForEvent('download'), botao.click()])
+  expect(download.suggestedFilename()).toMatch(/^oportunidades-\d{4}-\d{2}-\d{2}\.csv$/)
+  const { readFileSync } = await import('node:fs')
+  const texto = readFileSync(await download.path(), 'utf8')
+  expect(texto.startsWith('﻿')).toBe(true)
+  const linhas = texto.replace('﻿', '').split('\r\n').filter(Boolean)
+  expect(linhas).toHaveLength(win + 1) // cabeçalho + só as oportunidades filtradas
+  expect(linhas[0].split(';').slice(0, 3)).toEqual(['Código', 'Status', 'Sigla'])
+  for (const l of linhas.slice(1)) expect(l.split(';')[1]).toBe('Win')
+
+  // sem resultado, o botão desabilita
+  await page.getByLabel('Buscar oportunidades').fill('zzzz-nada-assim')
+  await expect(botao).toBeDisabled()
 })
