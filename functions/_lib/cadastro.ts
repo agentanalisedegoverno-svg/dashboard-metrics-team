@@ -2,7 +2,7 @@
  * Casos de uso do cadastro de oportunidades. Cada função recebe o cliente SQL (tagged template do Neon)
  * e devolve uma Response; as regras de negócio ficam no banco (funções SECURITY DEFINER).
  */
-import { atualizacaoInput, errosZod, opcaoInput, oportunidadeInput, usuarioInput } from '../../src/domain/oportunidade.ts'
+import { atualizacaoInput, errosZod, linhaTorreInput, opcaoInput, oportunidadeInput, usuarioInput } from '../../src/domain/oportunidade.ts'
 import { consultaCnpj, type ResultadoCnpj } from './cnpj.ts'
 import { erroBanco, send } from './http.ts'
 
@@ -167,6 +167,18 @@ export async function salvarOpcao(sql: Sql, email: string, corpo: unknown) {
   const o = parsed.data
   try {
     await sql`select salvar_opcao(${o.lista}, ${o.valor}, ${o.ativo}, ${o.ordem}::int, ${email})`
+    return send(200, { ok: true })
+  } catch (e) {
+    return erroBanco(e)
+  }
+}
+
+export async function salvarLinhaTorre(sql: Sql, email: string, corpo: unknown) {
+  const parsed = linhaTorreInput.safeParse(corpo)
+  if (!parsed.success) return invalido(parsed.error)
+  const o = parsed.data
+  try {
+    await sql`select salvar_linha_torre(${o.linha}, ${o.torre}, ${email})`
     return send(200, { ok: true })
   } catch (e) {
     return erroBanco(e)

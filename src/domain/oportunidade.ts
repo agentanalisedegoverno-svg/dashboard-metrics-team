@@ -135,6 +135,11 @@ export const opcaoInput = z.object({
   ordem: z.number().int().min(0).max(10_000).default(0),
 })
 
+export const linhaTorreInput = z.object({
+  linha: z.string().trim().min(1).max(120),
+  torre: z.string().trim().min(1).max(120),
+})
+
 export const usuarioInput = z.object({
   nome: z.string().trim().min(1).max(120),
   email: z.preprocess(vazioParaNull, z.string().trim().toLowerCase().email().nullable().optional()).transform((v) => v ?? null),

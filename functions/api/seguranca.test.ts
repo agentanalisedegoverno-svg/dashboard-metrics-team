@@ -77,6 +77,7 @@ describe('descoberta de rotas', () => {
       './email-config/teste.ts',
       './externo/campos.ts',
       './externo/oportunidades.ts',
+      './linhas-torre.ts',
       './me.ts',
       './monitor-licitacoes/[id].ts',
       './monitor-licitacoes/alertas/[id].ts',
@@ -205,6 +206,7 @@ describe('CSRF: escritas só do próprio site', () => {
     ['./oportunidades/[id]/restaurar.ts', 'POST'],
     ['./usuarios.ts', 'PUT'],
     ['./opcoes.ts', 'PUT'],
+    ['./linhas-torre.ts', 'PUT'],
     ['./email-config.ts', 'PUT'],
     ['./email-config/teste.ts', 'POST'],
   ] as const
@@ -244,6 +246,7 @@ describe('autorização: rotas de administração', () => {
   it.each([
     ['./usuarios.ts', 'PUT', { nome: 'X', email: 'x@x.com', admin: true }],
     ['./opcoes.ts', 'PUT', { lista: 'status', valor: 'Novo' }],
+    ['./linhas-torre.ts', 'PUT', { linha: 'Service Desk', torre: 'ITS' }],
     ['./email-config.ts', 'PUT', { ativo: false, status: [], destinatarios: [] }],
     ['./email-config/teste.ts', 'POST', {}],
     ['./oportunidades/[id]/arquivar.ts', 'POST', {}],
@@ -341,6 +344,7 @@ describe('métodos e respostas', () => {
   it.each([
     ['./oportunidades/index.ts', 'DELETE'], ['./oportunidades/index.ts', 'PUT'], ['./oportunidades/[id].ts', 'DELETE'], ['./me.ts', 'POST'],
     ['./usuarios.ts', 'GET'], ['./usuarios.ts', 'DELETE'], ['./email-config.ts', 'DELETE'], ['./opcoes.ts', 'DELETE'],
+    ['./linhas-torre.ts', 'GET'], ['./linhas-torre.ts', 'POST'],
   ] as const)('%s %s -> 405', async (t, method) => {
     const res = await chamar(rotaDe(t), { method, headers: { 'x-radar-csrf': '1' }, body: method === 'GET' ? undefined : '{}' })
     expect(res.status).toBe(405)

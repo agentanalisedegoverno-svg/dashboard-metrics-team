@@ -108,6 +108,11 @@ export const useSalvarOpcao = () => {
   return useMutation({ mutationFn: (o: { lista: string; valor: string; ativo: boolean; ordem: number }) => chamar('/opcoes', { method: 'PUT', body: o }), onSuccess: invalidar })
 }
 
+export const useSalvarLinhaTorre = () => {
+  const invalidar = useInvalidar()
+  return useMutation({ mutationFn: (o: { linha: string; torre: string }) => chamar('/linhas-torre', { method: 'PUT', body: o }), onSuccess: invalidar })
+}
+
 export const useSalvarUsuario = () => {
   const invalidar = useInvalidar()
   return useMutation({ mutationFn: (u: UsuarioAdmin) => chamar('/usuarios', { method: 'PUT', body: u }), onSuccess: invalidar })
