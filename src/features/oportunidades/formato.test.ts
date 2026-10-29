@@ -20,6 +20,14 @@ describe('formulário <-> API', () => {
     const r = deForm({ ...base, orcamento: 'R$ 1.234.567,89', valor_ctc: 'R$ 0,50', custo_total_ctc: '2.000,00', valor_vencedor: '' })
     expect(r.success && r.data).toMatchObject({ orcamento: 1234567.89, valor_ctc: 0.5, custo_total_ctc: 2000, valor_vencedor: null })
   })
+  it('segmento: Corporate ou Público; aceita sem acento e minúsculas (API), recusa outro valor, vazio vale null', () => {
+    expect(paraForm({ segmento: 'Público' }).segmento).toBe('Público')
+    for (const [entrada, saida] of [['Corporate', 'Corporate'], ['corporate', 'Corporate'], ['Público', 'Público'], ['publico', 'Público'], [' PUBLICO ', 'Público'], ['', null]] as const) {
+      const r = deForm({ ...base, segmento: entrada })
+      expect(r.success && r.data.segmento, entrada).toBe(saida)
+    }
+    for (const ruim of ['Privado', 'público e corporate', 'x']) expect(deForm({ ...base, segmento: ruim }).success, ruim).toBe(false)
+  })
   it('pasta de documentação: link só https (sem espaços), nome opcional, mas nome sem link é recusado', () => {
     const url = 'https://ctctech-my.sharepoint.com/:f:/g/personal/x/EsXPTO'
     expect(paraForm({ documentos_nome: 'Pasta XPTO', documentos_url: url })).toMatchObject({ documentos_nome: 'Pasta XPTO', documentos_url: url })

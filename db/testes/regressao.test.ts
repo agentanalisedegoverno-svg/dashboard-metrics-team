@@ -144,6 +144,19 @@ describe('validação (espelho das regras de negócio)', () => {
     expect(String(ok.descritivo)).toHaveLength(900)
     expect(camposComErro(await falha(atualizar(db, velho.id, ok.versao, opp({ descritivo: 'z'.repeat(61) }))))).toContain('descritivo')
   })
+  it('segmento: só Corporate ou Público (ou em branco); atualizar troca e limpa; registros sem informação ficam em branco', async () => {
+    expect((await criar(db, opp({ segmento: 'Corporate' }))).segmento).toBe('Corporate')
+    const a = await criar(db, opp({ segmento: ' Público ' }))
+    expect(a.segmento).toBe('Público')
+    expect((await criar(db, opp())).segmento).toBeNull()
+    for (const ruim of ['Privado', 'corporate', 'publico', 'Público e Corporate']) {
+      expect(camposComErro(await falha(criar(db, opp({ segmento: ruim })))), ruim).toContain('segmento')
+    }
+    const b = await atualizar(db, a.id, a.versao, opp({ segmento: 'Corporate' }))
+    expect(b.segmento).toBe('Corporate')
+    const c = await atualizar(db, a.id, b.versao, opp())
+    expect(c.segmento).toBeNull()
+  })
   it('pasta de documentação: nome + link https, ambos opcionais; nome sem link e link fora de https são recusados', async () => {
     const url = 'https://ctctech-my.sharepoint.com/:f:/g/personal/x/EsXPTO'
     const a = await criar(db, opp({ documentos_nome: ' Pasta XPTO ', documentos_url: ` ${url} ` }))

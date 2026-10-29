@@ -41,6 +41,10 @@
             "description": "Sigla. Até 20 caracteres. Não existe na planilha. texto",
             "type": "string"
           },
+          "segmento": {
+            "description": "Segmento. Corporate ou Público. texto: Corporate ou Público (aceita também sem acento e em minúsculas)",
+            "type": "string"
+          },
           "orgao": {
             "description": "Instituição / Órgão. texto",
             "type": "string"

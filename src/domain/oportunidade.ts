@@ -27,6 +27,17 @@ const tipoEmpresa = z
   .preprocess(vazioParaNull, z.enum(['Matriz', 'Filial']).nullable().optional())
   .transform((v) => v ?? null)
 
+/** Segmento: Corporate ou Público. Aceita sem acento e em minúsculas ("publico"), para a API externa ser tolerante; guarda a forma canônica. */
+export const SEGMENTOS = ['Corporate', 'Público'] as const
+const segmento = z
+  .preprocess((v) => {
+    const s = vazioParaNull(v)
+    if (typeof s !== 'string') return s
+    const chave = s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+    return chave === 'corporate' ? 'Corporate' : chave === 'publico' ? 'Público' : s
+  }, z.enum(SEGMENTOS, { error: 'Use Corporate ou Público' }).nullable().optional())
+  .transform((v) => v ?? null)
+
 /** Hora local de Brasília "HH:MM" (00:00 a 23:59). Aceita "HH:MM:SS" (como o banco devolve) e normaliza; vazio vira null. */
 const hora = z
   .preprocess((v) => {
@@ -85,6 +96,7 @@ export const oportunidadeInput = z.object({
   orgao: texto(200),
   descritivo: texto(100_000), // sem limite prático de caracteres
   sigla: texto(20), // sigla do órgão (não existe na planilha)
+  segmento, // Corporate ou Público (não existe na planilha; vazio nos registros antigos)
   objeto: texto(5000), // o que está sendo contratado (não existe na planilha)
   documentos_nome: texto(80), // nome da pasta de documentação (ex.: "Pasta XPTO")
   documentos_url: linkHttps, // link da pasta (OneDrive/SharePoint ou outra) com a documentação já anexada
