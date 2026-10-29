@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/pncp/:path*",
+      "destination": "/api/pncp/:path*"
+    },
+    {
+      "source": "/comprasgov/:path*",
+      "destination": "/api/pncp/comprasgov/:path*"
+    },
+    {
+      "source": "/conlicitacao",
+      "destination": "/api/pncp/conlicitacao"
+    }
+  ]
+}
