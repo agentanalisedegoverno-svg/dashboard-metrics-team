@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, AlertTriangle, CheckCircle2, Clock3, ExternalLink, RefreshCw, Search, ShieldAlert } from 'lucide-react'
-import { useOportunidades } from '@/features/oportunidades/api'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, RefreshCw, Search, ShieldAlert } from 'lucide-react'
+import { useMe, useOpcoes, useOportunidades } from '@/features/oportunidades/api'
+import { OportunidadeDrawer } from '@/features/oportunidades/OportunidadeDrawer'
 import type { Oportunidade } from '@/domain/oportunidade'
+import { FAIXAS, montar, type Linha, type Nivel } from './noc'
 
 type PncpItem = {
   numeroControlePNCP?: string; numeroCompra?: string; processo?: string; objetoCompra?: string; informacaoComplementar?: string
@@ -20,8 +22,7 @@ type PncpItem = {
 type PncpResponse = { data?: PncpItem[]; items?: PncpItem[]; content?: PncpItem[]; resultado?: PncpItem[]; totalPaginas?: number }
 type Resultado = { item: PncpItem; score: number; motivos: string[]; url: string | null }
 
-const STATUS = new Set(['prospect', 'go', 'on going', 'ongoing', 'suspended', 'suspenso', 'suspensa', 'onboarding'])
-const fold = (s: unknown) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+const fold = (s: unknown) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 const hoje = () => {
   const d = new Date()
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('')
@@ -30,13 +31,15 @@ export const pncpUrl = (control?: string) => {
   const m = control?.match(/^(\d{14})-\d+-(\d+)\/(\d{4})$/)
   return m ? 'https://pncp.gov.br/app/editais/' + m[1] + '/' + m[3] + '/' + m[2] : null
 }
-export async function consultarPncp(uf: string, signal?: AbortSignal): Promise<PncpItem[]> {
+
+/** Uma página de pregões eletrônicos com recebimento de propostas aberto na UF. */
+async function consultarPncpPagina(uf: string, pagina: number, signal?: AbortSignal) {
   const url = new URL('/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
   url.searchParams.set('dataFinal', hoje())
-  // A API do PNCP exige codigoModalidadeContratacao; esta consulta cobre pregões (código 1).
-  url.searchParams.set('codigoModalidadeContratacao', '1')
-  url.searchParams.set('pagina', '1')
-  url.searchParams.set('tamanhoPagina', '50')
+  // A API do PNCP exige codigoModalidadeContratacao: 6 = Pregão - Eletrônico (1 seria Leilão - Eletrônico).
+  url.searchParams.set('codigoModalidadeContratacao', '6')
+  url.searchParams.set('pagina', String(pagina))
+  url.searchParams.set('tamanhoPagina', '50') // máximo aceito pelo PNCP
   url.searchParams.set('uf', uf)
   // O PNCP pode ficar sem responder; não deixe uma consulta presa indefinidamente.
   const timeout = AbortSignal.timeout(12_000)
@@ -44,8 +47,21 @@ export async function consultarPncp(uf: string, signal?: AbortSignal): Promise<P
   const response = await fetch(url, { headers: { accept: 'application/json' }, signal: requestSignal })
   if (!response.ok) throw new Error('PNCP respondeu HTTP ' + response.status)
   const json = await response.json() as PncpResponse | PncpItem[]
-  if (Array.isArray(json)) return json
-  return json.data ?? json.items ?? json.content ?? json.resultado ?? []
+  if (Array.isArray(json)) return { itens: json, totalPaginas: 1 }
+  return { itens: json.data ?? json.items ?? json.content ?? json.resultado ?? [], totalPaginas: json.totalPaginas ?? 1 }
+}
+export async function consultarPncp(uf: string, signal?: AbortSignal, pagina = 1): Promise<PncpItem[]> {
+  return (await consultarPncpPagina(uf, pagina, signal)).itens
+}
+/** Varre as páginas em sequência (no máximo `maxPaginas` de 50) e para quando o PNCP diz que acabou. */
+export async function consultarPncpUf(uf: string, signal?: AbortSignal, maxPaginas = 6): Promise<PncpItem[]> {
+  const todos: PncpItem[] = []
+  for (let p = 1; p <= maxPaginas; p++) {
+    const r = await consultarPncpPagina(uf, p, signal)
+    todos.push(...r.itens)
+    if (p >= r.totalPaginas || r.itens.length === 0) break
+  }
+  return todos
 }
 
 const dataISO = (date: Date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
@@ -67,7 +83,7 @@ export async function consultarComprasGov(): Promise<PncpItem[]> {
   const consultas = [
     { path: 'modulo-legado/3_consultarPregoes', params: { dt_data_edital_inicial: de, dt_data_edital_final: ate } },
     { path: 'modulo-legado/1_consultarLicitacao', params: { data_publicacao_inicial: de, data_publicacao_final: ate } },
-    { path: 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133', params: { dataPublicacaoPncpInicial: de, dataPublicacaoPncpFinal: ate, codigoModalidade: '1' } },
+    { path: 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133', params: { dataPublicacaoPncpInicial: de, dataPublicacaoPncpFinal: ate, codigoModalidade: '5' } },
   ]
   const tentativas = await Promise.allSettled(consultas.map(async ({ path, params }) => {
     const url = new URL('/comprasgov/' + path, window.location.origin)
@@ -116,124 +132,152 @@ function pontuar(o: Oportunidade, c: PncpItem): Resultado | null {
   if (!score) return null
   return { item: c, score, motivos, url: c.url || pncpUrl(c.numeroControlePNCP) }
 }
-function alertaNoc(o: Oportunidade, matches: Resultado[], consulta: { isError?: boolean; isPending?: boolean } | undefined, comprasGov: { isError?: boolean; isPending?: boolean }, conlicitacao?: { isError?: boolean; isPending?: boolean }) {
-  const uf = (o.uf ?? '').trim().toUpperCase()
-  if (!uf) return { nivel: 'critico', titulo: 'Cadastro incompleto', acao: 'Corrija a UF desta oportunidade no Radar e execute a consulta novamente.' }
-  if (consulta?.isError && comprasGov.isError && conlicitacao?.isError) return { nivel: 'critico', titulo: 'Fontes indisponíveis', acao: 'Não tome decisão com dados desatualizados. Reexecute as consultas e valide os portais oficiais.' }
-  if (consulta?.isPending || !consulta || comprasGov.isPending || conlicitacao?.isPending) return { nivel: 'atencao', titulo: 'Consulta em andamento', acao: 'Aguarde a conclusão das fontes antes de decidir se há ou não correspondência.' }
-  if (matches.some(m => m.score >= 100)) return { nivel: 'atencao', titulo: 'Correspondência forte — confirmar', acao: 'Confira processo, UASG e órgão. Confirme o vínculo oficial antes de agir sobre o certame.' }
-  if (matches.length) return { nivel: 'atencao', titulo: 'Possível correspondência', acao: 'Revise os candidatos abaixo e confirme se algum corresponde à oportunidade cadastrada.' }
-  if (consulta?.isError || comprasGov.isError || conlicitacao?.isError) return { nivel: 'atencao', titulo: 'Consulta parcial', acao: 'Consulte novamente a fonte com erro e verifique o portal oficial antes de concluir que não há certame.' }
-  return { nivel: 'critico', titulo: 'Sem correspondência encontrada', acao: 'Valide número do processo, UASG, órgão e UF. A busca cobre apenas os registros retornados pelas fontes consultadas.' }
-}
 
 function candidatos(o: Oportunidade, itens: PncpItem[]) {
   return itens.map(c => pontuar(o, c)).filter((x): x is Resultado => x !== null).sort((a, b) => b.score - a.score).slice(0, 3)
 }
 function data(v: string | null | undefined) {
   if (!v) return 'Não informada'
+  // Data pura (aaaa-mm-dd) é dia de calendário: não passa por Date, que a leria como UTC e mostraria o dia anterior no Brasil.
+  const puro = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
+  if (puro) return `${puro[3]}/${puro[2]}/${puro[1]}`
   const d = new Date(v)
   return Number.isNaN(d.getTime()) ? v : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(d)
 }
 
+const COR: Record<Nivel, string> = { critico: 'border-st-critical/40 bg-st-critical/5', atencao: 'border-st-warn/40 bg-st-warn/5', ok: 'border-line bg-surface' }
+const ROTULO: Record<Nivel, string> = { critico: 'Ação agora', atencao: 'Atenção', ok: 'No prazo' }
+const httpsSeguro = (v: string | null | undefined) => (/^https?:\/\/\S+$/i.test(String(v ?? '').trim()) ? String(v).trim() : null)
+
+function BuscaPncp({ o }: { o: Oportunidade }) {
+  const uf = (o.uf ?? '').trim().toUpperCase()
+  const [ativo, setAtivo] = useState(false)
+  const q = useQuery({ queryKey: ['pncp-uf', uf], queryFn: ({ signal }) => consultarPncpUf(uf, signal), enabled: ativo && /^[A-Z]{2}$/.test(uf), staleTime: 10 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
+  const achados = useMemo(() => (q.data ? candidatos(o, q.data) : []), [q.data, o])
+  if (!ativo) return <button type="button" onClick={() => setAtivo(true)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-surface-2">Procurar edital no PNCP</button>
+  if (q.isPending || q.isFetching) return <p className="text-xs text-muted">Procurando entre os pregões abertos de {uf} no PNCP…</p>
+  if (q.isError) return <p role="alert" className="text-xs text-st-critical">PNCP: {(q.error as Error).message}. <button type="button" onClick={() => q.refetch()} className="font-semibold underline">Tentar de novo</button></p>
+  if (!achados.length) return <p className="text-xs text-muted">Nenhum pregão aberto de {uf} parece ser este (conferidos {q.data?.length ?? 0}). O PNCP só lista pregões com propostas abertas; confirme no portal do órgão.</p>
+  return <div className="w-full space-y-2">{achados.map((m, i) => <div key={m.item.numeroControlePNCP || i} className="rounded-md bg-surface-2 p-3 text-xs">
+    <p className="font-semibold text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'} <span className="font-normal text-muted">· compatibilidade {m.score}</span></p>
+    <p className="mt-1 text-ink-soft">{(m.item.processo ? 'Processo ' + m.item.processo + ' · ' : '') + (m.item.objetoCompra || 'Objeto não informado')}</p>
+    <p className="mt-1 text-muted">{m.motivos.join(' · ')} · Propostas até {data(m.item.dataEncerramentoProposta)}</p>
+    {m.url && <a className="mt-1 inline-flex items-center gap-1 font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer noopener">Ver no PNCP <ExternalLink className="size-3" /></a>}
+  </div>)}<p className="text-[11px] text-muted">Sugestão por semelhança: confirme o processo antes de agir.</p></div>
+}
+
+function Cartao({ l, onAbrir, procurar }: { l: Linha; onAbrir: (o: Oportunidade) => void; procurar: boolean }) {
+  const { o, a } = l
+  const link = httpsSeguro(o.site)
+  const uf = (o.uf ?? '').trim().toUpperCase()
+  const Icone = a.nivel === 'critico' ? AlertTriangle : a.nivel === 'atencao' ? Clock3 : CheckCircle2
+  return <article className={'rounded-lg border p-3 ' + COR[a.nivel]}>
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-ink">{(o.codigo ?? '#' + o.id) + ' · ' + (o.sigla ? o.sigla + ' — ' : '') + o.orgao}</p>
+        <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2"><span className="rounded-md border border-line bg-surface-2 px-2 py-0.5 text-xs text-ink">{o.status}</span><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">{data(o.data_pregao_dt)}</span></div>
+    </div>
+    <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-ink"><Icone className="size-4" aria-hidden />{a.titulo}<span className="sr-only"> ({ROTULO[a.nivel]})</span></p>
+    <p className="mt-0.5 text-sm text-ink-soft"><strong>Próxima ação:</strong> {a.acao}</p>
+    <p className="mt-1 text-xs text-muted">Processo: {o.processo || '—'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}{o.analista ? ' · Pré-vendas: ' + o.analista : ''}</p>
+    {a.faltas.length > 0 && <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="O que falta no cadastro">{a.faltas.map(f => <li key={f.chave} className={'rounded-md border px-2 py-0.5 text-xs ' + (f.bloqueia ? 'border-st-warn/50 text-ink' : 'border-line text-muted')}>{f.rotulo}</li>)}</ul>}
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <button type="button" onClick={() => onAbrir(o)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-page hover:opacity-90">Abrir cadastro</button>
+      {link && <a href={link} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-surface-2">Abrir edital <ExternalLink className="size-3" aria-hidden /></a>}
+      {procurar && /^[A-Z]{2}$/.test(uf) && <BuscaPncp o={o} />}
+    </div>
+  </article>
+}
+
+function Fonte({ titulo, query, vazio }: { titulo: string; query: { isError: boolean; isSuccess: boolean; error: unknown; data?: PncpItem[] }; vazio: string }) {
+  return <div className="rounded-lg border border-line p-3">
+    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold text-ink">{titulo}</h3><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">{query.isSuccess ? (query.data?.length ?? 0) + ' registros' : query.isError ? 'indisponível' : 'consultando…'}</span></div>
+    {query.isError ? <p role="alert" className="mt-2 text-xs text-st-critical">{(query.error as Error)?.message || 'Falha na consulta'}</p>
+      : query.isSuccess && (query.data ?? []).length === 0 ? <p className="mt-2 text-xs text-muted">{vazio}</p>
+      : <ul className="mt-2 space-y-1.5">{(query.data ?? []).slice(0, 6).map((item, i) => <li key={item.id_compra || item.numeroControlePNCP || i} className="text-xs text-ink-soft"><strong className="text-ink">{item.orgaoEntidade?.razaoSocial || item.unidadeOrgao?.nomeUnidade || 'Órgão não informado'}</strong> · {item.objetoCompra || 'Objeto não informado'} · encerra {data(item.dataEncerramentoProposta)}</li>)}</ul>}
+  </div>
+}
+
 export default function MonitorLicitaçõesTab() {
   const lista = useOportunidades(false)
+  const me = useMe()
+  const opcoes = useOpcoes()
   const qc = useQueryClient()
-  const [filtroStatus, setFiltroStatus] = useState('Todos')
+  const [visao, setVisao] = useState<'certames' | 'contratos'>('certames')
+  const [soAcao, setSoAcao] = useState(false)
   const [busca, setBusca] = useState('')
-  const elegiveis = useMemo(() => (lista.data ?? []).filter(o => STATUS.has(fold(o.status)) && !o.arquivado_em), [lista.data])
-  const ufs = useMemo(() => [...new Set(elegiveis.map(o => (o.uf ?? '').trim().toUpperCase()).filter(uf => /^[A-Z]{2}$/.test(uf)))].sort(), [elegiveis])
-  const comprasGov = useQuery({ queryKey: ['comprasgov-licitacoes-front'], queryFn: consultarComprasGov, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
-  const conlicitacao = useQuery({ queryKey: ['conlicitacao-licitacoes-front'], queryFn: consultarConlicitacao, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
-  const consultas = useQueries({ queries: ufs.map(uf => ({
-    queryKey: ['pncp-licitacoes-front', uf],
-    queryFn: ({ signal }: { signal: AbortSignal }) => consultarPncp(uf, signal),
-    staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false,
-  })) })
-  const atualizando = lista.isFetching || comprasGov.isFetching || conlicitacao.isFetching || consultas.some(q => q.isFetching)
-  const porUf = useMemo(() => new Map(ufs.map((uf, i) => [uf, consultas[i]])), [ufs, consultas])
-  const linhas = useMemo(() => {
+  const [fontes, setFontes] = useState(false)
+  const [editando, setEditando] = useState<Oportunidade | null | undefined>(undefined)
+  // Fontes públicas só rodam quando alguém abre o bloco "Fontes": a tela principal não depende delas e não faz rede à toa.
+  const comprasGov = useQuery({ queryKey: ['comprasgov-licitacoes-front'], queryFn: consultarComprasGov, enabled: fontes, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
+  const conlicitacao = useQuery({ queryKey: ['conlicitacao-licitacoes-front'], queryFn: consultarConlicitacao, enabled: fontes, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
+
+  const agora = useMemo(() => new Date(), [])
+  const todas = useMemo(() => montar(lista.data ?? [], agora), [lista.data, agora])
+  const certames = useMemo(() => todas.filter(l => l.a.grupo === 'certame'), [todas])
+  const contratos = useMemo(() => todas.filter(l => l.a.grupo === 'contrato'), [todas])
+  const visiveis = useMemo(() => {
     const q = fold(busca)
-    return elegiveis
-      .filter(o => (filtroStatus === 'Todos' || fold(o.status) === fold(filtroStatus)) &&
-        (!q || fold([o.codigo, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.site].join(' ')).includes(q)))
-      .sort((a, b) => {
-        const rank = (o: Oportunidade) => {
-          const uf = (o.uf ?? '').trim().toUpperCase()
-          const consulta = porUf.get(uf)
-          if (!consulta || consulta.isPending) return 2
-          if (consulta.isError) return 3
-          return consulta.data && candidatos(o, consulta.data).length > 0 ? 0 : 1
-        }
-        return rank(a) - rank(b)
-      })
-  }, [elegiveis, filtroStatus, busca, porUf])
-  const consultarNovamente = async () => {
+    return (visao === 'certames' ? certames : contratos).filter(l =>
+      (!soAcao || l.a.nivel !== 'ok') &&
+      (!q || fold([l.o.codigo, l.o.sigla, l.o.orgao, l.o.processo, l.o.descritivo, l.o.objeto, l.o.uasg, l.o.analista].join(' ')).includes(q)))
+  }, [visao, certames, contratos, soAcao, busca])
+  const nFaixa = (f: string) => certames.filter(l => l.a.faixa === f).length
+  const precisaAcao = todas.filter(l => l.a.nivel !== 'ok').length
+  const atualizando = lista.isFetching || comprasGov.isFetching || conlicitacao.isFetching
+  const atualizar = async () => {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ['oportunidades'] }),
-      qc.invalidateQueries({ queryKey: ['pncp-licitacoes-front'] }),
+      qc.invalidateQueries({ queryKey: ['pncp-uf'] }),
       qc.invalidateQueries({ queryKey: ['comprasgov-licitacoes-front'] }),
       qc.invalidateQueries({ queryKey: ['conlicitacao-licitacoes-front'] }),
     ])
-    await Promise.all([
-      qc.refetchQueries({ queryKey: ['pncp-licitacoes-front'], type: 'active' }),
-      qc.refetchQueries({ queryKey: ['comprasgov-licitacoes-front'], type: 'active' }),
-      qc.refetchQueries({ queryKey: ['conlicitacao-licitacoes-front'], type: 'active' }),
-      lista.refetch(),
-    ])
   }
-  const fontesOk = consultas.filter(q => q.isSuccess).length
-  const totalResultados = consultas.reduce((n, q) => n + (q.data?.length ?? 0), 0) + (comprasGov.data?.length ?? 0) + (conlicitacao.data?.length ?? 0)
-  const totalComCandidato = elegiveis.filter(o => {
-    const q = porUf.get((o.uf ?? '').trim().toUpperCase())
-    return (q?.data || comprasGov.data || conlicitacao.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])]).length > 0
-  }).length
-  const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='critico' }).length
-  const atencao = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='atencao' }).length
+  const kpis = [
+    { label: 'Pregão hoje', value: nFaixa('hoje'), tom: nFaixa('hoje') ? 'text-st-critical' : 'text-ink' },
+    { label: 'Pregão amanhã', value: nFaixa('amanha'), tom: nFaixa('amanha') ? 'text-st-warn' : 'text-ink' },
+    { label: 'Próximos 7 dias', value: nFaixa('semana'), tom: 'text-ink' },
+    { label: 'Precisam de ação', value: precisaAcao, tom: precisaAcao ? 'text-st-warn' : 'text-ink' },
+  ]
+  const aba = (id: typeof visao, rotulo: string, n: number) => (
+    <button key={id} type="button" onClick={() => setVisao(id)} aria-pressed={visao === id} className={'rounded-lg border px-3 py-1.5 text-xs font-semibold ' + (visao === id ? 'border-gold bg-gold-soft text-ink' : 'border-line text-muted hover:bg-surface-2')}>{rotulo} ({n})</button>
+  )
+
   return <section className="mt-5 space-y-5" aria-label="Monitoramento de licitações">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Módulo de inteligência de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento de licitações</h1><p className="mt-1 max-w-3xl text-sm text-muted">Central de comando de certames: dados da contratação, nível de atenção e próxima ação diretamente no Radar. Consulta somente leitura; sem alteração no banco do Radar.</p></div>
-      <button onClick={consultarNovamente} disabled={atualizando} className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"><RefreshCw className={'size-4 ' + (atualizando ? 'animate-spin' : '')}/> Atualizar consultas</button>
+      <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Painel de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento de licitações</h1><p className="mt-1 max-w-3xl text-sm text-muted">O que precisa de atenção nas oportunidades em andamento, por urgência. Os dados vêm do cadastro do Radar; cada cartão diz o que falta e qual é a próxima ação.</p></div>
+      <button onClick={atualizar} disabled={atualizando} className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"><RefreshCw className={'size-4 ' + (atualizando ? 'animate-spin' : '')} /> Atualizar</button>
     </div>
     {lista.error && <div role="alert" className="rounded-lg border border-st-critical/30 bg-surface p-4 text-sm text-ink-soft">Não foi possível ler as oportunidades do Radar: {(lista.error as Error).message}</div>}
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {[{label:'Oportunidades acompanhadas',value:lista.isPending?'—':elegiveis.length},{label:'Consultas por UF',value:ufs.length},{label:'Com correspondência candidata',value:lista.isPending?'—':totalComCandidato},{label:'Alertas críticos',value:lista.isPending?'—':criticos}].map(k=><div key={k.label} className="rounded-xl border border-line bg-surface p-4 shadow-card"><p className="text-xs text-muted">{k.label}</p><p className="mt-2 font-mono text-2xl font-medium tabular-nums text-ink">{k.value}</p></div>)}
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{kpis.map(k => <div key={k.label} className="rounded-xl border border-line bg-surface p-4 shadow-card"><p className="text-xs text-muted">{k.label}</p><p className={'mt-2 font-mono text-2xl font-medium tabular-nums ' + k.tom}>{lista.isPending ? '—' : k.value}</p></div>)}</div>
+
+    <div className="flex flex-wrap items-center gap-2">
+      {aba('certames', 'Certames (Prospect e Go)', certames.length)}
+      {aba('contratos', 'Contratos (On going, Onboarding, Suspended)', contratos.length)}
+      <label className="ml-2 flex cursor-pointer items-center gap-1.5 text-[13px] text-ink-soft"><input type="checkbox" className="size-4 accent-[var(--gold)]" checked={soAcao} onChange={e => setSoAcao(e.target.checked)} />Só o que precisa de ação</label>
+      <div className="relative min-w-60 flex-1"><Search className="absolute left-3 top-2.5 size-4 text-muted" /><input value={busca} onChange={e => setBusca(e.target.value)} aria-label="Buscar nas licitações" placeholder="Buscar órgão, processo, UASG ou objeto…" className="w-full rounded-lg border border-line bg-surface px-9 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-gold/40" /></div>
     </div>
-    <div className="grid gap-3 md:grid-cols-3">
-      <div className="rounded-xl border border-st-critical/30 bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><AlertTriangle className="size-4 text-st-critical"/>Ação necessária</div><p className="mt-1 text-xs text-muted">{criticos} oportunidade(s) exigem correção de cadastro, validação ou nova consulta.</p></div>
-      <div className="rounded-xl border border-st-warning/30 bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><Clock3 className="size-4 text-st-warning"/>Em revisão</div><p className="mt-1 text-xs text-muted">{atencao} oportunidade(s) precisam de conferência operacional.</p></div>
-      <div className="rounded-xl border border-st-success/30 bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><CheckCircle2 className="size-4 text-st-success"/>Correspondências candidatas</div><p className="mt-1 text-xs text-muted">{totalComCandidato} oportunidade(s) têm registros para conferir nas fontes consultadas.</p></div>
-    </div>
-    <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted"/><p>O PNCP retorna pregões com recebimento de propostas aberto nesta consulta. Isso não cobre, por si só, sessões encerradas, alterações em tempo real ou todos os portais. Correspondência automática é hipótese e precisa ser confirmada com o identificador oficial.</p></div>
-    <div className="rounded-xl border border-line bg-surface p-4">
-    <div className="rounded-xl border border-line bg-surface p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">Teste da fonte alternativa · Compras.gov.br</h2><p className="text-xs text-muted">Pregões e licitações legadas publicados nos últimos 45 dias · somente leitura</p></div><span className="rounded-md border border-line px-2 py-1 text-xs text-muted">{comprasGov.isSuccess ? (comprasGov.data?.length ?? 0)+' registros' : comprasGov.isError ? 'Fonte indisponível' : 'Consultando…'}</span></div>
-      {comprasGov.isPending ? <p className="py-4 text-sm text-muted">Consultando a API oficial de Dados Abertos do Compras.gov.br…</p> : comprasGov.isError ? <div role="alert" className="py-3 text-sm text-st-critical">Falha na consulta Compras.gov.br: {(comprasGov.error as Error)?.message || 'erro desconhecido'}</div> : (comprasGov.data ?? []).length === 0 ? <p className="py-4 text-sm text-muted">A API respondeu, mas não retornou registros no período consultado.</p> : <div className="mt-3 space-y-2">{(comprasGov.data ?? []).slice(0,8).map((item,i)=><div key={item.id_compra || item.numeroControlePNCP || i} className="rounded-lg border border-line p-3"><p className="text-sm font-semibold text-ink">{item.orgaoEntidade?.razaoSocial || item.unidadeOrgao?.nomeUnidade || 'Órgão não informado'} · {item.modalidadeNome || 'Pregão/licitação'}</p><p className="mt-1 text-xs text-ink-soft">{item.processo ? 'Processo/pregão '+item.processo+' · ' : ''}{item.objetoCompra || 'Objeto não informado'}</p><p className="mt-1 text-xs text-muted">Situação: {item.situacaoCompraNome || 'Não informada'} · Publicação: {data(item.dataPublicacaoPncp)} · Encerramento: {data(item.dataEncerramentoProposta)} · UASG: {item.unidadeOrgao?.codigoUnidade || 'Não informada'}</p></div>)}</div>}
-    </div>
-      <div className="rounded-xl border border-line bg-surface p-4 mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">ConLicitações · fonte autenticada</h2><p className="text-xs text-muted">Boletins associados à conta · credencial mantida somente no servidor</p></div><span className="rounded-md border border-line px-2 py-1 text-xs text-muted">{conlicitacao.isSuccess ? (conlicitacao.data?.length ?? 0)+' registros' : conlicitacao.isError ? 'Configuração/consulta pendente' : 'Consultando…'}</span></div>
-        {conlicitacao.isPending ? <p className="py-4 text-sm text-muted">Consultando boletins da ConLicitações…</p> : conlicitacao.isError ? <div role="alert" className="py-3 text-sm text-st-critical">{(conlicitacao.error as Error)?.message || 'ConLicitações indisponível'}. Configure CONLICITACAO_TOKEN no ambiente seguro do deploy e confirme a autorização do IP de saída.</div> : (conlicitacao.data ?? []).length === 0 ? <p className="py-4 text-sm text-muted">A API respondeu, mas não retornou licitações nos últimos boletins dos filtros configurados.</p> : <div className="mt-3 space-y-2">{(conlicitacao.data ?? []).slice(0,8).map((item,i)=><div key={item.numeroControlePNCP || item.processo || i} className="rounded-lg border border-line p-3"><p className="text-sm font-semibold text-ink">{item.orgaoEntidade?.razaoSocial || item.unidadeOrgao?.nomeUnidade || 'Órgão não informado'} · {item.modalidadeNome || 'Licitação'}</p><p className="mt-1 text-xs text-ink-soft">{item.processo ? 'Edital/processo '+item.processo+' · ' : ''}{item.objetoCompra || 'Objeto não informado'}</p><p className="mt-1 text-xs text-muted">Situação: {item.situacaoCompraNome || 'Não informada'} · Abertura: {data(item.dataEncerramentoProposta)} · UF: {item.unidadeOrgao?.ufSigla || '—'} · Fonte: ConLicitações</p>{item.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={item.url} target="_blank" rel="noreferrer">Ver fonte original <ExternalLink className="size-3"/></a>}</div>)}</div>}
+
+    {lista.isPending ? <p className="py-10 text-center text-sm text-muted">Carregando oportunidades…</p>
+      : visiveis.length === 0 ? <p className="py-10 text-center text-sm text-muted">Nada para mostrar com este filtro.</p>
+      : visao === 'certames'
+        ? FAIXAS.map(f => {
+          const itens = visiveis.filter(l => l.a.faixa === f.id)
+          return itens.length === 0 ? null : <div key={f.id} className="space-y-2"><h2 className="text-sm font-semibold text-ink">{f.titulo} <span className="font-normal text-muted">({itens.length})</span></h2>{itens.map(l => <Cartao key={l.o.id} l={l} onAbrir={setEditando} procurar />)}</div>
+        })
+        : <div className="space-y-2">{visiveis.map(l => <Cartao key={l.o.id} l={l} onAbrir={setEditando} procurar={false} />)}</div>}
+
+    <details className="rounded-xl border border-line bg-surface p-4" onToggle={e => setFontes((e.currentTarget as HTMLDetailsElement).open)}>
+      <summary className="cursor-pointer text-sm font-semibold text-ink">Fontes públicas (diagnóstico)</summary>
+      <div className="mt-3 space-y-3">
+        <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted" /><p>A busca no PNCP lista só pregões eletrônicos com propostas abertas e confere até 300 por UF. Não cobre sessões encerradas, remarcações em tempo real nem todos os portais. Correspondência é sugestão: confirme com o identificador oficial. O acompanhamento automático com histórico e alertas de mudança ainda depende de habilitar o monitor no servidor.</p></div>
+        <Fonte titulo="Compras.gov.br · últimos 45 dias" query={comprasGov} vazio="A API respondeu, mas não retornou registros no período." />
+        <Fonte titulo="ConLicitações · boletins da conta" query={conlicitacao} vazio="A API respondeu, mas não retornou licitações nos filtros configurados." />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg text-ink">Oportunidades em acompanhamento</h2><p className="text-xs text-muted">Fonte: cadastro existente do Radar · Sem escrita no banco</p></div>
-        <div className="flex flex-wrap gap-2">{['Todos','Prospect','Go','On going','Suspended'].map(s=><button key={s} onClick={()=>setFiltroStatus(s)} className={'rounded-lg border px-3 py-1.5 text-xs font-semibold '+(filtroStatus===s?'border-gold bg-gold-soft text-ink':'border-line text-muted hover:bg-surface-2')}>{s}</button>)}</div>
-      </div>
-      <div className="relative mt-4"><Search className="absolute left-3 top-2.5 size-4 text-muted"/><input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar órgão, processo, UASG ou objeto..." className="w-full rounded-lg border border-line bg-surface px-9 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-gold/40"/></div>
-      {lista.isPending ? <p className="py-10 text-center text-sm text-muted">Carregando oportunidades…</p> : linhas.length===0 ? <p className="py-10 text-center text-sm text-muted">Nenhuma oportunidade encontrada para este filtro.</p> : <div className="mt-4 space-y-3">{linhas.map(o=>{
-        const uf=(o.uf??'').trim().toUpperCase()
-        const consulta=porUf.get(uf)
-        const matches=candidatos(o,[...(consulta?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])])
-        return <article key={o.id} className="rounded-lg border border-line p-3">
-          <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-semibold text-ink">{(o.codigo ?? '#'+o.id) + ' · ' + o.orgao}</p><p className="mt-1 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p><p className="mt-1 text-xs text-muted">Processo/pregão: {o.processo || 'Não informado'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}</p><p className="mt-1 text-xs text-muted">Portal informado: {o.site || 'Não informado'} · Pregão: {data(o.data_pregao_dt)}</p></div><span className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs text-ink">{o.status}</span></div>
-          {(() => { const alerta = alertaNoc(o, matches, consulta, comprasGov, conlicitacao); const cor = alerta.nivel==='critico' ? 'border-st-critical/30 bg-st-critical/5' : 'border-st-warning/30 bg-st-warning/5'; return <div className={'mt-3 rounded-lg border p-3 '+cor}><div className="flex items-center gap-2 text-sm font-semibold text-ink">{alerta.nivel==='critico' ? <AlertTriangle className="size-4 text-st-critical"/> : <Clock3 className="size-4 text-st-warning"/>}{alerta.titulo}</div><p className="mt-1 text-sm text-ink-soft"><strong>Próxima ação:</strong> {alerta.acao}</p></div> })()}
-          <div className="mt-3 border-t border-line pt-3">
-            {!uf ? <p className="text-xs text-muted">Consulta não executada: esta oportunidade está sem UF válida no cadastro.</p> :
-            matches.length > 0 ? <div className="space-y-2"><p className="text-xs font-semibold text-ink"><Activity className="mr-1 inline size-3.5"/>Registros encontrados nas fontes públicas — confira os dados</p>{matches.map((m,i)=><div key={m.item.numeroControlePNCP || m.item.id_compra || i} className="rounded-md bg-surface-2 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><p className="text-sm font-medium text-ink">{m.item.orgaoEntidade?.razaoSocial || 'Órgão não informado'} · {m.item.unidadeOrgao?.nomeUnidade || 'Unidade não informada'}</p><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">Compatibilidade {m.score}</span></div><p className="mt-1 text-xs text-ink-soft">{(m.item.processo ? 'Processo '+m.item.processo+' · ' : '')+(m.item.objetoCompra || m.item.informacaoComplementar || 'Objeto não informado')}</p><p className="mt-1 text-xs text-muted">{m.motivos.join(' · ')} · Fonte: {m.item.source || 'PNCP'} · Situação: {m.item.situacaoCompraNome || 'Não informada'} · Encerramento: {data(m.item.dataEncerramentoProposta)}</p>{m.url && <a className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline" href={m.url} target="_blank" rel="noreferrer">Ver fonte oficial <ExternalLink className="size-3"/></a>}</div>)}</div> :
-            consulta?.isPending || !consulta || comprasGov.isPending ? <p className="text-xs text-muted">Consultando PNCP e Compras.gov.br para esta oportunidade…</p> :
-            <div className="text-xs text-muted"><p>Nenhum candidato compatível nos resultados retornados pelas fontes públicas para {uf}.</p>{consulta?.isError && <p className="mt-1 break-words text-st-critical">PNCP: {(consulta.error as Error)?.message || 'falha de rede'}</p>}{comprasGov.isError && <p className="mt-1 break-words text-st-critical">Compras.gov.br: {(comprasGov.error as Error)?.message || 'falha de consulta'}</p>}<button type="button" onClick={() => { qc.refetchQueries({ queryKey: ['pncp-licitacoes-front', uf], type: 'active' }); qc.refetchQueries({ queryKey: ['comprasgov-licitacoes-front'], type: 'active' }) }} className="mt-1 font-semibold underline">Tentar novamente nas fontes</button></div>}
-          </div>
-        </article>
-      })}</div>}
-      <p className="mt-4 text-xs text-muted">Fontes consultadas: PNCP {fontesOk}/{ufs.length} UFs · Compras.gov.br {comprasGov.isSuccess ? 'OK' : comprasGov.isError ? 'com erro' : 'consultando'} · ConLicitações {conlicitacao.isSuccess ? 'OK' : conlicitacao.isError ? 'com erro/configuração pendente' : 'consultando'} · {totalResultados} registros recebidos · Cache de 5 minutos. A interface mostra o estado da consulta atual; detecção histórica de alterações exige snapshots persistentes, ainda não habilitados nesta etapa.</p>
-    </div>
+    </details>
+
+    {me.data && opcoes.data && <OportunidadeDrawer aberto={editando !== undefined} onFechar={() => setEditando(undefined)} registro={editando ?? null} opcoes={opcoes.data} me={me.data} />}
   </section>
 }
