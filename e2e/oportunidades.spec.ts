@@ -581,6 +581,57 @@ test('filtro de período: Ano, Quarter e Mês (mês acompanha o quarter)', async
   await expect(mes).toHaveValue('')
 })
 
+test('filtro de pregões por intervalo de datas e atalhos de semana e mês', async ({ page }) => {
+  await api(page)
+  await abrirAba(page)
+  const de = page.getByLabel('Pregão a partir de')
+  const ate = page.getByLabel('Pregão até')
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+  await de.fill('2026-03-10') // todas as datas da semente são 2026-03-10: as pontas valem (inclusivo)
+  await ate.fill('2026-03-10')
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+  await de.fill('2026-03-11')
+  await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'A data inicial é depois da final' })).toBeVisible()
+  await de.fill('2026-03-01')
+  await ate.fill('2026-03-09')
+  await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible()
+  await ate.fill('2026-03-31')
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+  // combina com o quarter: março é Q1, então Q2 esvazia mesmo dentro do intervalo
+  await page.getByLabel('Filtrar por quarter do pregão').selectOption('Q2')
+  await expect(page.getByText(/^0 de 500 oportunidades/)).toBeVisible()
+  await page.getByLabel('Filtrar por quarter do pregão').selectOption('')
+
+  const dias = async () => (new Date(await ate.inputValue()).getTime() - new Date(await de.inputValue()).getTime()) / 86_400_000
+  await page.getByRole('button', { name: 'Esta semana' }).click()
+  expect(await dias()).toBe(6)
+  expect(new Date((await de.inputValue()) + 'T12:00:00').getDay()).toBe(1) // começa na segunda
+  const estaSemana = await de.inputValue()
+  await page.getByRole('button', { name: 'Próxima semana' }).click()
+  expect((new Date((await de.inputValue()) + 'T12:00:00').getTime() - new Date(estaSemana + 'T12:00:00').getTime()) / 86_400_000).toBe(7)
+  await page.getByRole('button', { name: 'Este mês' }).click()
+  expect((await de.inputValue()).endsWith('-01')).toBe(true)
+  await page.getByRole('button', { name: 'Limpar datas' }).click()
+  await expect(de).toHaveValue('')
+  await expect(ate).toHaveValue('')
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+})
+
+test('arquivadas listadas pelo admin não entram nos contadores', async ({ page }) => {
+  await api(page, true)
+  const linhas = semente(500)
+  await page.route('**/api/oportunidades?arquivadas=1', (r) =>
+    r.fulfill({ json: { rows: [...linhas, { ...linhas[0], id: 901, codigo: '2026-0901', arquivado_em: '2026-10-20T12:00:00Z', pendencias: ['site'] }, { ...linhas[1], id: 902, codigo: '2026-0902', arquivado_em: '2026-10-20T12:00:00Z' }] } }),
+  )
+  await abrirAba(page)
+  await expect(page.getByText(/^500 de 500 oportunidades/)).toBeVisible()
+  await expect(page.getByText('Só com pendências (1)')).toBeVisible()
+  await page.getByLabel('Incluir arquivadas').check()
+  await expect(page.getByText(/^500 de 500 oportunidades \(\+2 arquivadas na lista, fora das contas\)/)).toBeVisible()
+  await expect(page.getByText('Só com pendências (1)')).toBeVisible() // a pendência da arquivada não conta
+})
+
 test('filtro por linha de serviço traz as linhas novas (Governança e gestão da TI, Outros)', async ({ page }) => {
   await api(page)
   await abrirAba(page)
