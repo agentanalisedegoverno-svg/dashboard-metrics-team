@@ -186,7 +186,7 @@ export default function MonitorLicitaçõesTab() {
   const totalResultados = consultas.reduce((n, q) => n + (q.data?.length ?? 0), 0) + (comprasGov.data?.length ?? 0) + (conlicitacao.data?.length ?? 0)
   const totalComCandidato = elegiveis.filter(o => {
     const q = porUf.get((o.uf ?? '').trim().toUpperCase())
-    return (q?.data || comprasGov.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])]).length > 0
+    return (q?.data || comprasGov.data || conlicitacao.data) && candidatos(o, [...(q?.data ?? []), ...(comprasGov.data ?? []), ...(conlicitacao.data ?? [])]).length > 0
   }).length
   const criticos = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='critico' }).length
   const atencao = elegiveis.filter(o => { const q=porUf.get((o.uf??'').trim().toUpperCase()); const ms=candidatos(o,[...(q?.data??[]),...(comprasGov.data??[]),...(conlicitacao.data??[])]); return alertaNoc(o,ms,q,comprasGov,conlicitacao).nivel==='atencao' }).length
