@@ -132,6 +132,7 @@ Mesmos campos do formulário *Nova oportunidade*. Nomes em `snake_case`, exatame
 |---|---|---|---|---|
 | `status` | Identificação | **sim** | texto: um dos valores da lista indicada (lista `status`) | Status |
 | `sigla` | Identificação | não | texto | Sigla. Até 20 caracteres |
+| `segmento` | Identificação | não | texto: Corporate ou Público (aceita também sem acento e em minúsculas) | Segmento da oportunidade. Em branco nas oportunidades antigas; aparece ao lado da sigla, no filtro da lista, no e-mail e no cartão do Planner |
 | `orgao` | Identificação | **sim** | texto | Instituição / Órgão |
 | `descritivo` | Identificação | **sim** | texto (pode ter várias linhas) | Descritivo. Até 60 caracteres (resumo curto); o detalhe vai em Objeto |
 | `objeto` | Identificação | não | texto (pode ter várias linhas) | Objeto. O que está sendo contratado |

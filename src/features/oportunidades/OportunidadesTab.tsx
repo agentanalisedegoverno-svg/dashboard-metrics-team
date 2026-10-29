@@ -5,6 +5,7 @@ import { useMe, useOpcoes, useOportunidades } from './api'
 import { OportunidadeDrawer } from './OportunidadeDrawer'
 import { OportunidadesGrid } from './OportunidadesGrid'
 import { baixarCsv } from './exportarCsv'
+import { SEGMENTOS } from '@/domain/oportunidade'
 import { nomesPreVendas } from '@/domain/preVendas'
 import { anosDisponiveis, MESES, mesesDoQuarter, noPeriodo, QUARTERS } from './periodo'
 
@@ -33,6 +34,7 @@ export default function OportunidadesTab() {
   const buscaAdiada = useDeferredValue(busca)
   const [status, setStatus] = useState('')
   const [torre, setTorre] = useState('')
+  const [segmento, setSegmento] = useState('')
   const [linha, setLinha] = useState('')
   const [analista, setAnalista] = useState('')
   const [soPendencias, setSoPendencias] = useState(false)
@@ -46,13 +48,14 @@ export default function OportunidadesTab() {
       (o) =>
         (!status || o.status === status) &&
         (!torre || o.torre === torre) &&
+        (!segmento || o.segmento === segmento) &&
         (!linha || o.linha_servico === linha) &&
         (!analista || nomesPreVendas(o.analista).includes(analista)) &&
         noPeriodo(o.data_pregao_dt, periodo) &&
         (!soPendencias || (o.pendencias?.length ?? 0) > 0) &&
         (!q || fold([o.codigo, o.sigla, o.orgao, o.processo, o.descritivo, o.objeto, o.uasg, o.analista, o.linha_servico].join(' ')).includes(q)),
     )
-  }, [lista.data, buscaAdiada, status, torre, linha, analista, soPendencias, periodo])
+  }, [lista.data, buscaAdiada, status, torre, segmento, linha, analista, soPendencias, periodo])
 
   if (me.error || opcoes.error || lista.error) {
     const e = (me.error ?? opcoes.error ?? lista.error) as Error
@@ -85,6 +88,10 @@ export default function OportunidadesTab() {
         <select aria-label="Filtrar por torre" className={selectCls} value={torre} onChange={(e) => setTorre(e.target.value)}>
           <option value="">Torre</option>
           {valores('torre').map((v) => <option key={v}>{v}</option>)}
+        </select>
+        <select aria-label="Filtrar por segmento" className={selectCls} value={segmento} onChange={(e) => setSegmento(e.target.value)}>
+          <option value="">Segmento</option>
+          {SEGMENTOS.map((v) => <option key={v}>{v}</option>)}
         </select>
         <select aria-label="Filtrar por linha de serviço" className={selectCls} value={linha} onChange={(e) => setLinha(e.target.value)}>
           <option value="">Linha de serviço</option>

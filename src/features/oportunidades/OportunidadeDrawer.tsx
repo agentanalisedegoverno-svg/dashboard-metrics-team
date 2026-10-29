@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { formataCnpj, soDigitos, validaCnpj } from '@/domain/cnpj'
 import { juntaPreVendas, nomesPreVendas } from '@/domain/preVendas'
-import { CAMPO_LISTA, regrasNegocio, torreDaLinha, type ErroCampo, type Oportunidade } from '@/domain/oportunidade'
+import { CAMPO_LISTA, regrasNegocio, SEGMENTOS, torreDaLinha, type ErroCampo, type Oportunidade } from '@/domain/oportunidade'
 import { cn } from '@/lib/utils'
 import { ApiError, useArquivar, useAtualizar, useConsultaCnpj, useCriar, useHistorico, type Me, type Opcoes } from './api'
 import { SECOES, ROTULO, TIPO_CAMPO, type Campo } from './campos'
@@ -175,6 +175,24 @@ function CampoInput({
     controle = <input type="date" className={cls} {...comum} {...reg} />
   } else if (c.tipo === 'hora') {
     controle = <input type="time" className={cls} {...comum} {...reg} />
+  } else if (c.tipo === 'segmento') {
+    // Duas caixas excludentes: marcar uma desmarca a outra; desmarcar deixa em branco.
+    const atual = String(form.watch(c.nome as never) ?? valorAtual ?? '')
+    controle = (
+      <fieldset aria-label={c.rotulo} className={cn(cls, 'flex min-h-[38px] items-center gap-4')} id={id} disabled={desabilitado}>
+        {SEGMENTOS.map((s) => (
+          <label key={s} className="flex cursor-pointer items-center gap-1.5 text-[13px]">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--gold)]"
+              checked={atual === s}
+              onChange={(e) => form.setValue(c.nome as never, (e.target.checked ? s : '') as never, { shouldDirty: true, shouldValidate: true })}
+            />
+            {s}
+          </label>
+        ))}
+      </fieldset>
+    )
   } else if (c.tipo === 'link') {
     const atual = String(form.watch(c.nome as never) ?? valorAtual ?? '').trim()
     const abrir = /^https:\/\/\S+$/.test(atual) ? atual : null

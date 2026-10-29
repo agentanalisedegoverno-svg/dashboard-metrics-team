@@ -19,6 +19,7 @@ const FORMATO: Record<Campo['tipo'], string> = {
   bool: 'true ou false',
   cnpj: '14 dígitos (com ou sem máscara); razão social e matriz/filial vêm da Receita',
   link: 'link que começa com https:// (sem espaços, até 2000 caracteres)',
+  segmento: 'texto: Corporate ou Público (aceita também sem acento e em minúsculas)',
 }
 
 export type CampoApi = {

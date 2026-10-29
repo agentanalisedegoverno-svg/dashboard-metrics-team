@@ -618,7 +618,8 @@ test('Sigla (até 20 caracteres) vem antes de Instituição / Órgão e é desta
   await page.getByRole('button', { name: 'Nova oportunidade' }).click()
   const rotulos = await page.locator('label').allInnerTexts()
   const pos = (re: RegExp) => rotulos.findIndex((t) => re.test(t))
-  expect(pos(/^Sigla/), 'Sigla vem logo antes da Instituição').toBe(pos(/^Instituição/) - 1)
+  expect(pos(/^Segmento/), 'Segmento fica ao lado da sigla').toBe(pos(/^Sigla/) + 1)
+  expect(pos(/^Instituição/), 'depois do Segmento (e das caixas Corporate e Público) vem a Instituição').toBe(pos(/^Segmento/) + 3)
   const sigla = page.getByLabel(/^Sigla/)
   expect(await sigla.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 246, 168)')
   await sigla.fill('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
@@ -801,4 +802,42 @@ test('Baixar CSV leva só o que está filtrado na tela, em formato que o Excel a
   // sem resultado, o botão desabilita
   await page.getByLabel('Buscar oportunidades').fill('zzzz-nada-assim')
   await expect(botao).toBeDisabled()
+})
+
+test('Segmento: Corporate ou Público ao lado da sigla (caixas excludentes), vai no envio e filtra a lista', async ({ page }) => {
+  const { enviados } = await api(page)
+  await abrirAba(page)
+
+  // filtro na lista (a semente não tem segmento: tudo em branco)
+  const filtro = page.getByLabel('Filtrar por segmento')
+  await expect(filtro.locator('option')).toHaveText(['Segmento', 'Corporate', 'Público'])
+
+  await page.getByRole('button', { name: 'Nova oportunidade' }).click()
+  const grupo = page.getByRole('group', { name: 'Segmento' })
+  const corporate = grupo.getByRole('checkbox', { name: 'Corporate' })
+  const publico = grupo.getByRole('checkbox', { name: 'Público' })
+  await expect(corporate).not.toBeChecked()
+  await expect(publico).not.toBeChecked()
+  await corporate.check()
+  await publico.check() // marcar uma desmarca a outra
+  await expect(corporate).not.toBeChecked()
+  await expect(publico).toBeChecked()
+  await publico.uncheck() // desmarcar deixa em branco
+  await expect(publico).not.toBeChecked()
+  await corporate.check()
+
+  // fica na mesma linha da sigla
+  const caixaSigla = await page.getByLabel(/^Sigla/).boundingBox()
+  const caixaSegmento = await grupo.boundingBox()
+  if (test.info().project.name === 'desktop') expect(Math.abs(caixaSigla!.y - caixaSegmento!.y)).toBeLessThan(40) // no celular a grade tem uma coluna
+  await page.screenshot({ path: 'test-results/zz-segmento.png' })
+
+  await page.getByLabel(/^Status/).selectOption('Go')
+  await page.getByLabel(/^Instituição/).fill('Prefeitura S')
+  await page.getByLabel(/^Descritivo/).fill('Descrição')
+  await page.getByLabel(/^Torre/).selectOption('ITS')
+  await page.getByLabel(/^Data do pregão/).fill('2099-06-02')
+  await page.getByRole('button', { name: 'Cadastrar' }).click()
+  await expect(page.getByText('Oportunidade cadastrada.')).toBeVisible()
+  expect(enviados[0]).toMatchObject({ segmento: 'Corporate' })
 })
