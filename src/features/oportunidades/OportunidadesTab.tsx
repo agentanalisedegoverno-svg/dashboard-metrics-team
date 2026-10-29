@@ -1,9 +1,10 @@
-import { Plus } from 'lucide-react'
+import { Download, Plus } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import type { Oportunidade } from '@/domain/oportunidade'
 import { useMe, useOpcoes, useOportunidades } from './api'
 import { OportunidadeDrawer } from './OportunidadeDrawer'
 import { OportunidadesGrid } from './OportunidadesGrid'
+import { baixarCsv } from './exportarCsv'
 import { nomesPreVendas } from '@/domain/preVendas'
 import { anosDisponiveis, MESES, mesesDoQuarter, noPeriodo, QUARTERS } from './periodo'
 
@@ -78,23 +79,23 @@ export default function OportunidadesTab() {
           className={`${selectCls} min-w-60 flex-1`}
         />
         <select aria-label="Filtrar por status" className={selectCls} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">Todos os status</option>
+          <option value="">Status</option>
           {valores('status').map((v) => <option key={v}>{v}</option>)}
         </select>
         <select aria-label="Filtrar por torre" className={selectCls} value={torre} onChange={(e) => setTorre(e.target.value)}>
-          <option value="">Todas as torres</option>
+          <option value="">Torre</option>
           {valores('torre').map((v) => <option key={v}>{v}</option>)}
         </select>
         <select aria-label="Filtrar por linha de serviço" className={selectCls} value={linha} onChange={(e) => setLinha(e.target.value)}>
-          <option value="">Todas as linhas de serviço</option>
+          <option value="">Linha de serviço</option>
           {valores('linha_servico').map((v) => <option key={v}>{v}</option>)}
         </select>
         <select aria-label="Filtrar por pré-vendas" className={selectCls} value={analista} onChange={(e) => setAnalista(e.target.value)}>
-          <option value="">Todos os pré-vendas</option>
+          <option value="">Pré-vendas</option>
           {opcoes.data.preVendas.map((v) => <option key={v}>{v}</option>)}
         </select>
         <select aria-label="Filtrar por ano do pregão" className={selectCls} value={periodo.ano} onChange={(e) => setPeriodo((p) => ({ ...p, ano: e.target.value }))}>
-          <option value="">Todos os anos</option>
+          <option value="">Ano</option>
           {anosDisponiveis(lista.data.map((o) => o.data_pregao_dt)).map((a) => <option key={a}>{a}</option>)}
         </select>
         <select
@@ -103,11 +104,11 @@ export default function OportunidadesTab() {
           value={periodo.quarter}
           onChange={(e) => setPeriodo((p) => ({ ...p, quarter: e.target.value, mes: '' }))}
         >
-          <option value="">Todos os quarters</option>
+          <option value="">Quarter</option>
           {QUARTERS.map((q) => <option key={q} value={q}>{q} ({mesesDoQuarter(q).map((m) => MESES[m - 1].slice(0, 3)).join('/')})</option>)}
         </select>
         <select aria-label="Filtrar por mês do pregão" className={selectCls} value={periodo.mes} onChange={(e) => setPeriodo((p) => ({ ...p, mes: e.target.value }))}>
-          <option value="">Todos os meses</option>
+          <option value="">Mês</option>
           {mesesDoQuarter(periodo.quarter).map((m) => <option key={m} value={m}>{MESES[m - 1]}</option>)}
         </select>
         <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-ink-soft">
@@ -121,6 +122,15 @@ export default function OportunidadesTab() {
           </label>
         )}
         <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={() => baixarCsv(dados)}
+            disabled={dados.length === 0}
+            title="Baixa em CSV (abre no Excel) as oportunidades que estão na tela, com os filtros aplicados"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-surface px-3.5 py-[7px] text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+          >
+            <Download className="size-4" /> Baixar CSV ({dados.length})
+          </button>
           {!me.data.somenteLeitura && (
             <button
               onClick={() => setEditando(null)}
