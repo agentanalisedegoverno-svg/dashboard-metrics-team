@@ -1,7 +1,7 @@
 import type { OportunidadeInput } from '@/domain/oportunidade'
 
 export type Nome = keyof OportunidadeInput
-export type Tipo = 'texto' | 'longo' | 'data' | 'hora' | 'dinheiro' | 'percentual' | 'inteiro' | 'lista' | 'preVendas' | 'bool' | 'cnpj'
+export type Tipo = 'texto' | 'longo' | 'data' | 'hora' | 'dinheiro' | 'percentual' | 'inteiro' | 'lista' | 'preVendas' | 'bool' | 'cnpj' | 'link'
 
 export type Campo = {
   nome: Nome
@@ -69,6 +69,14 @@ export const SECOES: Secao[] = [
       { nome: 'unidade_fornecimento', destaque: true, rotulo: 'Unidade de fornecimento', tipo: 'lista' },
       { nome: 'conta_vinculada', destaque: true, rotulo: 'Conta vinculada', tipo: 'lista' },
       { nome: 'analista', rotulo: 'Pré-vendas', tipo: 'preVendas', largo: true, dica: 'Marque um ou mais pré-vendas' },
+    ],
+  },
+  {
+    id: 'documentos',
+    titulo: 'Documentação',
+    campos: [
+      { nome: 'documentos_nome', destaque: true, rotulo: 'Documentação: nome da pasta', tipo: 'texto', dica: 'Até 80 caracteres (ex.: Pasta XPTO)' },
+      { nome: 'documentos_url', destaque: true, rotulo: 'Documentação: link da pasta', tipo: 'link', largo: true, dica: 'Link https da pasta (OneDrive, SharePoint ou outra) com a documentação já anexada' },
     ],
   },
   {

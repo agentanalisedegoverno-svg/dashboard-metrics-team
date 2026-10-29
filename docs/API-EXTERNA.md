@@ -153,6 +153,8 @@ Mesmos campos do formulário *Nova oportunidade*. Nomes em `snake_case`, exatame
 | `unidade_fornecimento` | Escopo e responsável | não | texto: um dos valores da lista indicada (lista `unidade_fornecimento`) | Unidade de fornecimento |
 | `conta_vinculada` | Escopo e responsável | não | texto: um dos valores da lista indicada (lista `conta_vinculada`) | Conta vinculada |
 | `analista` | Escopo e responsável | não | texto: nome(s) de pré-vendas ativos, separados por vírgula | Pré-vendas (vira o responsável do cartão do Planner) |
+| `documentos_nome` | Documentação | não | texto | Nome da pasta de documentação (ex.: `Pasta XPTO`). Até 80 caracteres. Se enviar o nome, envie também o link |
+| `documentos_url` | Documentação | não | link que começa com https:// (sem espaços, até 2000 caracteres) | Link da pasta (OneDrive, SharePoint ou outra) com a documentação já anexada da oportunidade. Só `https://`; aparece no formulário (botão *Abrir pasta*), no e-mail e no cartão do Planner |
 | `orcamento` | Valores e margens | não | número em reais, com ponto decimal (ex.: 1234.56) | Orçamento (R$) |
 | `orcamento_sigiloso` | Valores e margens | não | true ou false | Orçamento sigiloso (esconde o valor no e-mail e no Planner) |
 | `valor_ctc` | Valores e margens | sim, se status = Win | número em reais, com ponto decimal (ex.: 1234.56) | Valor CTC (R$) |

@@ -119,6 +119,28 @@ describe('validação (espelho das regras de negócio)', () => {
     expect(String(ok.descritivo)).toHaveLength(900)
     expect(camposComErro(await falha(atualizar(db, velho.id, ok.versao, opp({ descritivo: 'z'.repeat(61) }))))).toContain('descritivo')
   })
+  it('pasta de documentação: nome + link https, ambos opcionais; nome sem link e link fora de https são recusados', async () => {
+    const url = 'https://ctctech-my.sharepoint.com/:f:/g/personal/x/EsXPTO'
+    const a = await criar(db, opp({ documentos_nome: ' Pasta XPTO ', documentos_url: ` ${url} ` }))
+    expect(a.documentos_nome).toBe('Pasta XPTO')
+    expect(a.documentos_url).toBe(url)
+    const b = await criar(db, opp())
+    expect(b.documentos_nome).toBeNull()
+    expect(b.documentos_url).toBeNull()
+    expect((await criar(db, opp({ documentos_url: url }))).documentos_nome).toBeNull() // o link vale sozinho
+    expect(camposComErro(await falha(criar(db, opp({ documentos_nome: 'Pasta XPTO' }))))).toContain('documentos_url')
+    for (const ruim of ['http://exemplo.com/pasta', 'javascript:alert(1)', 'ftp://x/y', 'https://x y', 'pasta/xpto']) {
+      expect(camposComErro(await falha(criar(db, opp({ documentos_url: ruim })))), ruim).toContain('documentos_url')
+    }
+    expect(camposComErro(await falha(criar(db, opp({ documentos_nome: 'x'.repeat(81), documentos_url: url }))))).toContain('documentos_nome')
+    // atualizar troca e limpa
+    const c = await atualizar(db, a.id, a.versao, opp({ documentos_nome: 'Outra pasta', documentos_url: url + '2' }))
+    expect(c.documentos_nome).toBe('Outra pasta')
+    expect(c.documentos_url).toBe(url + '2')
+    const d = await atualizar(db, a.id, c.versao, opp())
+    expect(d.documentos_nome).toBeNull()
+    expect(d.documentos_url).toBeNull()
+  })
   it('duração do contrato (meses): inteiro de 1 a 600, opcional; o antigo campo tipo deixa de ser alterado no salvamento', async () => {
     expect((await criar(db, opp({ duracao_contrato_meses: 12 }))).duracao_contrato_meses).toBe(12)
     expect((await criar(db, opp({ duracao_contrato_meses: 600 }))).duracao_contrato_meses).toBe(600)

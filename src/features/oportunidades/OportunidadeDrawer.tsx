@@ -175,6 +175,19 @@ function CampoInput({
     controle = <input type="date" className={cls} {...comum} {...reg} />
   } else if (c.tipo === 'hora') {
     controle = <input type="time" className={cls} {...comum} {...reg} />
+  } else if (c.tipo === 'link') {
+    const atual = String(form.watch(c.nome as never) ?? valorAtual ?? '').trim()
+    const abrir = /^https:\/\/\S+$/.test(atual) ? atual : null
+    controle = (
+      <div className="flex items-center gap-2">
+        <input type="url" inputMode="url" autoComplete="off" placeholder="https://" maxLength={2000} className={cn(cls, 'flex-1')} {...comum} {...reg} />
+        {abrir && (
+          <a href={abrir} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-md border border-line px-3 py-2 text-[13px] font-semibold text-ink hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-gold">
+            Abrir pasta
+          </a>
+        )}
+      </div>
+    )
   } else if (c.tipo === 'bool') {
     return (
       <label className={cn('flex cursor-pointer items-center gap-2 text-[13px] text-ink', c.destaque && 'w-fit rounded-md bg-[#fff6a8] px-2 py-1 text-[#1a1a1a]')}>

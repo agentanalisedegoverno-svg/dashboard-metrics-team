@@ -43,6 +43,26 @@ const inteiro = z
   .transform((v) => v ?? null)
 
 /** Duração do contrato em meses: inteiro de 1 a 600 (vazio = não informado). */
+/** Link https (ex.: pasta do OneDrive/SharePoint): só https, sem espaços, até 2000 caracteres. */
+const linkHttps = z
+  .preprocess(
+    vazioParaNull,
+    z
+      .string()
+      .trim()
+      .max(2000, 'Máximo de 2000 caracteres')
+      .refine((s) => {
+        try {
+          return new URL(s).protocol === 'https:' && !/\s/.test(s)
+        } catch {
+          return false
+        }
+      }, 'Informe um link que comece com https://')
+      .nullable()
+      .optional(),
+  )
+  .transform((v) => v ?? null)
+
 const duracaoMeses = inteiro.refine((v) => v === null || (v >= 1 && v <= 600), 'Informe de 1 a 600 meses')
 
 const data = z
@@ -66,6 +86,8 @@ export const oportunidadeInput = z.object({
   descritivo: texto(100_000), // sem limite prático de caracteres
   sigla: texto(20), // sigla do órgão (não existe na planilha)
   objeto: texto(5000), // o que está sendo contratado (não existe na planilha)
+  documentos_nome: texto(80), // nome da pasta de documentação (ex.: "Pasta XPTO")
+  documentos_url: linkHttps, // link da pasta (OneDrive/SharePoint ou outra) com a documentação já anexada
   criterio: texto(60),
   uf: texto(2),
   processo: texto(100),
@@ -190,6 +212,7 @@ export function regrasNegocio(d: OportunidadeInput): ErroCampo[] {
   if (d.data_distribuicao && d.data_pregao_dt && d.data_pregao_dt < d.data_distribuicao) {
     erros.push({ campo: 'data_pregao_dt', mensagem: 'A Data Pregão não pode ser anterior à data de distribuição' })
   }
+  if (!vazio(d.documentos_nome) && vazio(d.documentos_url)) erros.push({ campo: 'documentos_url', mensagem: 'Informe o link da pasta de documentação' })
   if (d.status === 'No Go' && vazio(d.motivo_no_go)) erros.push({ campo: 'motivo_no_go', mensagem: 'Informe o motivo do No Go' })
   if (d.status === 'Lost' && vazio(d.motivo_lost)) erros.push({ campo: 'motivo_lost', mensagem: 'Informe o motivo do Lost' })
   if (d.status === 'Win' && d.valor_ctc === null) erros.push({ campo: 'valor_ctc', mensagem: 'Informe o Valor CTC quando o status é Win' })

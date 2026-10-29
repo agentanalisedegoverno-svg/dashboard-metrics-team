@@ -20,6 +20,22 @@ describe('formulário <-> API', () => {
     const r = deForm({ ...base, orcamento: 'R$ 1.234.567,89', valor_ctc: 'R$ 0,50', custo_total_ctc: '2.000,00', valor_vencedor: '' })
     expect(r.success && r.data).toMatchObject({ orcamento: 1234567.89, valor_ctc: 0.5, custo_total_ctc: 2000, valor_vencedor: null })
   })
+  it('pasta de documentação: link só https (sem espaços), nome opcional, mas nome sem link é recusado', () => {
+    const url = 'https://ctctech-my.sharepoint.com/:f:/g/personal/x/EsXPTO'
+    expect(paraForm({ documentos_nome: 'Pasta XPTO', documentos_url: url })).toMatchObject({ documentos_nome: 'Pasta XPTO', documentos_url: url })
+    const ok = deForm({ ...base, documentos_nome: 'Pasta XPTO', documentos_url: `  ${url}  ` })
+    expect(ok.success && ok.data).toMatchObject({ documentos_nome: 'Pasta XPTO', documentos_url: url })
+    const vazio = deForm({ ...base, documentos_nome: '', documentos_url: '' })
+    expect(vazio.success && [vazio.data.documentos_nome, vazio.data.documentos_url]).toEqual([null, null])
+    const soLink = deForm({ ...base, documentos_url: url })
+    expect(soLink.success && soLink.data.documentos_nome).toBeNull()
+    for (const ruim of ['http://exemplo.com/p', 'javascript:alert(1)', 'ftp://x/y', 'https://x y', 'pasta/xpto', 'https://' + 'a'.repeat(2000)]) {
+      expect(deForm({ ...base, documentos_url: ruim }).success, ruim).toBe(false)
+    }
+    expect(deForm({ ...base, documentos_nome: 'x'.repeat(81), documentos_url: url }).success).toBe(false)
+    const semLink = deForm({ ...base, documentos_nome: 'Pasta XPTO' })
+    expect(semLink.success && regrasNegocio(semLink.data).map((e) => e.campo)).toContain('documentos_url')
+  })
   it('duração do contrato (meses): inteiro de 1 a 600, vazio vale null', () => {
     expect(paraForm({ duracao_contrato_meses: 36 }).duracao_contrato_meses).toBe('36')
     const ok = deForm({ ...base, duracao_contrato_meses: '12' })

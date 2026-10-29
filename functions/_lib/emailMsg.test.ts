@@ -25,6 +25,13 @@ describe('montarEmail', () => {
     expect(m.texto).toContain('Orçamento: R$')
     expect(m.html).toContain('href="https://radar.test"')
   })
+  it('pasta de documentação: nome e link vão no texto, e o link é clicável no HTML', () => {
+    const link = 'https://ctctech.sharepoint.com/:f:/s/x/EsXPTO?e=1&a=2'
+    const m = montarEmail({ ...base, dados: { versao: 1, documentos_nome: 'Pasta XPTO', documentos_url: link } }, 'https://radar.test')
+    expect(m.texto).toContain('Documentação: nome da pasta: Pasta XPTO')
+    expect(m.texto).toContain(`Documentação: link da pasta: ${link}`)
+    expect(m.html).toContain('<a href="https://ctctech.sharepoint.com/:f:/s/x/EsXPTO?e=1&amp;a=2">')
+  })
   it('orçamento sigiloso não mostra valor', () => {
     const m = montarEmail({ ...base, orcamento_sigiloso: true }, 'https://radar.test')
     expect(m.texto).toContain('Orçamento: Sigiloso')

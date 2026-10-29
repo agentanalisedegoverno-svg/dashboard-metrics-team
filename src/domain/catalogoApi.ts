@@ -18,6 +18,7 @@ const FORMATO: Record<Campo['tipo'], string> = {
   preVendas: 'texto: nome(s) de pré-vendas ativos, separados por vírgula',
   bool: 'true ou false',
   cnpj: '14 dígitos (com ou sem máscara); razão social e matriz/filial vêm da Receita',
+  link: 'link que começa com https:// (sem espaços, até 2000 caracteres)',
 }
 
 export type CampoApi = {

@@ -80,7 +80,7 @@ function montarEmailCompleto(o: DadosEmail, url: string, assunto: string, titulo
   ].join('\n')
   const tabela = (itens: [string, string][]) =>
     `<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;border:1px solid #ddd;width:100%;max-width:900px">\n${itens
-      .map(([k, v]) => `<tr><td style="${celula};background:#f6f6f6;width:32%"><strong>${esc(k)}</strong></td><td style="${celula};white-space:pre-line">${esc(valorCheio(v))}</td></tr>`)
+      .map(([k, v]) => `<tr><td style="${celula};background:#f6f6f6;width:32%"><strong>${esc(k)}</strong></td><td style="${celula};white-space:pre-line">${/^https:\/\/\S+$/.test(v) ? `<a href="${esc(v)}">${esc(v)}</a>` : esc(valorCheio(v))}</td></tr>`)
       .join('\n')}\n</table>`
   const bloco = (s: { titulo: string; itens: [string, string][] }) =>
     `${s.titulo ? `<p style="margin:16px 0 4px"><strong>${esc(s.titulo.toUpperCase())}</strong></p>\n` : '<p style="margin:8px 0 0"></p>\n'}${tabela(s.itens)}`
