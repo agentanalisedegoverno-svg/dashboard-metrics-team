@@ -23,7 +23,7 @@ Quando a oportunidade deixa essas etapas ou é arquivada, o monitoramento é pau
 ## Instalação
 
 1. Revisar e aplicar `db/migrations/021_monitoramento_licitacoes.sql` no Neon usando o mesmo processo de migrações do Radar e o papel proprietário do banco. A migração é aditiva; não substitui tabelas de oportunidades.
-2. No GitHub, cadastrar o secret `DATABASE_URL_MONITOR` com conexão Neon dedicada ao monitoramento. Preferir um papel com permissões mínimas apenas para as tabelas/funções do módulo; não reutilizar uma credencial de proprietário.
+2. A migração `026_monitor_papel_coletor.sql` cria o papel `radar_monitor` (NOLOGIN, privilégio mínimo: só as tabelas do monitor e as colunas `id` e `arquivado_em` de oportunidades). Defina o login e a senha fora do Git (`ALTER ROLE radar_monitor WITH LOGIN PASSWORD '...'`) e cadastre no GitHub o secret `DATABASE_URL_MONITOR` com a conexão desse papel (host `-pooler`, `sslmode=require`). Não use `radar_app` nem o proprietário.
 3. Verificar o workflow **Monitoramento de licitações** em Actions. Ele roda a cada 30 minutos e também pode ser executado manualmente.
 4. Fazer vínculo de teste para um processo real publicado no PNCP e informar o identificador oficial CNPJ/ano/sequencial. Confirmar a primeira coleta, depois uma segunda coleta e o registro de falha simulada antes de habilitar para a equipe.
 
@@ -83,3 +83,7 @@ A aba abre como um painel de urgência, calculado só com os dados do cadastro d
 - Regras em `src/features/licitacoes/noc.ts` (funções puras, com testes).
 
 O acompanhamento automático com histórico e alertas de mudança (migração 021, secret `DATABASE_URL_MONITOR` e `MONITOR_LICITACOES_ENABLED=true`) continua desligado; é a Fase 2.
+
+### Segurança do gatilho (021)
+
+O gatilho que mantém a fila do monitor em dia (`oportunidades_monitor_licitacoes_tg`) roda como dono (`SECURITY DEFINER`), sai logo quando nada relevante mudou e **nunca derruba o cadastro**: se algo falhar ali, só emite um aviso (WARNING) e a oportunidade é salva normalmente. Há teste de banco que quebra a tabela do monitor de propósito e confere que criar e editar oportunidades continuam funcionando.

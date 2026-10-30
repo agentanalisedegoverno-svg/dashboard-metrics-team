@@ -11,7 +11,7 @@ beforeAll(async () => {
   db = await criarBanco()
 }, 120_000)
 
-const PAPEIS = ['radar_leitor', 'radar_escritor', 'radar_app', 'radar_planner', 'radar_email'] as const
+const PAPEIS = ['radar_leitor', 'radar_escritor', 'radar_app', 'radar_planner', 'radar_email', 'radar_monitor'] as const
 const TABELAS = [
   'oportunidades', 'oportunidades_historico', 'opcoes', 'usuarios', 'carga_status', 'linhas_torre', 'codigo_sequencia',
   'planner_marco', 'planner_exportacao', 'planner_auto_estado', 'email_config', 'email_destinatarios', 'email_fila', 'api_clientes', 'api_idempotencia',
@@ -41,6 +41,11 @@ const TABELA_PERMITIDA: Record<string, Record<string, string[]>> = {
   },
   radar_email: {
     oportunidades: ['SELECT'], email_config: ['SELECT'], email_destinatarios: ['SELECT'], email_fila: ['SELECT', 'UPDATE'],
+  },
+  // Coletor de licitações (migração 026): só as tabelas do monitor; de oportunidades lê apenas id e arquivado_em (privilégio de coluna).
+  radar_monitor: {
+    monitor_licitacoes: ['SELECT', 'UPDATE'], monitor_licitacoes_coletas: ['SELECT', 'INSERT', 'UPDATE'],
+    monitor_licitacoes_snapshots: ['SELECT', 'INSERT'], monitor_licitacoes_eventos: ['SELECT', 'INSERT'], monitor_licitacoes_alertas: ['SELECT', 'INSERT'],
   },
 }
 
@@ -73,6 +78,13 @@ describe('privilégios de tabela por papel (matriz completa)', () => {
     const col = async (c: string) => (await db.query<{ v: boolean }>(`select has_column_privilege('radar_email', 'usuarios', $1, 'SELECT') as v`, [c])).rows[0].v
     expect([await col('nome'), await col('email'), await col('ativo')]).toEqual([true, true, true])
     expect([await col('admin'), await col('somente_leitura'), await col('pre_vendas')]).toEqual([false, false, false])
+  })
+  it('radar_monitor lê só id e arquivado_em das oportunidades (não vê órgão, valores nem contatos)', async () => {
+    const col = async (c: string) => (await db.query<{ v: boolean }>(`select has_column_privilege('radar_monitor', 'oportunidades', $1, 'SELECT') as v`, [c])).rows[0].v
+    expect([await col('id'), await col('arquivado_em')]).toEqual([true, true])
+    expect([await col('orgao'), await col('orcamento'), await col('criado_por'), await col('site')]).toEqual([false, false, false, false])
+    const upd = await db.query<{ v: boolean }>(`select has_any_column_privilege('radar_monitor', 'oportunidades', 'UPDATE') as v`)
+    expect(upd.rows[0].v).toBe(false)
   })
   it('o esquema public não aceita criação de objetos por qualquer um', async () => {
     const r = await db.query<{ v: boolean }>(`select has_schema_privilege('public', 'public', 'CREATE') as v`)
