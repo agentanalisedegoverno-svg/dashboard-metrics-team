@@ -36,7 +36,7 @@ async function abrir(page: Page, pncpItens: unknown[] = []) {
 
 test('painel por urgência: hoje, amanhã, semana, atrasado e sem data, com a próxima ação', async ({ page }) => {
   const { chamadas } = await abrir(page)
-  await expect(page.getByText('Pregão hoje', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Hoje/ })).toBeVisible()
   const cartao = (orgao: string) => page.locator('article').filter({ hasText: orgao })
 
   await expect(cartao('Prefeitura de Hoje')).toContainText('Pregão hoje às 09:30')
@@ -57,6 +57,26 @@ test('painel por urgência: hoje, amanhã, semana, atrasado e sem data, com a pr
   expect(titulos.map((t) => t.replace(/\s*\(\d+\)$/, ''))).toEqual(['Pregão já passou', 'Hoje', 'Amanhã', 'Próximos 7 dias', 'Mais adiante', 'Sem data de pregão'])
   // abrir a tela não dispara nenhuma consulta às fontes externas
   expect(chamadas).toEqual([])
+})
+
+test('placar por faixa: mostra a contagem, filtra ao clicar e volta ao clicar de novo', async ({ page }) => {
+  await abrir(page)
+  const placar = page.getByRole('group', { name: /Placar por urgência/ })
+  const faixa = (nome: RegExp) => placar.getByRole('button', { name: nome })
+  await expect(faixa(/^Hoje/)).toContainText('1')
+  await expect(faixa(/^Amanhã/)).toContainText('1')
+  await expect(faixa(/^Pregão já passou/)).toContainText('1')
+  await expect(faixa(/^Precisam de ação/)).toContainText('5') // 4 certames (atrasado, hoje, amanhã sem processo, sem data) + o contrato suspenso
+  await expect(page.locator('article')).toHaveCount(6)
+  await faixa(/^Amanhã/).click()
+  await expect(faixa(/^Amanhã/)).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('article')).toHaveCount(1)
+  await expect(page.locator('article')).toContainText('Câmara de Amanhã')
+  await faixa(/^Amanhã/).click()
+  await expect(page.locator('article')).toHaveCount(6)
+  await faixa(/^Precisam de ação/).click()
+  await expect(page.locator('article')).toHaveCount(4)
+  await expect(page.getByText(/Atualizado às \d{2}:\d{2}/)).toBeVisible()
 })
 
 test('contratos em andamento ficam em outra visão, sem alerta de pregão; filtro "só o que precisa de ação" e busca', async ({ page }) => {
