@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, RefreshCw, Search, ShieldAlert } from 'lucide-react'
 import { useMe, useOpcoes, useOportunidades } from '@/features/oportunidades/api'
 import { OportunidadeDrawer } from '@/features/oportunidades/OportunidadeDrawer'
 import type { Oportunidade } from '@/domain/oportunidade'
-import { FAIXAS, montar, type Linha, type Nivel } from './noc'
+import { FAIXAS, montar, type Faixa, type Linha, type Nivel } from './noc'
 
 type PncpItem = {
   numeroControlePNCP?: string; numeroCompra?: string; processo?: string; objetoCompra?: string; informacaoComplementar?: string
@@ -147,6 +147,11 @@ function data(v: string | null | undefined) {
 
 const COR: Record<Nivel, string> = { critico: 'border-st-critical/40 bg-st-critical/5', atencao: 'border-st-warn/40 bg-st-warn/5', ok: 'border-line bg-surface' }
 const ROTULO: Record<Nivel, string> = { critico: 'Ação agora', atencao: 'Atenção', ok: 'No prazo' }
+const PONTO: Record<Nivel, string> = { critico: 'bg-st-critical', atencao: 'bg-st-warn', ok: 'bg-st-good' }
+/** Cor do placar de cada faixa quando há itens nela. */
+const TOM_FAIXA: Record<Faixa, Nivel> = { atrasado: 'critico', hoje: 'critico', amanha: 'atencao', semana: 'ok', proximas: 'ok', sem_data: 'atencao' }
+const TILE: Record<Nivel, string> = { critico: 'border-st-critical/50 bg-st-critical/10', atencao: 'border-st-warn/50 bg-st-warn/10', ok: 'border-st-good/40 bg-st-good/5' }
+const TEXTO_TILE: Record<Nivel, string> = { critico: 'text-st-critical', atencao: 'text-st-warn', ok: 'text-st-good' }
 const httpsSeguro = (v: string | null | undefined) => (/^https?:\/\/\S+$/i.test(String(v ?? '').trim()) ? String(v).trim() : null)
 
 function BuscaPncp({ o }: { o: Oportunidade }) {
@@ -171,22 +176,24 @@ function Cartao({ l, onAbrir, procurar }: { l: Linha; onAbrir: (o: Oportunidade)
   const link = httpsSeguro(o.site)
   const uf = (o.uf ?? '').trim().toUpperCase()
   const Icone = a.nivel === 'critico' ? AlertTriangle : a.nivel === 'atencao' ? Clock3 : CheckCircle2
-  return <article className={'rounded-lg border p-3 ' + COR[a.nivel]}>
-    <div className="flex flex-wrap items-start justify-between gap-2">
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold text-ink">{(o.codigo ?? '#' + o.id) + ' · ' + (o.sigla ? o.sigla + ' — ' : '') + o.orgao}</p>
-        <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">{o.descritivo || o.objeto || 'Sem descrição do objeto'}</p>
+  return <article className={'rounded-lg border px-3 py-2.5 ' + COR[a.nivel]}>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span className={'size-2.5 shrink-0 rounded-full ' + PONTO[a.nivel]} aria-hidden />
+      <p className="min-w-0 flex-1 basis-60 truncate text-sm text-ink" title={o.descritivo || o.objeto || undefined}>
+        <span className="font-semibold">{(o.codigo ?? '#' + o.id) + ' · ' + (o.sigla ? o.sigla + ' — ' : '') + o.orgao}</span>
+        <span className="text-ink-soft"> · {o.descritivo || o.objeto || 'Sem descrição do objeto'}</span>
+      </p>
+      <span className="rounded-md border border-line bg-surface-2 px-2 py-0.5 text-xs text-ink">{o.status}</span>
+      <span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">{data(o.data_pregao_dt)}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => onAbrir(o)} className="rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-page hover:opacity-90">Abrir cadastro</button>
+        {link && <a href={link} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-ink hover:bg-surface-2">Abrir edital <ExternalLink className="size-3" aria-hidden /></a>}
+        {procurar && /^[A-Z]{2}$/.test(uf) && <BuscaPncp o={o} />}
       </div>
-      <div className="flex shrink-0 items-center gap-2"><span className="rounded-md border border-line bg-surface-2 px-2 py-0.5 text-xs text-ink">{o.status}</span><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">{data(o.data_pregao_dt)}</span></div>
     </div>
-    <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-ink"><Icone className="size-4" aria-hidden />{a.titulo}<span className="sr-only"> ({ROTULO[a.nivel]})</span></p>
-    <p className="mt-0.5 text-sm text-ink-soft"><strong>Próxima ação:</strong> {a.acao}</p>
-    <p className="mt-1 text-xs text-muted">Processo: {o.processo || '—'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}{o.analista ? ' · Pré-vendas: ' + o.analista : ''}</p>
-    {a.faltas.length > 0 && <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="O que falta no cadastro">{a.faltas.map(f => <li key={f.chave} className={'rounded-md border px-2 py-0.5 text-xs ' + (f.bloqueia ? 'border-st-warn/50 text-ink' : 'border-line text-muted')}>{f.rotulo}</li>)}</ul>}
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <button type="button" onClick={() => onAbrir(o)} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-page hover:opacity-90">Abrir cadastro</button>
-      {link && <a href={link} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-surface-2">Abrir edital <ExternalLink className="size-3" aria-hidden /></a>}
-      {procurar && /^[A-Z]{2}$/.test(uf) && <BuscaPncp o={o} />}
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-soft"><Icone className="size-4 shrink-0 self-center text-ink" aria-hidden /><strong className="text-ink">{a.titulo}</strong><span className="sr-only"> ({ROTULO[a.nivel]})</span><span>· <strong>Próxima ação:</strong> {a.acao}</span></p>
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted"><span>Processo: {o.processo || '—'} · UASG: {o.uasg || '—'} · UF: {uf || '—'}{o.analista ? ' · Pré-vendas: ' + o.analista : ''}</span>
+      {a.faltas.length > 0 && <ul className="contents" aria-label="O que falta no cadastro">{a.faltas.map(f => <li key={f.chave} className={'rounded-md border px-1.5 py-px ' + (f.bloqueia ? 'border-st-warn/50 text-ink' : 'border-line text-muted')}>{f.rotulo}</li>)}</ul>}
     </div>
   </article>
 }
@@ -214,7 +221,14 @@ export default function MonitorLicitaçõesTab() {
   const comprasGov = useQuery({ queryKey: ['comprasgov-licitacoes-front'], queryFn: consultarComprasGov, enabled: fontes, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
   const conlicitacao = useQuery({ queryKey: ['conlicitacao-licitacoes-front'], queryFn: consultarConlicitacao, enabled: fontes, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
 
-  const agora = useMemo(() => new Date(), [])
+  const [faixaSel, setFaixaSel] = useState<Faixa | ''>('')
+  // Painel que fica aberto o dia todo: relê o cadastro a cada 2 minutos (só com a aba visível) e recalcula "hoje" a cada leitura.
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') qc.invalidateQueries({ queryKey: ['oportunidades'] }) }, 120_000)
+    return () => clearInterval(t)
+  }, [qc])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- "agora" deve mudar a cada leitura nova dos dados
+  const agora = useMemo(() => new Date(), [lista.dataUpdatedAt])
   const todas = useMemo(() => montar(lista.data ?? [], agora), [lista.data, agora])
   const certames = useMemo(() => todas.filter(l => l.a.grupo === 'certame'), [todas])
   const contratos = useMemo(() => todas.filter(l => l.a.grupo === 'contrato'), [todas])
@@ -222,8 +236,9 @@ export default function MonitorLicitaçõesTab() {
     const q = fold(busca)
     return (visao === 'certames' ? certames : contratos).filter(l =>
       (!soAcao || l.a.nivel !== 'ok') &&
+      (visao !== 'certames' || !faixaSel || l.a.faixa === faixaSel) &&
       (!q || fold([l.o.codigo, l.o.sigla, l.o.orgao, l.o.processo, l.o.descritivo, l.o.objeto, l.o.uasg, l.o.analista].join(' ')).includes(q)))
-  }, [visao, certames, contratos, soAcao, busca])
+  }, [visao, certames, contratos, soAcao, faixaSel, busca])
   const nFaixa = (f: string) => certames.filter(l => l.a.faixa === f).length
   const precisaAcao = todas.filter(l => l.a.nivel !== 'ok').length
   const atualizando = lista.isFetching || comprasGov.isFetching || conlicitacao.isFetching
@@ -235,23 +250,29 @@ export default function MonitorLicitaçõesTab() {
       qc.invalidateQueries({ queryKey: ['conlicitacao-licitacoes-front'] }),
     ])
   }
-  const kpis = [
-    { label: 'Pregão hoje', value: nFaixa('hoje'), tom: nFaixa('hoje') ? 'text-st-critical' : 'text-ink' },
-    { label: 'Pregão amanhã', value: nFaixa('amanha'), tom: nFaixa('amanha') ? 'text-st-warn' : 'text-ink' },
-    { label: 'Próximos 7 dias', value: nFaixa('semana'), tom: 'text-ink' },
-    { label: 'Precisam de ação', value: precisaAcao, tom: precisaAcao ? 'text-st-warn' : 'text-ink' },
-  ]
+  const atualizadoEm = lista.dataUpdatedAt ? new Date(lista.dataUpdatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'
+  const placar = (id: string, titulo: string, n: number, nivel: Nivel, ativo: boolean, onClick: () => void) => (
+    <button key={id} type="button" onClick={onClick} aria-pressed={ativo} disabled={lista.isPending}
+      className={'rounded-xl border p-3 text-left transition-colors ' + (n > 0 ? TILE[nivel] : 'border-line bg-surface') + (ativo ? ' ring-2 ring-gold' : ' hover:bg-surface-2')}>
+      <span className="block text-xs text-muted">{titulo}</span>
+      <span className={'mt-1 block font-mono text-2xl font-medium tabular-nums ' + (n > 0 ? TEXTO_TILE[nivel] : 'text-muted')}>{lista.isPending ? '—' : n}</span>
+    </button>
+  )
+  const escolherFaixa = (f: Faixa) => { setVisao('certames'); setFaixaSel(x => (x === f ? '' : f)) }
   const aba = (id: typeof visao, rotulo: string, n: number) => (
     <button key={id} type="button" onClick={() => setVisao(id)} aria-pressed={visao === id} className={'rounded-lg border px-3 py-1.5 text-xs font-semibold ' + (visao === id ? 'border-gold bg-gold-soft text-ink' : 'border-line text-muted hover:bg-surface-2')}>{rotulo} ({n})</button>
   )
 
   return <section className="mt-5 space-y-5" aria-label="Monitoramento de licitações">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Painel de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento de licitações</h1><p className="mt-1 max-w-3xl text-sm text-muted">O que precisa de atenção nas oportunidades em andamento, por urgência. Os dados vêm do cadastro do Radar; cada cartão diz o que falta e qual é a próxima ação.</p></div>
-      <button onClick={atualizar} disabled={atualizando} className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"><RefreshCw className={'size-4 ' + (atualizando ? 'animate-spin' : '')} /> Atualizar</button>
+      <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Painel de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento de licitações</h1><p className="mt-1 max-w-3xl text-sm text-muted">Placar por urgência das oportunidades em andamento: clique numa faixa para filtrar. Cada linha mostra a situação, a próxima ação e o que falta no cadastro.</p></div>
+      <div className="flex items-center gap-3"><span className="text-xs text-muted" aria-live="polite">Atualizado às {atualizadoEm} · relê a cada 2 min</span><button onClick={atualizar} disabled={atualizando} className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"><RefreshCw className={'size-4 ' + (atualizando ? 'animate-spin' : '')} /> Atualizar</button></div>
     </div>
     {lista.error && <div role="alert" className="rounded-lg border border-st-critical/30 bg-surface p-4 text-sm text-ink-soft">Não foi possível ler as oportunidades do Radar: {(lista.error as Error).message}</div>}
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{kpis.map(k => <div key={k.label} className="rounded-xl border border-line bg-surface p-4 shadow-card"><p className="text-xs text-muted">{k.label}</p><p className={'mt-2 font-mono text-2xl font-medium tabular-nums ' + k.tom}>{lista.isPending ? '—' : k.value}</p></div>)}</div>
+    <div role="group" aria-label="Placar por urgência (clique para filtrar)" className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+      {placar('acao', 'Precisam de ação', precisaAcao, 'atencao', soAcao, () => setSoAcao(v => !v))}
+      {FAIXAS.map(f => placar(f.id, f.titulo, nFaixa(f.id), TOM_FAIXA[f.id], faixaSel === f.id, () => escolherFaixa(f.id)))}
+    </div>
 
     <div className="flex flex-wrap items-center gap-2">
       {aba('certames', 'Certames (Prospect e Go)', certames.length)}
