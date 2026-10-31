@@ -23,8 +23,10 @@ type PncpResponse = { data?: PncpItem[]; items?: PncpItem[]; content?: PncpItem[
 type Resultado = { item: PncpItem; score: number; motivos: string[]; url: string | null }
 
 const fold = (s: unknown) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-const hoje = () => {
+/** `dataFinal` do PNCP é o limite de encerramento das propostas: com a data de hoje ele devolve 204 (vazio), então olhamos 90 dias à frente. */
+const limitePropostas = () => {
   const d = new Date()
+  d.setDate(d.getDate() + 90)
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('')
 }
 export const pncpUrl = (control?: string) => {
@@ -35,7 +37,7 @@ export const pncpUrl = (control?: string) => {
 /** Uma página de pregões eletrônicos com recebimento de propostas aberto na UF. */
 async function consultarPncpPagina(uf: string, pagina: number, signal?: AbortSignal) {
   const url = new URL('/pncp/consulta/v1/contratacoes/proposta', window.location.origin)
-  url.searchParams.set('dataFinal', hoje())
+  url.searchParams.set('dataFinal', limitePropostas())
   // A API do PNCP exige codigoModalidadeContratacao: 6 = Pregão - Eletrônico (1 seria Leilão - Eletrônico).
   url.searchParams.set('codigoModalidadeContratacao', '6')
   url.searchParams.set('pagina', String(pagina))
