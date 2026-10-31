@@ -147,7 +147,9 @@ async function main() {
         { tipo: 'historico', url: historicoUrl, titulo: 'Histórico oficial da contratação alterado', descricao: 'O histórico de eventos da contratação no PNCP difere da última observação.' },
       ]) {
         try {
-          const resposta = extra.paginado ? await fetchPaginatedJson(extra.url) : { dados: await fetchJson(extra.url), parcial: false }\n          registros.push({ ...extra, chave: `${baseKey}:${extra.tipo}`, dados: resposta.dados })\n          if (resposta.parcial) falhasParciais.push(`${extra.tipo}: paginação limitada ao máximo de páginas por coleta`)
+          const resposta = extra.paginado ? await fetchPaginatedJson(extra.url) : { dados: await fetchJson(extra.url), parcial: false }
+          registros.push({ ...extra, chave: `${baseKey}:${extra.tipo}`, dados: resposta.dados })
+          if (resposta.parcial) falhasParciais.push(`${extra.tipo}: paginação limitada ao máximo de páginas por coleta`)
         } catch (e) {
           falhasParciais.push(`${extra.tipo}: ${e instanceof Error ? e.message : 'falha desconhecida'}`)
         }
