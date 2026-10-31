@@ -25,7 +25,10 @@ describe('consultas públicas de licitações', () => {
     expect(requestUrl?.searchParams.get('codigoModalidadeContratacao')).toBe('6') // 6 = Pregão - Eletrônico no PNCP (1 é Leilão)
     expect(requestUrl?.searchParams.get('tamanhoPagina')).toBe('50')
     expect(requestUrl?.searchParams.get('uf')).toBe('SP')
-    expect(requestUrl?.searchParams.get('dataFinal')).toMatch(/^\d{8}$/)
+    const dataFinal = requestUrl?.searchParams.get('dataFinal') ?? ''
+    expect(dataFinal).toMatch(/^\d{8}$/)
+    const hojeIso = new Date().toISOString().slice(0, 10).replaceAll('-', '')
+    expect(dataFinal > hojeIso).toBe(true) // com a data de hoje o PNCP responde 204 e a busca "não acha nada"
   })
 
   it('envia filtros obrigatórios à consulta de contratações da Lei 14.133', async () => {
