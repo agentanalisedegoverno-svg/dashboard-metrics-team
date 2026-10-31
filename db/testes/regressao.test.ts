@@ -58,6 +58,21 @@ describe('monitoramento de licitações', () => {
     })
   })
 
+  it('se o monitor falhar, o cadastro continua: criar e editar oportunidade não são derrubados (só avisa)', async () => {
+    await db.exec('ALTER TABLE monitor_licitacoes ADD CONSTRAINT zz_quebra CHECK (false) NOT VALID')
+    try {
+      const o = await criar(db, opp({ status: 'Go', orgao: 'Monitor quebrado' }))
+      expect(o.id).toBeTruthy()
+      const sem = await db.query('select 1 from monitor_licitacoes where oportunidade_id = $1', [o.id])
+      expect(sem.rows).toHaveLength(0) // o gatilho falhou e foi engolido
+      await db.query('update oportunidades set status = $1, site = $2 where id = $3', ['Prospect', 'https://pncp.gov.br/app/editais/00000000000191/2026/9', o.id])
+      const depois = await um<{ orgao: string; status: string }>('select orgao, status from oportunidades where id = $1', [o.id])
+      expect(depois).toEqual({ orgao: 'Monitor quebrado', status: 'Prospect' })
+    } finally {
+      await db.exec('ALTER TABLE monitor_licitacoes DROP CONSTRAINT zz_quebra')
+    }
+  })
+
   it('inclui Onboarding mesmo quando o status não fazia parte das opções originais', async () => {
     const o = await criar(db, opp({ status: 'Onboarding' }))
     const registro = await um<{ oportunidade_id: string }>(

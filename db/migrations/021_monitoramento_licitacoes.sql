@@ -91,8 +91,10 @@ CREATE TABLE IF NOT EXISTS monitor_licitacoes_alertas (
   atualizado_em timestamptz NOT NULL DEFAULT now()
 );;
 
+-- O gatilho nunca pode derrubar o cadastro: roda como dono (SECURITY DEFINER, então não depende do papel de quem grava)
+-- e, se algo falhar, só avisa (WARNING) e deixa a oportunidade ser salva. Quando nada que interessa mudou, sai antes de tudo.
 CREATE OR REPLACE FUNCTION monitor_licitacoes_sincronizar_oportunidade() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 DECLARE
   v_status text;
   v_portal text;
@@ -109,6 +111,7 @@ BEGIN
     AND OLD.arquivado_em IS NOT DISTINCT FROM NEW.arquivado_em THEN
     RETURN NEW;
   END IF;
+  BEGIN
   v_status := lower(btrim(coalesce(NEW.status, '')));
   v_ativa := NEW.arquivado_em IS NULL AND v_status IN ('prospect', 'go', 'onboarding', 'on going', 'ongoing', 'suspenso', 'suspensa', 'suspended');
   v_url := nullif(btrim(coalesce(NEW.site, '')), '');
@@ -141,7 +144,12 @@ BEGIN
     WHERE oportunidade_id = NEW.id;
   END IF;
   RETURN NEW;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'monitor de licitações: %', SQLERRM;
+    RETURN NEW;
+  END;
 END $$;;
+REVOKE ALL ON FUNCTION monitor_licitacoes_sincronizar_oportunidade() FROM PUBLIC;;
 
 DROP TRIGGER IF EXISTS oportunidades_monitor_licitacoes_tg ON oportunidades;;
 CREATE TRIGGER oportunidades_monitor_licitacoes_tg
