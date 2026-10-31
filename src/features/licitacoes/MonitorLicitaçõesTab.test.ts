@@ -64,6 +64,14 @@ describe('consultas públicas de licitações', () => {
     expect(paginas).toEqual(['1', '2'])
   })
 
+  it('trata resposta vazia do PNCP (204 sem corpo) como lista vazia, sem erro', async () => {
+    vi.stubGlobal('window', { location: { origin: 'https://radar.test' } })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })))
+    expect(await consultarPncpUf('SP')).toEqual([])
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 200 })))
+    expect(await consultarPncpUf('SP')).toEqual([])
+  })
+
   it('monta o link oficial do PNCP com ano e sequencial na ordem correta', () => {
     expect(pncpUrl('12345678000199-1-000123/2026'))
       .toBe('https://pncp.gov.br/app/editais/12345678000199/2026/000123')

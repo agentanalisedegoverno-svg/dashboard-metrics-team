@@ -46,7 +46,10 @@ async function consultarPncpPagina(uf: string, pagina: number, signal?: AbortSig
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
   const response = await fetch(url, { headers: { accept: 'application/json' }, signal: requestSignal })
   if (!response.ok) throw new Error('PNCP respondeu HTTP ' + response.status)
-  const json = await response.json() as PncpResponse | PncpItem[]
+  // Sem resultados (ou página além da última) o PNCP responde 204 sem corpo: não é erro, é lista vazia.
+  const texto = response.status === 204 ? '' : (await response.text()).trim()
+  if (!texto) return { itens: [], totalPaginas: 1 }
+  const json = JSON.parse(texto) as PncpResponse | PncpItem[]
   if (Array.isArray(json)) return { itens: json, totalPaginas: 1 }
   return { itens: json.data ?? json.items ?? json.content ?? json.resultado ?? [], totalPaginas: json.totalPaginas ?? 1 }
 }
