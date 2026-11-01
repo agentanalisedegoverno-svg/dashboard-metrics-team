@@ -80,6 +80,32 @@ async function consultarConlicitacao(): Promise<PncpItem[]> {
   return json.resultado ?? json.data ?? []
 }
 
+/**
+ * Compras.gov.br tem dois formatos: o legado (co_processo, tx_objeto, no_orgao…) e o da Lei 14.133/PNCP (processo, objetoCompra,
+ * orgaoEntidadeRazaoSocial, dataEncerramentoPropostaPncp…). Cada campo usa o do formato que veio, sem apagar o do outro.
+ */
+export function normalizarCompras(item: PncpItem & Record<string, unknown>, path: string): PncpItem {
+  const texto = (v: unknown) => (v == null || v === '' ? undefined : String(v))
+  return {
+    ...item,
+    processo: texto(item.processo) ?? texto(item.co_processo) ?? texto(item.numero_processo) ?? texto(item.numero),
+    numeroCompra: texto(item.numeroCompra) ?? texto(item.numero) ?? texto(item.numero_aviso),
+    objetoCompra: texto(item.objetoCompra) ?? texto(item.tx_objeto) ?? texto(item.objeto),
+    situacaoCompraNome: texto(item.situacaoCompraNome) ?? texto(item.situacaoCompraNomePncp) ?? texto(item.ds_situacao_pregao) ?? texto(item.situacao_aviso),
+    dataPublicacaoPncp: texto(item.dataPublicacaoPncp) ?? texto(item.data_publicacao) ?? texto(item.dt_data_edital),
+    dataEncerramentoProposta: texto(item.dataEncerramentoProposta) ?? texto(item.dataEncerramentoPropostaPncp) ?? texto(item.dt_fim_proposta) ?? texto(item.data_entrega_proposta),
+    modalidadeNome: texto(item.modalidadeNome) ?? texto(item.ds_tipo_pregao) ?? texto(item.nome_modalidade),
+    orgaoEntidade: { ...item.orgaoEntidade, razaoSocial: texto(item.orgaoEntidade?.razaoSocial) ?? texto(item.orgaoEntidadeRazaoSocial) ?? texto(item.no_orgao) },
+    unidadeOrgao: {
+      codigoUnidade: texto(item.unidadeOrgao?.codigoUnidade) ?? texto(item.unidadeOrgaoCodigoUnidade) ?? texto(item.co_uasg) ?? texto(item.uasg),
+      nomeUnidade: texto(item.unidadeOrgao?.nomeUnidade) ?? texto(item.unidadeOrgaoNomeUnidade) ?? texto(item.no_ausg),
+      ufSigla: texto(item.unidadeOrgao?.ufSigla) ?? texto(item.unidadeOrgaoUfSigla),
+    },
+    numeroControlePNCP: texto(item.numeroControlePNCP) ?? texto(item.id_compra) ?? texto(item.idCompra),
+    source: path.includes('modulo-legado') ? 'Compras.gov.br — legado' : 'Compras.gov.br — Lei 14.133/PNCP',
+  }
+}
+
 export async function consultarComprasGov(): Promise<PncpItem[]> {
   const fim = new Date()
   const inicio = new Date(fim)
@@ -99,25 +125,12 @@ export async function consultarComprasGov(): Promise<PncpItem[]> {
     if (!response.ok) throw new Error('Compras.gov.br respondeu HTTP ' + response.status + ' em ' + path)
     const json = await response.json() as PncpResponse
     const registros = (json.resultado ?? json.data ?? json.items ?? json.content ?? []) as PncpItem[]
-    return registros.map((item): PncpItem => ({
-      ...item,
-      processo: item.co_processo ?? item.numero_processo ?? (item.numero != null ? String(item.numero) : undefined),
-      numeroCompra: item.numero != null ? String(item.numero) : item.numero_aviso != null ? String(item.numero_aviso) : undefined,
-      objetoCompra: item.tx_objeto ?? item.objeto,
-      situacaoCompraNome: item.ds_situacao_pregao ?? item.situacao_aviso,
-      dataPublicacaoPncp: item.data_publicacao ?? item.dt_data_edital,
-      dataEncerramentoProposta: item.dt_fim_proposta ?? item.data_entrega_proposta,
-      modalidadeNome: item.ds_tipo_pregao ?? item.nome_modalidade,
-      orgaoEntidade: { razaoSocial: item.no_orgao ?? item.orgaoEntidadeRazaoSocial },
-      unidadeOrgao: { codigoUnidade: item.co_uasg != null ? String(item.co_uasg) : item.uasg != null ? String(item.uasg) : undefined, nomeUnidade: item.no_ausg, ufSigla: item.unidadeOrgaoUfSigla },
-      numeroControlePNCP: item.id_compra,
-      source: path.includes('modulo-legado') ? 'Compras.gov.br — legado' : 'Compras.gov.br — Lei 14.133/PNCP',
-    }))
+    return registros.map(item => normalizarCompras(item, path))
   }))
   const resultados = tentativas.filter((r): r is PromiseFulfilledResult<PncpItem[]> => r.status === 'fulfilled').map(r => r.value)
   if (resultados.length === 0) throw new Error(tentativas.map(r => r.status === 'rejected' ? String(r.reason) : '').filter(Boolean).join(' | ') || 'Nenhuma fonte respondeu')
   const unique = new Map<string, PncpItem>()
-  resultados.flat().forEach((item, index) => unique.set(item.id_compra ?? [item.processo, item.numeroCompra, item.objetoCompra, index].join('|'), item))
+  resultados.flat().forEach((item, index) => unique.set(item.numeroControlePNCP ?? [item.processo, item.numeroCompra, item.objetoCompra, index].join('|'), item))
   return [...unique.values()]
 }
 
@@ -203,12 +216,31 @@ function Cartao({ l, onAbrir, procurar }: { l: Linha; onAbrir: (o: Oportunidade)
   </article>
 }
 
-function Fonte({ titulo, query, vazio }: { titulo: string; query: { isError: boolean; isSuccess: boolean; error: unknown; data?: PncpItem[] }; vazio: string }) {
+/** Fonte não ligada neste ambiente (ex.: ConLicitações sem credencial): é um estado esperado, não uma falha. */
+export const fonteNaoAtivada = (erro: unknown) => /não está configurad/i.test((erro as Error)?.message ?? '')
+
+/** Se o registro da fonte é de uma oportunidade do Radar (processo exato, ou UASG + órgão), devolve o código dela. */
+export function oportunidadeDe(c: PncpItem, ops: Oportunidade[]): string | null {
+  for (const o of ops) {
+    const r = pontuar(o, c)
+    if (r && (r.motivos.includes('Processo exato') || (r.motivos.includes('UASG compatível') && r.motivos.includes('Órgão compatível')))) return o.codigo ?? String(o.id)
+  }
+  return null
+}
+
+function Fonte({ titulo, query, vazio, ops }: { titulo: string; query: { isError: boolean; isSuccess: boolean; error: unknown; data?: PncpItem[] }; vazio: string; ops?: Oportunidade[] }) {
+  const inativa = query.isError && fonteNaoAtivada(query.error)
+  // Com o cadastro do Radar à mão, o que bate com uma oportunidade nossa vem primeiro e ganha o código dela.
+  const linhas = (query.data ?? []).map(item => ({ item, op: ops ? oportunidadeDe(item, ops) : null }))
+  const batem = linhas.filter(l => l.op).length
+  const ordenadas = [...linhas].sort((a, b) => Number(!!b.op) - Number(!!a.op))
   return <div className="rounded-lg border border-line p-3">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold text-ink">{titulo}</h3><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">{query.isSuccess ? (query.data?.length ?? 0) + ' registros' : query.isError ? 'indisponível' : 'consultando…'}</span></div>
-    {query.isError ? <p role="alert" className="mt-2 text-xs text-st-critical">{(query.error as Error)?.message || 'Falha na consulta'}</p>
+    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold text-ink">{titulo}</h3><span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">{query.isSuccess ? (query.data?.length ?? 0) + ' registros' + (ops ? ' · ' + batem + ' no Radar' : '') : inativa ? 'não ativada' : query.isError ? 'indisponível' : 'consultando…'}</span></div>
+    {inativa ? <p className="mt-2 text-xs text-muted">Fonte não ativada neste ambiente. O restante do painel não depende dela.</p>
+      : query.isError ? <p role="alert" className="mt-2 text-xs text-st-critical">{(query.error as Error)?.message || 'Falha na consulta'}</p>
       : query.isSuccess && (query.data ?? []).length === 0 ? <p className="mt-2 text-xs text-muted">{vazio}</p>
-      : <ul className="mt-2 space-y-1.5">{(query.data ?? []).slice(0, 6).map((item, i) => <li key={item.id_compra || item.numeroControlePNCP || i} className="text-xs text-ink-soft"><strong className="text-ink">{item.orgaoEntidade?.razaoSocial || item.unidadeOrgao?.nomeUnidade || 'Órgão não informado'}</strong> · {item.objetoCompra || 'Objeto não informado'} · encerra {data(item.dataEncerramentoProposta)}</li>)}</ul>}
+      : <ul className="mt-2 space-y-1.5">{ordenadas.slice(0, 6).map(({ item, op }, i) => <li key={item.numeroControlePNCP || i} className="text-xs text-ink-soft">{op && <span className="mr-1.5 rounded-md border border-st-good/50 px-1.5 py-px text-ink">No Radar: {op}</span>}<strong className="text-ink">{item.orgaoEntidade?.razaoSocial || item.unidadeOrgao?.nomeUnidade || 'Órgão não informado'}</strong> · {item.objetoCompra || 'Objeto não informado'} · encerra {data(item.dataEncerramentoProposta)}</li>)}</ul>}
+    {ops && query.isSuccess && batem === 0 && (query.data ?? []).length > 0 && <p className="mt-2 text-xs text-muted">Nenhum destes registros corresponde a uma oportunidade do Radar (processo, ou UASG e órgão). A lista mostra uma amostra geral do portal.</p>}
   </div>
 }
 
@@ -235,6 +267,7 @@ export default function MonitorLicitaçõesTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- "agora" deve mudar a cada leitura nova dos dados
   const agora = useMemo(() => new Date(), [lista.dataUpdatedAt])
   const todas = useMemo(() => montar(lista.data ?? [], agora), [lista.data, agora])
+  const opsAtivas = useMemo(() => todas.map(l => l.o), [todas])
   const certames = useMemo(() => todas.filter(l => l.a.grupo === 'certame'), [todas])
   const contratos = useMemo(() => todas.filter(l => l.a.grupo === 'contrato'), [todas])
   const visiveis = useMemo(() => {
@@ -299,7 +332,7 @@ export default function MonitorLicitaçõesTab() {
       <summary className="cursor-pointer text-sm font-semibold text-ink">Fontes públicas (diagnóstico)</summary>
       <div className="mt-3 space-y-3">
         <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 p-3 text-xs text-ink-soft"><ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted" /><p>A busca no PNCP lista só pregões eletrônicos com propostas abertas e confere até 300 por UF. Não cobre sessões encerradas, remarcações em tempo real nem todos os portais. Correspondência é sugestão: confirme com o identificador oficial. O acompanhamento automático com histórico e alertas de mudança ainda depende de habilitar o monitor no servidor.</p></div>
-        <Fonte titulo="Compras.gov.br · últimos 45 dias" query={comprasGov} vazio="A API respondeu, mas não retornou registros no período." />
+        <Fonte titulo="Compras.gov.br · últimos 45 dias" query={comprasGov} ops={opsAtivas} vazio="A API respondeu, mas não retornou registros no período." />
         <Fonte titulo="ConLicitações · boletins da conta" query={conlicitacao} vazio="A API respondeu, mas não retornou licitações nos filtros configurados." />
       </div>
     </details>
