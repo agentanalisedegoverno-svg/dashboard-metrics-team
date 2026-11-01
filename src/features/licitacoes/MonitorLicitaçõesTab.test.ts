@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { consultarComprasGov, consultarPncp, consultarPncpUf, pncpUrl } from './MonitorLicitaçõesTab'
+import { consultarComprasGov, consultarPncp, consultarPncpUf, fonteNaoAtivada, normalizarCompras, oportunidadeDe, pncpUrl } from './MonitorLicitaçõesTab'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -73,6 +73,31 @@ describe('consultas públicas de licitações', () => {
     expect(await consultarPncpUf('SP')).toEqual([])
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 200 })))
     expect(await consultarPncpUf('SP')).toEqual([])
+  })
+
+  it('normaliza o Compras.gov (formato 14.133) sem apagar objeto, processo, órgão, UASG e data de encerramento', () => {
+    const r = normalizarCompras({
+      processo: '64047.004227/2026-18', numeroCompra: '76', objetoCompra: 'Serviços de engenharia', orgaoEntidadeRazaoSocial: 'COMANDO DO EXERCITO',
+      unidadeOrgaoCodigoUnidade: '160157', unidadeOrgaoNomeUnidade: '9 BATALHAO', unidadeOrgaoUfSigla: 'MT',
+      dataEncerramentoPropostaPncp: '2026-10-30T10:00:00', numeroControlePNCP: '00394452000103-1-022223/2026',
+    }, 'modulo-contratacoes/1_consultarContratacoes_PNCP_14133')
+    expect([r.objetoCompra, r.processo, r.orgaoEntidade?.razaoSocial, r.unidadeOrgao?.codigoUnidade, r.unidadeOrgao?.ufSigla]).toEqual(['Serviços de engenharia', '64047.004227/2026-18', 'COMANDO DO EXERCITO', '160157', 'MT'])
+    expect(r.dataEncerramentoProposta).toBe('2026-10-30T10:00:00')
+    expect(r.source).toContain('14.133')
+  })
+
+  it('normaliza o formato legado do Compras.gov', () => {
+    const r = normalizarCompras({ co_processo: '12/2026', tx_objeto: 'Link', no_orgao: 'MINISTERIO X', co_uasg: 123, dt_fim_proposta: '2026-11-01', id_compra: 'abc' }, 'modulo-legado/3_consultarPregoes')
+    expect([r.processo, r.objetoCompra, r.orgaoEntidade?.razaoSocial, r.unidadeOrgao?.codigoUnidade, r.dataEncerramentoProposta, r.numeroControlePNCP]).toEqual(['12/2026', 'Link', 'MINISTERIO X', '123', '2026-11-01', 'abc'])
+  })
+
+  it('reconhece fonte não ativada e cruza o registro com a oportunidade do Radar', () => {
+    expect(fonteNaoAtivada(new Error('ConLicitações ainda não está configurado no ambiente seguro.'))).toBe(true)
+    expect(fonteNaoAtivada(new Error('Compras.gov.br respondeu HTTP 500'))).toBe(false)
+    const ops = [{ id: 7, codigo: '2026-0007', processo: '14/2026', uasg: '806030', orgao: 'SERPRO' }, { id: 8, codigo: '2026-0008', processo: '99/2026', uasg: '1', orgao: 'Outro' }] as never[]
+    expect(oportunidadeDe({ processo: '14/2026' }, ops)).toBe('2026-0007')
+    expect(oportunidadeDe({ processo: '500/2026', unidadeOrgao: { codigoUnidade: '806030' }, orgaoEntidade: { razaoSocial: 'SERPRO' } }, ops)).toBe('2026-0007')
+    expect(oportunidadeDe({ processo: '500/2026', objetoCompra: 'link de internet' }, ops)).toBeNull()
   })
 
   it('monta o link oficial do PNCP com ano e sequencial na ordem correta', () => {
