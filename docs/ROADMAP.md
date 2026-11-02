@@ -15,7 +15,7 @@ Estado em 28/10/2026 (monitoramento de licitações atualizado em 02/11/2026) e 
 | Integração Radar → Planner (exportador, `planner-auto`) **na nuvem**, disparada ao salvar (GitHub Actions, estado cifrado no banco) | ✅ (28/10) |
 | E-mails de nova oportunidade e de mudança de status, com todas as informações | ✅ (27/10) |
 | Espelho diário do banco no Supabase (segunda redundância) | ✅ (28/10) |
-| API externa para outras aplicações criarem oportunidades (chave por aplicação, idempotência, solicitante) | ✅ (28/10); Bypass do Access criado e função validada em produção (sem rastro); modo de simulação (`?simular=true`, sem gravar nada) e documentação interativa em Administração → API; **falta**: teste com chave (`scripts/teste-api-externa.mjs --simular`), chave da aplicação real e regra de *rate limiting* no Cloudflare (sugerida: `/api/externo` por IP, 60 req/min ou 10 req/10 s no plano gratuito; criação com o administrador, passo a passo em [API-EXTERNA.md](API-EXTERNA.md)) |
+| API externa para outras aplicações criarem oportunidades (chave por aplicação, idempotência, solicitante) | ✅ (28/10); Bypass do Access criado e função validada em produção (sem rastro); modo de simulação (`?simular=true`, sem gravar nada) e documentação interativa em Administração → API; **falta**: teste com chave (`scripts/teste-api-externa.mjs --simular`), chave da aplicação real e regra de *rate limiting* no Cloudflare (a conta não tem domínio próprio, então o WAF não está disponível: o limite foi implementado na função, 60 req/min por IP e por chave e 10 chamadas com chave inválida/min por IP, com `429` e `Retry-After`; a regra do Cloudflare ficou no roadmap de segurança, item S1) |
 | Campos novos: sigla (20), descritivo (60), duração do contrato em meses, valores em R$ com máscara | ✅ (27–28/10) |
 | Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) → **desativada e removida em 27/10/2026** |
 | Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ✅ (22/10) |
@@ -84,6 +84,16 @@ Estado em 28/10/2026 (monitoramento de licitações atualizado em 02/11/2026) e 
 | 25 | **SLA real de triagem** (campo de data da decisão Go/No Go) | Hoje o indicador é um proxy distribuição → pregão | M |
 | 26 | **ESLint** quando o `typescript-eslint` suportar TypeScript 7 | Hoje o gate é só o `tsc` | P |
 | 27 | **Observabilidade:** métricas de uso, erros da API e tempo de resposta (Cloudflare Analytics / logs) | Hoje não há visão de uso | M |
+
+## 4.1 Roadmap de segurança
+
+| # | Item | Por quê | Tam. |
+|---|---|---|---|
+| S1 | **Rate limiting no Cloudflare para `/api/externo`** (WAF: `URI Path starts with "/api/externo"`, por IP; 60 req/min, ou 10 req/10 s no plano gratuito). Depende do item 23 (domínio próprio na conta Cloudflare) | O limite atual vive na função: é por instância (não global), só atua depois que a requisição chega ao código e não segura um flood grande | M |
+| S2 | **Limite global compartilhado** (contador no banco ou Durable Object) enquanto não houver WAF | A contagem em memória se perde a cada instância nova e não soma entre instâncias | M |
+| S3 | **Revogar a chave sandbox do `radar-tic`** e rotacionar chaves de API em ciclo trimestral (item 5) | Chave de teste não deve continuar válida | P |
+| S4 | **Apagar do histórico do Neon SQL Editor** o script que criou o papel `radar_monitor` (contém senha) e rotacionar a senha se houver dúvida | Credencial gravada no histórico da ferramenta | P |
+| S5 | **Alertar sobre picos de 401/429** em `/api/externo` (item 27, observabilidade) | Hoje ninguém é avisado de tentativa de adivinhar chave | M |
 
 ## 5. Riscos que o roadmap endereça
 

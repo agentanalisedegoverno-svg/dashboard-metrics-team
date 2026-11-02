@@ -25,6 +25,35 @@ export const LIMITE_CORPO = 64 * 1024
 
 const NOME_CLIENTE = /^[a-z0-9][a-z0-9_-]{2,39}$/
 
+// ---------------------------------------------------------------- limite de requisições
+// Sem domínio próprio não há WAF/rate limiting do Cloudflare para este caminho (ver docs/ROADMAP.md, segurança). Este limite vale por
+// instância da função (janela fixa, em memória): freia tentativas de adivinhar chave e uso abusivo, mas não é global nem substitui o WAF.
+export const LIMITE_POR_MINUTO = 60
+export const LIMITE_FALHAS_POR_MINUTO = 10
+const JANELA_MS = 60_000
+const MAX_CONTADORES = 5000
+const contadores = new Map<string, { inicio: number; n: number }>()
+
+/** Conta uma requisição em `chave`. Devolve os segundos até liberar (>0) quando passou do limite, ou 0 se está dentro. */
+export function limitar(chave: string, limite: number, agora = Date.now(), contar = true): number {
+  let c = contadores.get(chave)
+  if (!c || agora - c.inicio >= JANELA_MS) {
+    if (contadores.size >= MAX_CONTADORES) for (const [k, v] of contadores) if (agora - v.inicio >= JANELA_MS) contadores.delete(k)
+    c = { inicio: agora, n: 0 }
+    contadores.set(chave, c)
+  }
+  if (contar) c.n++
+  return c.n > limite ? Math.max(1, Math.ceil((c.inicio + JANELA_MS - agora) / 1000)) : 0
+}
+
+export const reiniciarLimites = () => contadores.clear()
+
+function respostaLimite(segundos: number): Response {
+  const r = send(429, { error: 'Muitas requisições. Aguarde e tente de novo.' })
+  r.headers.set('retry-after', String(segundos))
+  return r
+}
+
 /** Gera uma chave nova (256 bits aleatórios). Só é mostrada uma vez, na criação. */
 export function gerarChave(): string {
   const b = crypto.getRandomValues(new Uint8Array(32))
@@ -70,13 +99,19 @@ export const rotaExterna =
     if (!handler) return send(405, { error: 'Método não permitido.' })
     const sql = bancoApp(env) as Sql | null
     if (!sql) return send(503, { error: 'Banco de dados do cadastro não configurado.' })
+    const ip = request.headers.get('cf-connecting-ip') ?? 'sem-ip'
+    const espera = limitar(`ip:${ip}`, LIMITE_POR_MINUTO) || limitar(`falha:${ip}`, LIMITE_FALHAS_POR_MINUTO - 1, Date.now(), false)
+    if (espera) return respostaLimite(espera)
     try {
       const cliente = await autenticar(sql, request)
       if (!cliente) {
+        limitar(`falha:${ip}`, LIMITE_FALHAS_POR_MINUTO) // só as chamadas sem chave válida contam aqui
         const r = send(401, { error: 'Chave de API ausente, inválida ou revogada.' })
         r.headers.set('www-authenticate', 'Bearer realm="radar-prevendas"')
         return r
       }
+      const esperaCliente = limitar(`cliente:${cliente}`, LIMITE_POR_MINUTO)
+      if (esperaCliente) return respostaLimite(esperaCliente)
       const resposta = await handler({
         sql,
         cliente,

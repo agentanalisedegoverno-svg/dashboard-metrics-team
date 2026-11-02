@@ -4,6 +4,7 @@
  * comportamento da camada HTTP: autenticação, CSRF, autorização, validação de entrada e vazamento de informação.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { reiniciarLimites } from '../_lib/apiExterna.ts'
 
 const sqlMock = vi.fn()
 vi.mock('@neondatabase/serverless', () => ({ neon: () => sqlMock }))
@@ -59,6 +60,7 @@ const rotaDe = (trecho: string) => {
 }
 
 beforeEach(() => {
+  reiniciarLimites() // o limite de requisições da API externa é por instância; cada teste começa com a contagem zerada
   sqlMock.mockReset()
   verifyId.mockReset().mockResolvedValue({ email: 'jwt@ctctech.com.br' })
   verifyJwt.mockReset().mockResolvedValue(true)

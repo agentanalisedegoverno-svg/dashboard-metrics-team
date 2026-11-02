@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TODOS_CAMPOS } from '../../src/features/oportunidades/campos.ts'
 import { oportunidadeInput } from '../../src/domain/oportunidade.ts'
 
@@ -31,7 +31,12 @@ vi.mock('./http.ts', async (importOriginal) => ({
 import { catalogoCampos, chaveDaRequisicao, chaveIdempotencia, gerarChave, hashChave, openApi, rotaExterna, separarSolicitante } from './apiExterna.ts'
 import { criar } from './cadastro.ts'
 import { onRequest as rotaOportunidades } from '../api/externo/oportunidades.ts'
-import { previa, querSimular } from './apiExterna.ts'
+import { LIMITE_FALHAS_POR_MINUTO, LIMITE_POR_MINUTO, limitar, previa, querSimular, reiniciarLimites } from './apiExterna.ts'
+
+beforeEach(() => {
+  reiniciarLimites()
+  chamadas.nomeDaChave = 'sistema-x'
+})
 
 const CHAVE = 'rdr_' + 'A'.repeat(43)
 const req = (metodo: string, corpo?: unknown, cab: Record<string, string> = { authorization: `Bearer ${CHAVE}` }) =>
@@ -212,5 +217,42 @@ describe('modo de simulação (?simular=true): testa sem gravar, sem e-mail e se
     expect(p.email.texto).toContain('Orçamento (R$): Sigiloso')
     expect(p.email.texto).not.toMatch(/1\.000/)
     expect(p.planner.anotacao).toContain('Radar 2026-0001 (v1)')
+  })
+})
+
+describe('limite de requisições', () => {
+  const env = { DATABASE_URL_APP: 'postgres://x' }
+  const rota = rotaExterna({ GET: async () => new Response('{}', { status: 200 }) })
+  const chamar = (ip: string) =>
+    rota({ request: new Request('https://radar.test/api/externo/campos', { headers: { 'cf-connecting-ip': ip, authorization: `Bearer ${CHAVE}` } }), env })
+
+  it('conta por janela de 1 minuto e libera na seguinte', () => {
+    expect(limitar('k', 2, 1000)).toBe(0)
+    expect(limitar('k', 2, 2000)).toBe(0)
+    expect(limitar('k', 2, 3000)).toBe(58)
+    expect(limitar('k', 2, 61_000)).toBe(0)
+  })
+
+  it('responde 429 com Retry-After a partir da requisição 61 do mesmo IP, sem afetar outro IP', async () => {
+    for (let i = 0; i < LIMITE_POR_MINUTO; i++) expect((await chamar('1.1.1.1')).status).toBe(200)
+    const r = await chamar('1.1.1.1')
+    expect(r.status).toBe(429)
+    expect(Number(r.headers.get('retry-after'))).toBeGreaterThan(0)
+    chamadas.nomeDaChave = 'outro-cliente' // o limite por cliente é separado; aqui só o IP muda
+    expect((await chamar('2.2.2.2')).status).toBe(200)
+  })
+
+  it('bloqueia o IP depois de várias chaves inválidas, antes de consultar o banco', async () => {
+    chamadas.nomeDaChave = null
+    for (let i = 0; i < LIMITE_FALHAS_POR_MINUTO; i++) expect((await chamar('3.3.3.3')).status).toBe(401)
+    const antes = chamadas.sql.length
+    expect((await chamar('3.3.3.3')).status).toBe(429)
+    expect(chamadas.sql.length).toBe(antes)
+    chamadas.nomeDaChave = 'sistema-x'
+  })
+
+  it('limita também por cliente, mesmo vindo de IPs diferentes', async () => {
+    for (let i = 0; i < LIMITE_POR_MINUTO; i++) expect((await chamar(`9.9.9.${i}`)).status).toBe(200)
+    expect((await chamar('9.9.9.200')).status).toBe(429)
   })
 })

@@ -60,7 +60,7 @@ Guia do dia a dia: como o sistema roda, onde ficam as configurações, como reso
 
 ### 2.2 API externa (chaves e Cloudflare Access)
 - **Criar/revogar chaves:** *Administração → API* (só administrador). A chave aparece uma única vez; o banco guarda só o hash. Uma chave por aplicação; revogar tem efeito imediato.
-- **Cloudflare Access (uma vez):** em Zero Trust → Access → Applications, crie uma regra **Bypass** (*Include: Everyone*) **só para o caminho `/api/externo/*`** do domínio do Radar. Sem ela as chamadas recebem 302 para o login. Esse caminho passa a ser protegido pela chave; recomenda-se uma regra de **rate limiting** do Cloudflare para ele.
+- **Cloudflare Access (uma vez):** em Zero Trust → Access → Applications, crie uma regra **Bypass** (*Include: Everyone*) **só para o caminho `/api/externo/*`** do domínio do Radar. Sem ela as chamadas recebem 302 para o login. Esse caminho passa a ser protegido pela chave; a função aplica um limite de requisições por IP e por chave (resposta `429`, ver [API-EXTERNA.md](API-EXTERNA.md)); a regra de WAF do Cloudflare depende de domínio próprio (roadmap de segurança).
 - **Documentação para quem integra:** [API-EXTERNA.md](API-EXTERNA.md). **Ao mudar um campo da oportunidade, atualize esse documento** (um teste avisa) e avise as aplicações.
 - **Auditoria:** as oportunidades criadas pela API têm `criado_por = api:<aplicação>` e `solicitante`; o histórico registra o mesmo.
 
