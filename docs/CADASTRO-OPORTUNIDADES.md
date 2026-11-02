@@ -49,7 +49,7 @@ Perfil feito sobre as 600 linhas de 14/10/2026. "Preench." é o percentual de li
 | 25 | Valor CTC | `valor_ctc` | R$ ≥ 0 | 13% | **Obrigatório** quando Status = Win (hoje ok em 12/12). |
 | 26 | Custo Total CTC | `custo_total_ctc` | R$ ≥ 0 | 0% | Coluna nova; "Avançado". |
 | 27 | Motivo de NO GO | `motivo_no_go` | lista | 73% | **Obrigatório** quando Status = No Go (2 linhas violam hoje). 24 grafias → ~14 motivos. |
-| 28 | Detalhe do NO GO | `detalhe_no_go` | texto longo ≤ 4000 | 68% | Multilinha (máx. 3.502 caracteres hoje). |
+| 28 | Descrição do NO GO | `detalhe_no_go` | texto longo ≤ 4000 | 68% | Obrigatória quando o status é No Go (desde a migração 027); multilinha (máx. 3.502 caracteres hoje). Vai destacada no e-mail de aviso. |
 | 29 | Empresas Vencedoras | `empresas_vencedoras` | texto longo ≤ 500 | 32% | Idealmente lista de empresas; v1 texto. |
 | 30 | Motivo do Lost | `motivo_lost` | lista | 5% | **Obrigatório** quando Status = Lost (30 linhas violam hoje). |
 | 31 | Acompanhamento / Status / Observações | `observacoes` | texto longo ≤ 4000 | 11% | Multilinha. |

@@ -170,7 +170,7 @@ Mesmos campos do formulário *Nova oportunidade*. Nomes em `snake_case`, exatame
 | `situacao_lance` | Resultado do certame | não | texto: um dos valores da lista indicada (lista `situacao_lance`) | Situação do lance (use quando não há posição) |
 | `motivo_lost` | Resultado do certame | sim, se status = Lost | texto: um dos valores da lista indicada (lista `motivo_lost`) | Motivo do Lost |
 | `motivo_no_go` | Resultado do certame | sim, se status = No Go | texto: um dos valores da lista indicada (lista `motivo_no_go`) | Motivo do No Go |
-| `detalhe_no_go` | Resultado do certame | não | texto (pode ter várias linhas) | Detalhe do No Go (só faz sentido em No Go) |
+| `detalhe_no_go` | Resultado do certame | só se status = No Go | texto (pode ter várias linhas) | Descrição do No Go: obrigatória quando o status é No Go; aparece destacada no e-mail de aviso |
 | `observacoes` | Acompanhamento | não | texto (pode ter várias linhas) | Acompanhamento / status / observações |
 
 Extra da API: `solicitante` (texto, até 120 caracteres, opcional): quem pediu a criação na aplicação externa.

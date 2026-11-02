@@ -125,3 +125,33 @@ describe('e-mail com todas as informações da oportunidade (como a anotação d
     expect(m.texto).not.toMatch(/54\.028/)
   })
 })
+
+describe('e-mail de No Go: motivo e descrição em destaque', () => {
+  const noGo = { ...base, status: 'No Go' }
+  const dados = { motivo_no_go: 'Risco Jurídico', detalhe_no_go: 'Edital exige atestado que a CTC não possui.\nPrazo curto.' }
+
+  it('e-mail completo: bloco no topo, antes dos demais dados, com motivo e descrição grifados', () => {
+    const m = montarEmail({ ...noGo, dados }, 'https://radar.example')
+    expect(m.texto.startsWith('Nova oportunidade cadastrada no Radar Pré-Vendas.\n\n*** NO GO ***\nMOTIVO: RISCO JURÍDICO\nDESCRIÇÃO: Edital exige atestado')).toBe(true)
+    expect(m.html).toContain('<mark')
+    expect(m.html).toContain('<u>')
+    expect(m.html).toContain('Edital exige atestado que a CTC não possui.')
+    expect(m.html.indexOf('NO GO')).toBeLessThan(m.html.indexOf('dados da oportunidade'))
+  })
+
+  it('e-mail resumido e aviso de mudança de status também destacam', () => {
+    const resumido = montarEmail({ ...noGo, motivo_no_go: 'Preço', detalhe_no_go: 'Margem negativa' }, 'u')
+    expect(resumido.texto).toContain('*** NO GO ***\nMOTIVO: PREÇO\nDESCRIÇÃO: Margem negativa')
+    expect(resumido.html).toContain('Margem negativa')
+    const mudou = montarEmail({ ...noGo, status_anterior: 'Prospect', alterado_por: 'ana@x.com', dados }, 'u')
+    expect(mudou.texto).toContain('*** NO GO ***')
+    expect(mudou.texto).toContain('Status: Prospect → No Go')
+  })
+
+  it('sem descrição (registro antigo) avisa em vez de omitir; escapa HTML; outros status não têm o bloco', () => {
+    expect(montarEmail({ ...noGo, dados: { motivo_no_go: 'Preço' } }, 'u').texto).toContain('DESCRIÇÃO: descrição não informada')
+    expect(montarEmail({ ...noGo, dados: { detalhe_no_go: '<script>x</script>' } }, 'u').html).not.toContain('<script>')
+    expect(montarEmail({ ...base, status: 'Go', dados }, 'u').texto).not.toContain('NO GO')
+    expect(montarEmail({ ...base, status: 'Go' }, 'u').html).not.toContain('<mark')
+  })
+})

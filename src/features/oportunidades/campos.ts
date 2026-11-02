@@ -103,7 +103,7 @@ export const SECOES: Secao[] = [
       { nome: 'situacao_lance', rotulo: 'Situação do lance', tipo: 'lista', dica: 'Use quando não há posição (ex.: Desclassificada)' },
       { nome: 'motivo_lost', rotulo: 'Motivo do Lost', tipo: 'lista', quando: ['Lost'] },
       { nome: 'motivo_no_go', rotulo: 'Motivo do No Go', tipo: 'lista', quando: ['No Go'] },
-      { nome: 'detalhe_no_go', rotulo: 'Detalhe do No Go', tipo: 'longo', largo: true, quando: ['No Go'] },
+      { nome: 'detalhe_no_go', rotulo: 'Descrição do No Go', tipo: 'longo', largo: true, quando: ['No Go'], dica: 'Obrigatória: explique o motivo com clareza. Ela vai destacada no e-mail de aviso.' },
     ],
   },
   {
