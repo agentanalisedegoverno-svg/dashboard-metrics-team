@@ -46,7 +46,7 @@ Uma aplicação externa cria oportunidades no Radar Pré-Vendas **como se fosse 
 3. **Conferir o e-mail e o cartão:** o e-mail "Nova oportunidade" chegou com *Cadastrada por: api:...* e *Solicitante (via API)*; em cerca de 1 minuto surgiu **um** cartão no Planner (plano ITS, coluna PROSPECT). Peça a conferência do banco a quem mantém o Radar (consulta abaixo).
 4. **Limpar:** arquivar a oportunidade de teste no Radar, apagar o cartão do Planner e **revogar a chave `teste-api`**.
 5. **Chave real:** criar a chave com o nome da aplicação integradora e entregá-la por canal seguro (cofre de senhas). Uma chave por aplicação; para trocar, crie a nova e revogue a antiga.
-6. **Limite de requisições (recomendado):** como `/api/externo/*` não passa pelo Access, crie no Cloudflare *Security → WAF → Rate limiting rules*: expressão `URI Path starts with "/api/externo"`, por exemplo 60 requisições por minuto por IP, ação **Block**. É mudança de segurança do Cloudflare (fica com o administrador).
+6. **Limite de requisições:** a própria função limita cada IP a 60 requisições por minuto, cada chave de API a 60 por minuto e cada IP a 10 chamadas com chave inválida por minuto. Acima disso a resposta é `429` com o cabeçalho `Retry-After` (segundos). A contagem é por instância da função, não global. Uma regra de WAF do Cloudflare (*Security → WAF → Rate limiting rules*, `URI Path starts with "/api/externo"`) exige domínio próprio na conta e está no roadmap de segurança ([ROADMAP.md](ROADMAP.md)).
 
 ### Conferência no banco (administrador, depois do teste)
 ```sql
@@ -110,6 +110,7 @@ curl -X POST https://radar-prevendas.pages.dev/api/externo/oportunidades \
 | `400` | Corpo que não é um objeto JSON | `{ "error": "..." }` |
 | `401` | Chave ausente, inválida ou revogada | `{ "error": "..." }` |
 | `413` | Corpo acima de 64 KB | `{ "error": "..." }` |
+| `429` | Muitas requisições (limite por minuto por IP e por chave) | `{ "error": "..." }` e cabeçalho `Retry-After` em segundos; espere e repita |
 | `422` | Dados inválidos | `{ "error": "Dados inválidos.", "erros": [{ "campo": "...", "mensagem": "..." }] }` |
 | `502`/`503` | Falha do servidor ou do banco | `{ "error": "..." }` (pode repetir com a mesma `Idempotency-Key`) |
 
