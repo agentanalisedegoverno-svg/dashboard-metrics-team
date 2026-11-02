@@ -211,7 +211,9 @@ describe('validação (espelho das regras de negócio)', () => {
     expect(camposComErro(await falha(criar(db, opp({ status: 'Lost' }))))).toContain('motivo_lost')
     expect(camposComErro(await falha(criar(db, opp({ status: 'Win' }))))).toContain('valor_ctc')
     await db.query(`insert into opcoes (lista, valor) values ('motivo_no_go','Risco') on conflict do nothing`)
-    expect((await criar(db, opp({ status: 'No Go', motivo_no_go: 'Risco' }))).status).toBe('No Go')
+    expect(camposComErro(await falha(criar(db, opp({ status: 'No Go', motivo_no_go: 'Risco' }))))).toEqual(['detalhe_no_go']) // a descrição do No Go também é obrigatória
+    expect(camposComErro(await falha(criar(db, opp({ status: 'No Go', motivo_no_go: 'Risco', detalhe_no_go: '   ' }))))).toEqual(['detalhe_no_go'])
+    expect((await criar(db, opp({ status: 'No Go', motivo_no_go: 'Risco', detalhe_no_go: 'Exige atestado que a CTC não tem' }))).status).toBe('No Go')
     expect((await criar(db, opp({ status: 'Win', valor_ctc: 1000 }))).status).toBe('Win')
   })
   it('orçamento sigiloso não tem valor; valores não são negativos', async () => {

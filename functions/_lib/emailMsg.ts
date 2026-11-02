@@ -26,6 +26,9 @@ export type DadosEmail = {
   alterado_por?: string | null
   /** Linha completa da oportunidade (to_jsonb): quando vem, o e-mail leva TODAS as informações, como a anotação do Planner. */
   dados?: Record<string, unknown>
+  /** Só para o e-mail resumido (sem `dados`): motivo e descrição do No Go. */
+  motivo_no_go?: string | null
+  detalhe_no_go?: string | null
 }
 
 export type Mensagem = { assunto: string; texto: string; html: string }
@@ -57,7 +60,23 @@ export function montarAssunto(o: DadosEmail) {
   return `[Radar] ${partes.join(' | ')}`
 }
 
-const RODAPE = 'Aviso automático. Quem administra o Radar define quem recebe e a partir de quais status.'
+/** No Go: o motivo e a descrição vão em destaque (texto e HTML), porque é a primeira coisa que quem recebe precisa ver. */
+function destaqueNoGo(o: DadosEmail): { texto: string[]; html: string } | null {
+  if (limpa(o.status).toLowerCase() !== 'no go') return null
+  const d = o.dados ?? {}
+  const motivo = limpa(d.motivo_no_go ?? o.motivo_no_go, 200) || 'não informado'
+  const descricao = valorCheio(String(d.detalhe_no_go ?? o.detalhe_no_go ?? '')) || 'descrição não informada'
+  return {
+    texto: ['*** NO GO ***', `MOTIVO: ${motivo.toUpperCase()}`, `DESCRIÇÃO: ${descricao}`, ''],
+    html: `<div style="border:3px solid #b00020;background:#fff3cd;padding:12px 14px;margin:12px 0;max-width:900px">
+<p style="margin:0;font-size:18px;color:#b00020"><strong>NO GO</strong></p>
+<p style="margin:6px 0 0;font-size:15px"><strong>Motivo:</strong> <strong>${esc(motivo)}</strong></p>
+<p style="margin:8px 0 0;font-size:15px;white-space:pre-line"><strong>Descrição:</strong> <strong><u><mark style="background:#ffe066;padding:1px 3px">${esc(descricao)}</mark></u></strong></p>
+</div>`,
+  }
+}
+
+const RODAPE ='Aviso automático. Quem administra o Radar define quem recebe e a partir de quais status.'
 const celula = 'border:1px solid #ddd;vertical-align:top'
 
 /** E-mail com todos os campos do formulário, nas mesmas seções e rótulos da anotação do Planner. */
@@ -67,10 +86,12 @@ function montarEmailCompleto(o: DadosEmail, url: string, assunto: string, titulo
     ? [['Status', `${limpa(o.status_anterior) || 'sem status'} → ${limpa(o.status) || 'sem status'}`], ['Alterado por', limpa(o.alterado_por) || '—']]
     : []
   const secoes = secoesNota(d)
+  const noGo = destaqueNoGo(o)
   const primeira = `Radar ${limpa(o.codigo) || '—'} (v${limpa(d.versao)}) — dados da oportunidade`
   const texto = [
     titulo,
     '',
+    ...(noGo ? noGo.texto : []),
     ...cabecalho.map(([k, v]) => `${k}: ${v}`),
     ...(mudou ? [''] : []),
     primeira,
@@ -86,7 +107,7 @@ function montarEmailCompleto(o: DadosEmail, url: string, assunto: string, titulo
     `${s.titulo ? `<p style="margin:16px 0 4px"><strong>${esc(s.titulo.toUpperCase())}</strong></p>\n` : '<p style="margin:8px 0 0"></p>\n'}${tabela(s.itens)}`
   const html = `<!doctype html><html lang="pt-BR"><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:14px">
 <p><strong>${esc(titulo)}</strong></p>
-${cabecalho.length ? `${tabela(cabecalho)}\n` : ''}<p style="color:#555">${esc(primeira)}</p>
+${noGo ? `${noGo.html}\n` : ''}${cabecalho.length ? `${tabela(cabecalho)}\n` : ''}<p style="color:#555">${esc(primeira)}</p>
 ${secoes.map(bloco).join('\n')}
 <p><a href="${esc(url)}">Abrir o Radar</a></p>
 <p style="color:#777;font-size:12px">${RODAPE}</p>
@@ -112,10 +133,11 @@ export function montarEmail(o: DadosEmail, url: string): Mensagem {
     ['Orçamento', o.orcamento_sigiloso ? 'Sigiloso' : brl(o.orcamento)],
     mudou ? ['Alterado por', limpa(o.alterado_por) || '—'] : ['Cadastrada por', limpa(o.criado_por) || '—'],
   ]
-  const texto = [titulo, '', ...linhas.map(([k, v]) => `${k}: ${v}`), '', `Abrir o Radar: ${url}`].join('\n')
+  const noGo = destaqueNoGo(o)
+  const texto = [titulo, '', ...(noGo ? noGo.texto : []), ...linhas.map(([k, v]) => `${k}: ${v}`), '', `Abrir o Radar: ${url}`].join('\n')
   const html = `<!doctype html><html lang="pt-BR"><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:14px">
 <p><strong>${esc(titulo)}</strong></p>
-<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;border:1px solid #ddd">
+${noGo ? `${noGo.html}\n` : ''}<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;border:1px solid #ddd">
 ${linhas.map(([k, v]) => `<tr><td style="border:1px solid #ddd;background:#f6f6f6"><strong>${esc(k)}</strong></td><td style="border:1px solid #ddd">${esc(v)}</td></tr>`).join('\n')}
 </table>
 <p><a href="${esc(url)}">Abrir o Radar</a></p>

@@ -41,7 +41,7 @@ export type CampoApi = {
 }
 
 /** Campos que o banco exige conforme o status (mesmas regras do cadastro manual). */
-const EXIGIDO_POR_STATUS: Record<string, readonly string[]> = { motivo_no_go: ['No Go'], motivo_lost: ['Lost'], valor_ctc: ['Win'] }
+const EXIGIDO_POR_STATUS: Record<string, readonly string[]> = { motivo_no_go: ['No Go'], detalhe_no_go: ['No Go'], motivo_lost: ['Lost'], valor_ctc: ['Win'] }
 
 /** Catálogo dos campos aceitos, na ordem do formulário. `listas` traz as opções ativas (por nome de lista) para os campos do tipo lista. */
 export function catalogoCampos(listas: Record<string, { valor: string; ativo: boolean }[]> = {}): CampoApi[] {
@@ -68,7 +68,7 @@ export function catalogoCampos(listas: Record<string, { valor: string; ativo: bo
 /** Regras que valem além do formato (as mesmas do cadastro manual; o banco é quem as impõe). */
 export const REGRAS = [
   'status, orgao, descritivo e data_pregao_dt são obrigatórios; a torre é calculada pela linha_servico (informe torre só se não enviar linha_servico).',
-  'Se status for "No Go", informe motivo_no_go; se for "Lost", motivo_lost; se for "Win", valor_ctc.',
+  'Se status for "No Go", informe motivo_no_go e detalhe_no_go (a descrição); se for "Lost", motivo_lost; se for "Win", valor_ctc.',
   'data_pregao_dt não pode ser anterior a data_distribuicao.',
   'Campos de lista só aceitam valores cadastrados e ativos (veja "valores" em GET /api/externo/campos).',
   'analista aceita só pré-vendas ativos cadastrados (vários, separados por vírgula).',

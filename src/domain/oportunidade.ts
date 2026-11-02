@@ -231,6 +231,7 @@ export function regrasNegocio(d: OportunidadeInput): ErroCampo[] {
   }
   if (!vazio(d.documentos_nome) && vazio(d.documentos_url)) erros.push({ campo: 'documentos_url', mensagem: 'Informe o link da pasta de documentação' })
   if (d.status === 'No Go' && vazio(d.motivo_no_go)) erros.push({ campo: 'motivo_no_go', mensagem: 'Informe o motivo do No Go' })
+  if (d.status === 'No Go' && vazio(d.detalhe_no_go)) erros.push({ campo: 'detalhe_no_go', mensagem: 'Informe a descrição do No Go' })
   if (d.status === 'Lost' && vazio(d.motivo_lost)) erros.push({ campo: 'motivo_lost', mensagem: 'Informe o motivo do Lost' })
   if (d.status === 'Win' && d.valor_ctc === null) erros.push({ campo: 'valor_ctc', mensagem: 'Informe o Valor CTC quando o status é Win' })
   if (d.orcamento_sigiloso && d.orcamento !== null) erros.push({ campo: 'orcamento', mensagem: 'Orçamento sigiloso não tem valor' })

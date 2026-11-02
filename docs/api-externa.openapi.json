@@ -208,7 +208,7 @@
             "type": "string"
           },
           "detalhe_no_go": {
-            "description": "Detalhe do No Go. texto (pode ter várias linhas)",
+            "description": "Descrição do No Go. Obrigatória: explique o motivo com clareza. Ela vai destacada no e-mail de aviso.. texto (pode ter várias linhas)",
             "type": "string"
           },
           "observacoes": {

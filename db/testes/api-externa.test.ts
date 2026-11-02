@@ -63,7 +63,7 @@ describe('criar_oportunidade_api: mesmo fluxo do cadastro manual', () => {
   it('aplica as mesmas validações do cadastro manual (campos obrigatórios, listas, regras por status)', async () => {
     expect(camposComErro(await falha(api({ status: 'Go' })))).toEqual(expect.arrayContaining(['orgao', 'descritivo', 'data_pregao_dt']))
     expect(camposComErro(await falha(api(opp({ status: 'Inventado' }))))).toContain('status')
-    expect(camposComErro(await falha(api(opp({ status: 'No Go' }))))).toContain('motivo_no_go')
+    expect(camposComErro(await falha(api(opp({ status: 'No Go' }))))).toEqual(expect.arrayContaining(['motivo_no_go', 'detalhe_no_go']))
     expect(camposComErro(await falha(api(opp({ sigla: 'x'.repeat(21) }))))).toContain('sigla')
     expect(camposComErro(await falha(api(opp({ duracao_contrato_meses: 601 }))))).toContain('duracao_contrato_meses')
   })
@@ -147,7 +147,7 @@ describe('simular_oportunidade_api: testa sem sujar a base', () => {
   it('erros de validação saem iguais aos da criação de verdade e também não deixam rastro', async () => {
     const antes = await contagens()
     expect(camposComErro(await falha(simular({ status: 'Go' })))).toEqual(expect.arrayContaining(['orgao', 'descritivo', 'data_pregao_dt']))
-    expect(camposComErro(await falha(simular(opp({ status: 'No Go' }))))).toContain('motivo_no_go')
+    expect(camposComErro(await falha(simular(opp({ status: 'No Go' }))))).toEqual(expect.arrayContaining(['motivo_no_go', 'detalhe_no_go']))
     expect(await contagens()).toEqual(antes)
   })
 })
