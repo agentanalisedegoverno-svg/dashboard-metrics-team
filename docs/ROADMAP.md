@@ -1,6 +1,6 @@
 # Roadmap de melhorias
 
-Estado em 28/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **tamanho** aproximado (P = horas, M = dias, G = semanas). A prioridade é uma sugestão para validação do time.
+Estado em 28/10/2026 (monitoramento de licitações atualizado em 02/11/2026) e o que vem a seguir. Cada item traz o **porquê** e o **tamanho** aproximado (P = horas, M = dias, G = semanas). A prioridade é uma sugestão para validação do time.
 
 ## 1. Onde estamos
 
@@ -15,7 +15,7 @@ Estado em 28/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 | Integração Radar → Planner (exportador, `planner-auto`) **na nuvem**, disparada ao salvar (GitHub Actions, estado cifrado no banco) | ✅ (28/10) |
 | E-mails de nova oportunidade e de mudança de status, com todas as informações | ✅ (27/10) |
 | Espelho diário do banco no Supabase (segunda redundância) | ✅ (28/10) |
-| API externa para outras aplicações criarem oportunidades (chave por aplicação, idempotência, solicitante) | ✅ (28/10); Bypass do Access criado e função validada em produção (sem rastro); modo de simulação (`?simular=true`, sem gravar nada) e documentação interativa em Administração → API; **falta**: teste com chave (`scripts/teste-api-externa.mjs --simular`), chave da aplicação real e regra de *rate limiting* no Cloudflare |
+| API externa para outras aplicações criarem oportunidades (chave por aplicação, idempotência, solicitante) | ✅ (28/10); Bypass do Access criado e função validada em produção (sem rastro); modo de simulação (`?simular=true`, sem gravar nada) e documentação interativa em Administração → API; **falta**: teste com chave (`scripts/teste-api-externa.mjs --simular`), chave da aplicação real e regra de *rate limiting* no Cloudflare (sugerida: `/api/externo` por IP, 60 req/min ou 10 req/10 s no plano gratuito; criação com o administrador, passo a passo em [API-EXTERNA.md](API-EXTERNA.md)) |
 | Campos novos: sigla (20), descritivo (60), duração do contrato em meses, valores em R$ com máscara | ✅ (27–28/10) |
 | Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) → **desativada e removida em 27/10/2026** |
 | Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ✅ (22/10) |
@@ -24,14 +24,15 @@ Estado em 28/10/2026 e o que vem a seguir. Cada item traz o **porquê** e o **ta
 
 | Etapa | Estado | Escopo / critério de conclusão |
 |---|---|---|
-| Consulta PNCP na aba Licitações | 🟡 Em validação | Proxy de mesma origem com timeout; painel exibe dados encontrados, nível de atenção e próxima ação. Ainda exige validação com oportunidades reais em produção. Sem novas tabelas ou APIs do Radar. |
+| Consulta PNCP na aba Licitações | 🟢 Em produção (02/11) | Proxy de mesma origem com timeout; painel exibe dados encontrados, nível de atenção e próxima ação. Corrigido com respostas reais: modalidade obrigatória (6 = Pregão eletrônico), `dataFinal` = limite de propostas (hoje + 90 dias; com a data de hoje o PNCP devolve 204) e corpo vazio tratado como "sem resultados". Falta validar com um certame vinculado a uma oportunidade real. |
 | Ampliar a cobertura de descoberta | 🟡 Próxima prioridade | Revisar paginação e filtros do PNCP para reduzir falsos negativos. Inventário atual: 22 oportunidades ativas em Comprasnet (Gov.br), 11 em Compras.gov.br / PNCP, 4 em Petronect, 2 em Compras SC e 2 em bbmnet; existem registros sem portal identificado. A contagem é por cadastro atual, não prova que cada fonte tenha API pública utilizável. |
-| Compras.gov.br — dados abertos | 🟡 Implementação inicial | Proxy de mesma origem restrito a endpoints oficiais; consultas aos módulos legados de licitação/pregão e ao módulo de contratações da Lei 14.133. A cobertura e os parâmetros precisam ser validados com respostas reais antes de declarar concluído. |
+| Compras.gov.br — dados abertos | 🟢 Em produção (02/11) | Proxy de mesma origem restrito a endpoints oficiais; formatos legado e Lei 14.133 normalizados sem perder objeto, processo, órgão, UASG e data de encerramento. O bloco "Fontes públicas" cruza os registros com as oportunidades do Radar (processo exato ou UASG + órgão) e mostra "No Radar: <código>" como sugestão. Limite: amostra dos últimos 45 dias, 100 registros por consulta. ConLicitações aparece como "não ativada" até haver credencial no ambiente seguro. |
+| Monitor automático (fase 2) | 🟡 Pronto, desligado | Banco (migrações 021 e 026), papel `radar_monitor`, segredo `DATABASE_URL_MONITOR` e workflow `monitoramento-licitacoes.yml` aplicados; execução manual conecta e roda. Nenhuma oportunidade tem link do PNCP no campo Site, então ainda não houve coleta com dado real (`encontrados: 0`). Para ligar: validar com um certame vinculado e só então definir `MONITOR_LICITACOES_ENABLED=true`. |
 | Portais estaduais abertos | ⬜ Próxima etapa | Priorizar Compras SC, Compras MS e Seplag/MT. Confirmar endpoints oficiais, parâmetros, limites e termos de uso; manter conectores isolados e somente leitura. |
 | Acompanhamento de certames em que participamos | ⬜ Futuro | Evoluir de descoberta para acompanhamento de oportunidades confirmadas: vínculo por identificador oficial, prazos/sessões, mudanças publicadas, resultado/andamento e links oficiais. Definir o fluxo operacional com o time antes de persistir qualquer dado novo. |
 | Alertas de prazo e mudança | ⬜ Futuro | Após validar a etapa de acompanhamento, definir alertas para prazos e alterações relevantes com fonte e data da última verificação visíveis. |
 
-**Limite da fase atual:** o módulo é um paliativo de consulta. Não registra participação, não confirma automaticamente vínculos e não altera banco/back-end. As etapas futuras precisam de decisão explícita antes de introduzir persistência ou automações.
+**Limite da fase atual:** a aba Licitações é só consulta. Não registra participação nem confirma vínculos automaticamente. O monitor da fase 2 (tabelas de vínculo, snapshots e eventos) já existe no banco, mas fica desligado até a validação com dado real; a aba ainda não lê os resultados dele. As etapas futuras precisam de decisão explícita antes de ligar automações.
 
 ## 2. Próximos passos (curto prazo)
 
