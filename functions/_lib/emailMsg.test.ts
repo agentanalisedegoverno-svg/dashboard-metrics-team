@@ -17,6 +17,21 @@ describe('assunto', () => {
   })
 })
 
+describe('assunto com sigla e destaque de Suspended', () => {
+  it('a sigla substitui o nome do órgão no assunto; sem sigla, mantém o órgão', () => {
+    expect(montarEmail({ ...base, sigla: 'PM-X' }, 'u').assunto).toContain('| 2026-0123 | PM-X | ITS |')
+    expect(montarEmail({ ...base, dados: { sigla: 'COM. AERO' } }, 'u').assunto).toContain('| COM. AERO | ITS |')
+    expect(montarEmail({ ...base, sigla: '  ' }, 'u').assunto).toContain('| Prefeitura de X | ITS |')
+  })
+  it('Suspended ganha faixa amarela (cor do status no Radar) no resumo e no completo; outros status não', () => {
+    const resumo = montarEmail({ ...base, status: 'Suspended' }, 'u')
+    expect(resumo.html).toContain('#facc15')
+    expect(resumo.texto).toContain('*** SUSPENDED ***')
+    expect(montarEmail({ ...base, status: 'Suspended', dados: { versao: 1 } }, 'u').html).toContain('SUSPENDED')
+    expect(montarEmail(base, 'u').html).not.toContain('#facc15')
+  })
+})
+
 describe('montarEmail', () => {
   it('monta assunto, texto e html com os campos principais', () => {
     const m = montarEmail(base, 'https://radar.test')

@@ -7,6 +7,7 @@ import { secoesNota } from './plannerNota.ts'
 export type DadosEmail = {
   codigo: string | null
   orgao: string | null
+  sigla?: string | null
   descritivo?: string | null
   objeto?: string | null
   processo?: string | null
@@ -50,7 +51,7 @@ export function montarAssunto(o: DadosEmail) {
   const partes = [
     mudou ? `${limpa(o.status_anterior) || 'sem status'} → ${limpa(o.status) || 'sem status'}` : limpa(o.status) || 'sem status',
     limpa(o.codigo) || 'sem código',
-    limpa(o.orgao, 80) || 'sem órgão',
+    limpa(o.sigla ?? o.dados?.sigla, 80) || limpa(o.orgao, 80) || 'sem órgão', // a sigla substitui o nome do órgão; sem sigla, cai no nome
     limpa(o.torre, 40) || '—',
     limpa(o.linha_servico, 60) || '—',
     descricao.length > 90 ? `${descricao.slice(0, 89).trimEnd()}…` : descricao || '—',
@@ -76,6 +77,19 @@ function destaqueNoGo(o: DadosEmail): { texto: string[]; html: string } | null {
   }
 }
 
+/** Suspended: faixa amarela, a mesma cor da bolinha do status no Radar (--dot-suspended). */
+function destaqueSuspended(o: DadosEmail): { texto: string[]; html: string } | null {
+  if (limpa(o.status).toLowerCase() !== 'suspended') return null
+  return {
+    texto: ['*** SUSPENDED ***', ''],
+    html: `<div style="border:3px solid #facc15;background:#fef9c3;padding:10px 14px;margin:12px 0;max-width:900px">
+<p style="margin:0;font-size:18px;color:#854d0e"><span style="color:#facc15">&#9679;</span> <strong>SUSPENDED</strong></p>
+</div>`,
+  }
+}
+
+const destaque = (o: DadosEmail) => destaqueNoGo(o) ?? destaqueSuspended(o)
+
 const RODAPE ='Aviso automático. Quem administra o Radar define quem recebe e a partir de quais status.'
 const celula = 'border:1px solid #ddd;vertical-align:top'
 
@@ -86,7 +100,7 @@ function montarEmailCompleto(o: DadosEmail, url: string, assunto: string, titulo
     ? [['Status', `${limpa(o.status_anterior) || 'sem status'} → ${limpa(o.status) || 'sem status'}`], ['Alterado por', limpa(o.alterado_por) || '—']]
     : []
   const secoes = secoesNota(d)
-  const noGo = destaqueNoGo(o)
+  const noGo = destaque(o)
   const primeira = `Radar ${limpa(o.codigo) || '—'} (v${limpa(d.versao)}) — dados da oportunidade`
   const texto = [
     titulo,
@@ -133,7 +147,7 @@ export function montarEmail(o: DadosEmail, url: string): Mensagem {
     ['Orçamento', o.orcamento_sigiloso ? 'Sigiloso' : brl(o.orcamento)],
     mudou ? ['Alterado por', limpa(o.alterado_por) || '—'] : ['Cadastrada por', limpa(o.criado_por) || '—'],
   ]
-  const noGo = destaqueNoGo(o)
+  const noGo = destaque(o)
   const texto = [titulo, '', ...(noGo ? noGo.texto : []), ...linhas.map(([k, v]) => `${k}: ${v}`), '', `Abrir o Radar: ${url}`].join('\n')
   const html = `<!doctype html><html lang="pt-BR"><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:14px">
 <p><strong>${esc(titulo)}</strong></p>
