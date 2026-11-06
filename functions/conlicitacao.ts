@@ -6,7 +6,7 @@ const json = (status: number, body: unknown) => Response.json(body, { status, he
 export const onRequestGet = async ({ env }: Context): Promise<Response> => {
   const token = env.CONLICITACAO_TOKEN
   if (!token) return json(503, { error: 'ConLicitações ainda não está configurado no ambiente seguro.', fonte: 'ConLicitações', retryable: false })
-  const base = 'https://consulteonline.conlicitacao.com.br/api'
+  const base = 'https://consultaonline.conlicitacao.com.br/api'
   const get = async (endpoint: string) => {
     const response = await fetch(base + endpoint, {
       headers: { accept: 'application/json', 'X-AUTH-TOKEN': token },

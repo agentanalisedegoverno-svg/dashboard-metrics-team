@@ -40,7 +40,7 @@ export const onRequest = async ({ request, params, env }: Context): Promise<Resp
       return json({ error: 'ConLicitações ainda não está configurado no ambiente seguro.', fonte: 'ConLicitações', retryable: false }, 503)
     }
 
-    const base = 'https://consulteonline.conlicitacao.com.br/api'
+    const base = 'https://consultaonline.conlicitacao.com.br/api'
     const get = async (endpoint: string) => {
       const response = await fetch(base + endpoint, {
         headers: { accept: 'application/json', 'X-AUTH-TOKEN': token },
