@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   if (path === 'conlicitacao') {
     const token = process.env.CONLICITACAO_TOKEN
     if (!token) return res.status(503).json({ error: 'ConLicitações ainda não está configurado no ambiente seguro.', fonte: 'ConLicitações', retryable: false })
-    const base = 'https://consulteonline.conlicitacao.com.br/api'
+    const base = 'https://consultaonline.conlicitacao.com.br/api'
     const get = async (endpoint) => {
       const response = await fetch(base + endpoint, {
         headers: { accept: 'application/json', 'X-AUTH-TOKEN': token },
