@@ -8,6 +8,12 @@ const COMPRAS_ALLOWED = new Set([
   'modulo-contratacoes/1_consultarContratacoes_PNCP_14133',
 ])
 
+/** Motivo técnico curto da falha na fonte (status HTTP ou tipo do erro de rede). Nunca inclui token, URL ou corpo da resposta. */
+const motivoTecnico = (e: unknown) => {
+  const x = (e ?? {}) as { status?: number; name?: string }
+  return x.status ? `HTTP ${x.status}` : String(x.name ?? 'erro').slice(0, 40)
+}
+
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store', ...extra } })
 
@@ -84,7 +90,7 @@ export const onRequest = async ({ request, params, env }: Context): Promise<Resp
         const status = first?.status === 403 ? 403 : first?.status === 401 ? 401 : 502
         return json({
           error: status === 403 ? 'ConLicitações recusou a origem da consulta (IP não autorizado).' : status === 401 ? 'ConLicitações recusou a credencial configurada.' : 'Não foi possível ler os boletins da ConLicitações.',
-          fonte: 'ConLicitações', retryable: status >= 500,
+          fonte: 'ConLicitações', retryable: status >= 500, motivo: motivoTecnico(falhas[0].reason),
         }, status)
       }
       return json({ resultado: registros, total: registros.length, filtrosConsultados: filtros.length, filtrosComFalha: falhas.length, fonte: 'ConLicitações' })
@@ -93,7 +99,7 @@ export const onRequest = async ({ request, params, env }: Context): Promise<Resp
       const code = status === 403 ? 403 : status === 401 ? 401 : 502
       return json({
         error: code === 403 ? 'ConLicitações recusou a origem da consulta (IP não autorizado).' : code === 401 ? 'ConLicitações recusou a credencial configurada.' : 'Não foi possível consultar a ConLicitações agora.',
-        fonte: 'ConLicitações', retryable: code >= 500,
+        fonte: 'ConLicitações', retryable: code >= 500, motivo: motivoTecnico(error),
       }, code)
     }
   }
