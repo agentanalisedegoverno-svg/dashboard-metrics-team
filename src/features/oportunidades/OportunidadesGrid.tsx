@@ -15,11 +15,14 @@ export const Selo = ({ status }: { status: string | null }) => (
   </span>
 )
 
+/** Oportunidades do segmento Corporate: nome (sigla e órgão) em azul. Os demais seguem a tinta padrão. */
+const nomeCorporate = (o: Oportunidade) => (o.segmento === 'Corporate' ? 'font-semibold text-corporate' : '')
+
 const colunas: ColumnDef<Oportunidade>[] = [
   { accessorKey: 'codigo', header: 'Código', size: 100, cell: (c) => <span className="font-mono text-xs">{c.getValue<string | null>() ?? '—'}</span> },
   { accessorKey: 'status', header: 'Status', size: 110, cell: (c) => <Selo status={c.getValue<string | null>()} /> },
-  { accessorKey: 'sigla', header: 'Sigla', size: 90 },
-  { accessorKey: 'orgao', header: 'Órgão', size: 260, cell: (c) => <span className="line-clamp-1" title={c.getValue<string>() ?? ''}>{c.getValue<string>() ?? '—'}</span> },
+  { accessorKey: 'sigla', header: 'Sigla', size: 90, cell: (c) => <span className={nomeCorporate(c.row.original)}>{c.getValue<string | null>() ?? ''}</span> },
+  { accessorKey: 'orgao', header: 'Órgão', size: 260, cell: (c) => <span className={cn('line-clamp-1', nomeCorporate(c.row.original))} title={c.getValue<string>() ?? ''}>{c.getValue<string>() ?? '—'}</span> },
   { accessorKey: 'processo', header: 'Processo/Pregão', size: 140 },
   { accessorKey: 'data_pregao_dt', header: 'Pregão', size: 135, cell: (c) => pregaoBr(c.getValue<string | null>(), c.row.original.hora_pregao) },
   { accessorKey: 'torre', header: 'Torre', size: 90 },
@@ -75,7 +78,7 @@ export function OportunidadesGrid({ dados, onAbrir, compacto }: Props) {
                     <span className="font-mono text-xs text-muted">{o.codigo ?? ''}</span>
                     <span className="text-xs text-muted">{pregaoBr(o.data_pregao_dt, o.hora_pregao)}</span>
                   </div>
-                  <p className="mt-1 line-clamp-1 text-[13px] font-semibold text-ink">{o.orgao ?? '—'}</p>
+                  <p className={cn('mt-1 line-clamp-1 text-[13px] font-semibold', o.segmento === 'Corporate' ? 'text-corporate' : 'text-ink')}>{o.orgao ?? '—'}</p>
                   <p className="line-clamp-1 text-xs text-muted">{[o.processo, o.torre, o.uf].filter(Boolean).join(' · ')}</p>
                 </button>
               </div>

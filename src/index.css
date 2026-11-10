@@ -13,7 +13,7 @@
   --page: #f4f5f7; --surface: #ffffff; --surface-2: #edeff3;
   --ink: #151b2b; --ink-soft: #4a5169; --muted: #5d6479; --line: #dce0e8; --line-soft: #e9ecf1;
   --brand: #16233f; --brand-ink: #0e1830;
-  --gold: #8a560d; --gold-soft: #f4e6d0;
+  --gold: #8a560d; --gold-soft: #f4e6d0; --corporate: #1d4ed8;
   --series-blue: #2a78d6; --series-orange: #eb6834; --series-gold: #c98500;
   --series-green: #008300; --series-red: #e34948; --series-violet: #4a3aa7;
   --dot-win: #d4a017; --dot-go: #16a34a; --dot-nogo: #7c3aed; --dot-ongoing: #2563eb; --dot-lost: #dc2626; --dot-suspended: #facc15; --dot-canceled: #f97316; --dot-other: #9aa3b2;
@@ -28,7 +28,7 @@
     --page: #0e1320; --surface: #161d2e; --surface-2: #1d2538;
     --ink: #eef0f6; --ink-soft: #c4c9d8; --muted: #8b93a8; --line: #2a3349; --line-soft: #232b40;
     --brand: #c7d2e8; --brand-ink: #eef0f6;
-    --gold: #e0a94a; --gold-soft: #3a2e17;
+    --gold: #e0a94a; --gold-soft: #3a2e17; --corporate: #7cacff;
     --series-blue: #3987e5; --series-orange: #d95926; --series-gold: #c98500;
     --series-green: #1f9d1f; --series-red: #e66767; --series-violet: #9085e9;
     --st-good: #2fbf2f; --st-warn: #e0a94a; --st-serious: #e08a68; --st-critical: #e2564c;
@@ -40,7 +40,7 @@
   --page: #0e1320; --surface: #161d2e; --surface-2: #1d2538;
   --ink: #eef0f6; --ink-soft: #c4c9d8; --muted: #8b93a8; --line: #2a3349; --line-soft: #232b40;
   --brand: #c7d2e8; --brand-ink: #eef0f6;
-  --gold: #e0a94a; --gold-soft: #3a2e17;
+  --gold: #e0a94a; --gold-soft: #3a2e17; --corporate: #7cacff;
   --series-blue: #3987e5; --series-orange: #d95926; --series-gold: #c98500;
   --series-green: #1f9d1f; --series-red: #e66767; --series-violet: #9085e9;
   --st-good: #2fbf2f; --st-warn: #e0a94a; --st-serious: #e08a68; --st-critical: #e2564c;
@@ -61,6 +61,7 @@
   --color-brand-ink: var(--brand-ink);
   --color-gold: var(--gold);
   --color-gold-soft: var(--gold-soft);
+  --color-corporate: var(--corporate);
   --color-series-blue: var(--series-blue);
   --color-series-orange: var(--series-orange);
   --color-series-gold: var(--series-gold);
