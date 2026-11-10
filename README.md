@@ -14,6 +14,7 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 | [docs/EMAIL-NOVAS-OPORTUNIDADES.md](docs/EMAIL-NOVAS-OPORTUNIDADES.md) | E-mail a cada nova oportunidade: regras na Administração, envio por SMTP do Gmail |
 | [docs/DIAGRAMAS.md](docs/DIAGRAMAS.md) | Catálogo de diagramas (19, em camadas, com SVG): contexto, fluxos, segurança e dados |
 | [docs/TESTES.md](docs/TESTES.md) | Bateria de testes: regressão, segurança, carga e desempenho; como rodar e achados |
+| [docs/REQUISITOS-INFRA.md](docs/REQUISITOS-INFRA.md) | Requisitos mínimos da máquina com IP fixo para a consulta à ConLicitações (para o time de infraestrutura) |
 | [docs/CONTAS-E-SERVICOS.md](docs/CONTAS-E-SERVICOS.md) | Em qual conta está cada serviço (site, bancos, backups, e-mail) e roteiro para centralizar |
 | [docs/BACKUP.md](docs/BACKUP.md) | Backup diário criptografado no Drive, restauração e teste |
 | [docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md](docs/DECISAO-FIM-DA-CARGA-DA-PLANILHA.md) | **Decisão (27/10/2026): o banco não é mais alimentado pela planilha do Excel** (a carga foi desativada e removida) |
