@@ -133,7 +133,7 @@ async function api(page: Page, admin = false, forcarConflito = false, visualizad
 
 const abrirAba = async (page: Page) => {
   await page.goto('/')
-  await page.getByRole('tab', { name: 'Oportunidades' }).click()
+  await page.getByRole('tab', { name: 'Oportunidades', exact: true }).click()
   await expect(page.getByLabel('Buscar oportunidades')).toBeVisible()
 }
 

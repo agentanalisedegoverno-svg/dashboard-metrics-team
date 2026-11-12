@@ -66,7 +66,7 @@ test('texto hostil vindo da API é exibido como texto: grade, gaveta, histórico
   })
   await api(page, true)
   await page.goto('/')
-  await page.getByRole('tab', { name: 'Oportunidades' }).click()
+  await page.getByRole('tab', { name: 'Oportunidades', exact: true }).click()
   await expect(page.getByLabel('Buscar oportunidades')).toBeVisible()
   await expect(page.getByText(/5 de 5 oportunidades/)).toBeVisible()
   await semXss(page)
@@ -122,7 +122,7 @@ test('a aba de e-mails e a administração, com dados hostis, seguem acessíveis
 test('nada sensível vai para o armazenamento do navegador nem para cookies (só a preferência de tema)', async ({ page }) => {
   await api(page, true)
   await page.goto('/')
-  await page.getByRole('tab', { name: 'Oportunidades' }).click()
+  await page.getByRole('tab', { name: 'Oportunidades', exact: true }).click()
   await expect(page.getByLabel('Buscar oportunidades')).toBeVisible()
   const guardado = await page.evaluate(() => ({
     local: Object.keys(localStorage),
@@ -142,7 +142,7 @@ test('a tela não faz chamadas a servidores externos (tudo passa pelo próprio s
   })
   await api(page, true)
   await page.goto('/')
-  await page.getByRole('tab', { name: 'Oportunidades' }).click()
+  await page.getByRole('tab', { name: 'Oportunidades', exact: true }).click()
   await expect(page.getByLabel('Buscar oportunidades')).toBeVisible()
   await page.getByRole('tab', { name: 'Administração' }).click()
   expect(externas, `chamadas fora de ${origem}`).toEqual([])
