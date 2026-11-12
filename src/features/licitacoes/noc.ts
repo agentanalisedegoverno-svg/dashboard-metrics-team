@@ -7,6 +7,8 @@ import type { Oportunidade } from '@/domain/oportunidade'
 export type Nivel = 'critico' | 'atencao' | 'ok'
 export type Faixa = 'atrasado' | 'hoje' | 'amanha' | 'semana' | 'proximas' | 'sem_data'
 export type Grupo = 'certame' | 'contrato'
+/** Por que uma oportunidade precisa de ação (null = no prazo, nada a fazer). */
+export type Motivo = 'status_desatualizado' | 'pregao_hoje' | 'pregao_amanha' | 'cadastro_incompleto' | 'sem_data' | 'suspenso'
 
 export const FAIXAS: { id: Faixa; titulo: string }[] = [
   { id: 'atrasado', titulo: 'Pregão já passou' },
@@ -41,6 +43,15 @@ export function diasAte(data: string | null | undefined, hoje: Date): number | n
 export const faixaDe = (dias: number | null): Faixa =>
   dias === null ? 'sem_data' : dias < 0 ? 'atrasado' : dias === 0 ? 'hoje' : dias === 1 ? 'amanha' : dias <= 7 ? 'semana' : 'proximas'
 
+export const MOTIVOS: Record<Motivo, string> = {
+  status_desatualizado: 'Pregão já passou e o status não foi atualizado',
+  pregao_hoje: 'Pregão hoje: confirmar proposta e sessão',
+  pregao_amanha: 'Pregão amanhã: revisar proposta e documentos',
+  cadastro_incompleto: 'Cadastro incompleto (processo ou UF)',
+  sem_data: 'Sem data de pregão',
+  suspenso: 'Suspenso: confirmar retomada',
+}
+
 export type Falta = { chave: 'processo' | 'uf' | 'uasg' | 'link'; rotulo: string; bloqueia: boolean }
 
 /** O que falta no cadastro. Só processo e UF atrapalham a busca do edital; UASG e link ajudam, mas nem todo certame tem. */
@@ -54,7 +65,7 @@ export function faltas(o: Pick<Oportunidade, 'processo' | 'uf' | 'uasg' | 'site'
   return r
 }
 
-export type Avaliacao = { grupo: Grupo; faixa: Faixa; dias: number | null; nivel: Nivel; titulo: string; acao: string; faltas: Falta[] }
+export type Avaliacao = { grupo: Grupo; faixa: Faixa; dias: number | null; nivel: Nivel; motivo: Motivo | null; titulo: string; acao: string; faltas: Falta[] }
 
 const quando = (dias: number) => (dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias} dias`)
 
@@ -69,20 +80,20 @@ export function avaliar(o: Oportunidade, hoje: Date): Avaliacao | null {
   if (grupo === 'contrato') {
     const suspenso = ['suspended', 'suspenso', 'suspensa'].includes(fold(o.status))
     return suspenso
-      ? { grupo, faixa, dias, nivel: 'atencao', titulo: 'Suspenso', acao: 'Confirme com o órgão se há data de retomada e atualize o status quando houver.', faltas: f }
-      : { grupo, faixa, dias, nivel: 'ok', titulo: fold(o.status) === 'onboarding' ? 'Em implantação' : 'Em andamento', acao: 'Sem ação pendente no pregão. Acompanhe a execução.', faltas: f }
+      ? { grupo, faixa, dias, nivel: 'atencao', motivo: 'suspenso', titulo: 'Suspenso', acao: 'Confirme com o órgão se há data de retomada e atualize o status quando houver.', faltas: f }
+      : { grupo, faixa, dias, nivel: 'ok', motivo: null, titulo: fold(o.status) === 'onboarding' ? 'Em implantação' : 'Em andamento', acao: 'Sem ação pendente no pregão. Acompanhe a execução.', faltas: f }
   }
 
-  if (dias === null) return { grupo, faixa, dias, nivel: 'atencao', titulo: 'Sem data de pregão', acao: 'Informe a data do pregão no cadastro para o painel poder acompanhar.', faltas: f }
+  if (dias === null) return { grupo, faixa, dias, nivel: 'atencao', motivo: 'sem_data', titulo: 'Sem data de pregão', acao: 'Informe a data do pregão no cadastro para o painel poder acompanhar.', faltas: f }
   if (dias < 0)
-    return { grupo, faixa, dias, nivel: 'critico', titulo: `Pregão foi há ${-dias} dia${dias === -1 ? '' : 's'} e o status segue ${o.status}`, acao: 'Atualize o status (Win, Lost, No Go, Suspended…) ou a data, se o pregão foi remarcado.', faltas: f }
+    return { grupo, faixa, dias, nivel: 'critico', motivo: 'status_desatualizado', titulo: `Pregão foi há ${-dias} dia${dias === -1 ? '' : 's'} e o status segue ${o.status}`, acao: 'Atualize o status (Win, Lost, No Go, Suspended…) ou a data, se o pregão foi remarcado.', faltas: f }
   if (dias === 0) {
     const hora = o.hora_pregao ? ` às ${String(o.hora_pregao).slice(0, 5)}` : ''
-    return { grupo, faixa, dias, nivel: 'critico', titulo: `Pregão hoje${hora}`, acao: bloqueio ? 'Complete o cadastro (processo/UF) e confirme proposta, sessão e responsável.' : 'Confirme proposta enviada, sessão aberta e responsável.', faltas: f }
+    return { grupo, faixa, dias, nivel: 'critico', motivo: 'pregao_hoje', titulo: `Pregão hoje${hora}`, acao: bloqueio ? 'Complete o cadastro (processo/UF) e confirme proposta, sessão e responsável.' : 'Confirme proposta enviada, sessão aberta e responsável.', faltas: f }
   }
-  if (dias === 1) return { grupo, faixa, dias, nivel: bloqueio ? 'critico' : 'atencao', titulo: 'Pregão amanhã', acao: bloqueio ? 'Complete o cadastro (processo/UF) antes da sessão.' : 'Revise a proposta e os documentos antes da sessão.', faltas: f }
-  if (dias <= 7) return { grupo, faixa, dias, nivel: bloqueio ? 'atencao' : 'ok', titulo: `Pregão ${quando(dias)}`, acao: bloqueio ? 'Complete o cadastro (processo/UF) para localizar o edital.' : 'No prazo. Confira o edital e as retificações.', faltas: f }
-  return { grupo, faixa, dias, nivel: 'ok', titulo: `Pregão ${quando(dias)}`, acao: bloqueio ? 'Complete o cadastro (processo/UF) quando puder.' : 'No prazo.', faltas: f }
+  if (dias === 1) return { grupo, faixa, dias, nivel: bloqueio ? 'critico' : 'atencao', motivo: bloqueio ? 'cadastro_incompleto' : 'pregao_amanha', titulo: 'Pregão amanhã', acao: bloqueio ? 'Complete o cadastro (processo/UF) antes da sessão.' : 'Revise a proposta e os documentos antes da sessão.', faltas: f }
+  if (dias <= 7) return { grupo, faixa, dias, nivel: bloqueio ? 'atencao' : 'ok', motivo: bloqueio ? 'cadastro_incompleto' : null, titulo: `Pregão ${quando(dias)}`, acao: bloqueio ? 'Complete o cadastro (processo/UF) para localizar o edital.' : 'No prazo. Confira o edital e as retificações.', faltas: f }
+  return { grupo, faixa, dias, nivel: 'ok', motivo: null, titulo: `Pregão ${quando(dias)}`, acao: bloqueio ? 'Complete o cadastro (processo/UF) quando puder.' : 'No prazo.', faltas: f }
 }
 
 export type Linha = { o: Oportunidade; a: Avaliacao }

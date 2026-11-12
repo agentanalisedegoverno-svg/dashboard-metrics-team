@@ -69,6 +69,19 @@ describe('painel de licitações (NOC)', () => {
     expect([susp.nivel, susp.titulo]).toEqual(['atencao', 'Suspenso'])
   })
 
+  it('todo item que pede ação traz o motivo; no prazo não tem motivo', () => {
+    const m = (o: Parameters<typeof op>[0]) => avaliar(op(o), HOJE)!.motivo
+    expect(m({ data_pregao_dt: '2026-10-27' })).toBe('status_desatualizado')
+    expect(m({ data_pregao_dt: '2026-10-29' })).toBe('pregao_hoje')
+    expect(m({ data_pregao_dt: '2026-10-30' })).toBe('pregao_amanha')
+    expect(m({ data_pregao_dt: '2026-10-30', processo: '' })).toBe('cadastro_incompleto')
+    expect(m({ data_pregao_dt: '2026-11-03', processo: '' })).toBe('cadastro_incompleto')
+    expect(m({ data_pregao_dt: null })).toBe('sem_data')
+    expect(m({ status: 'Suspended' })).toBe('suspenso')
+    expect(m({ data_pregao_dt: '2026-11-03' })).toBeNull()
+    expect(m({ status: 'On going' })).toBeNull()
+  })
+
   it('monta: ignora arquivadas e outros status, e ordena por data (atrasados primeiro, sem data por último)', () => {
     const linhas = montar(
       [
