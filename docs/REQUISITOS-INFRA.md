@@ -1,6 +1,6 @@
 # Radar Pré-Vendas — Requisitos mínimos de infraestrutura (máquina com IP fixo)
 
-Versão 1.0 · 08/11/2026 · para o time de infraestrutura provisionar **uma máquina (VM)** que roda a consulta à API da ConLicitações a partir de um **IP público fixo**.
+Versão 1.1 · 12/11/2026 · para o time de infraestrutura provisionar **uma máquina (VM)** que roda a consulta à API da ConLicitações a partir de um **IP público fixo**.
 
 > **O que este documento NÃO cobre:** o site, a API, o banco, os backups e as rotinas de e-mail/Planner/monitor continuam na nuvem (Cloudflare Pages, Neon, GitHub Actions, Supabase e Drive) e **não precisam de máquina própria**. Quem é dono de cada conta está em [CONTAS-E-SERVICOS.md](CONTAS-E-SERVICOS.md). O dimensionamento do outro projeto (Radar TIC, captador de editais) é separado e está no repositório dele.
 
@@ -8,7 +8,7 @@ Versão 1.0 · 08/11/2026 · para o time de infraestrutura provisionar **uma má
 
 A API da ConLicitações (`consultaonline.conlicitacao.com.br/api`) recusa o token do Radar (HTTP 401) quando chamada pelo Cloudflare Pages. A suspeita é **restrição por IP de origem**: o Cloudflare sai por IPs variáveis, que não dá para cadastrar na ConLicitações. Uma máquina com **IP público fixo e saída dedicada** resolve, porque esse IP é informado à ConLicitações para liberação.
 
-> **Antes de provisionar, confirmar a causa** (ver seção 9, item 1). Se a ConLicitações liberar o token sem restrição de IP, a máquina deixa de ser necessária.
+> **Causa confirmada em 12/11/2026:** o token é válido (a consulta retornou HTTP 200 a partir de um IP liberado, pela VPN) e a ConLicitações recusa as chamadas feitas pelo Cloudflare Pages (HTTP 401, "Token inválido ou IP de origem não cadastrado"). É restrição por IP de origem. **A máquina só é necessária se a ConLicitações não retirar a restrição** (ver seção 10); pedir isso a eles vem primeiro.
 
 ## 2. Resumo para quem vai provisionar
 
@@ -99,7 +99,7 @@ O coletor ainda **não foi implementado**; a escolha abaixo muda só o segredo q
 
 **Antes de provisionar**
 
-1. **Confirmar a restrição por IP.** Com a VPN ligada, testar a chamada à API da ConLicitações **de uma máquina com IP conhecido** e comparar com a chamada pelo Cloudflare. Teste: `curl -s -o /dev/null -w "%{http_code}" -H "X-AUTH-TOKEN: $T" https://consultaonline.conlicitacao.com.br/api/filtros`, com o token numa variável `T` digitada na hora (nunca colada em chat ou arquivo). `200` no IP conhecido e `401` pelo Cloudflare confirma a restrição por IP; `401` nos dois indica problema no próprio token. Perguntar ao suporte da ConLicitações **quais IPs o token aceita**, **como cadastrar o novo IP** e **quais limites de chamadas por minuto/dia** a API aplica.
+1. ~~**Confirmar a restrição por IP.**~~ **Feito em 12/11/2026** (200 no IP liberado, 401 pelo Cloudflare). Procedimento usado: Com a VPN ligada, testar a chamada à API da ConLicitações **de uma máquina com IP conhecido** e comparar com a chamada pelo Cloudflare. Teste: `curl -s -o /dev/null -w "%{http_code}" -H "X-AUTH-TOKEN: $T" https://consultaonline.conlicitacao.com.br/api/filtros`, com o token numa variável `T` digitada na hora (nunca colada em chat ou arquivo). `200` no IP conhecido e `401` pelo Cloudflare confirma a restrição por IP; `401` nos dois indica problema no próprio token. Perguntar ao suporte da ConLicitações **quais IPs o token aceita**, **como cadastrar o novo IP** e **quais limites de chamadas por minuto/dia** a API aplica.
 2. **Decidir o destino do resultado** (seção 6) e criar o papel do banco correspondente.
 3. **Definir o dono da máquina e do IP fixo** (conta/centro de custo) e registrar em [CONTAS-E-SERVICOS.md](CONTAS-E-SERVICOS.md).
 
@@ -118,6 +118,6 @@ O coletor ainda **não foi implementado**; a escolha abaixo muda só o segredo q
 
 ## 10. Alternativas
 
-- **Sem máquina:** a ConLicitações remove a restrição de IP do token (ou aceita a faixa de IPs do provedor). É a opção mais simples; vale pedir antes de contratar a VM.
+- **Sem máquina (tentar primeiro):** a ConLicitações remove a restrição de IP do token. É a opção mais simples. Cadastrar as faixas de IP do Cloudflare não é uma boa saída: são faixas enormes e compartilhadas com outros clientes, e o IP de saída do Cloudflare Pages não é garantido nem estável, então a liberação seria frágil e pouco segura.
 - **Serviço gerenciado com IP de saída fixo** (por exemplo um serviço de nuvem com NAT dedicado): exige conta e cartão na nuvem escolhida; mesmo conjunto de requisitos de rede e segurança deste documento.
 - **Máquina pessoal na VPN:** só para testes. Não serve para produção (depende de uma pessoa ligada e logada, como o histórico do Planner mostrou em [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md)).
