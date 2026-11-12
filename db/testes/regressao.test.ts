@@ -413,6 +413,16 @@ describe('e-mail de nova oportunidade', () => {
     const p = await um<number>(`select id from oportunidades where chave_planilha = 'em1'`)
     expect(await naFila(p.id as number)).toBe(0)
   })
+  it('status Radar-TIC nunca envia e-mail (nova ou mudança para ele), mesmo marcado nos gatilhos; sair dele avisa', async () => {
+    await config(true, ['Go', 'Radar-TIC'])
+    expect(await naFila((await criar(db, opp({ status: 'Radar-TIC' }))).id)).toBe(0)
+    const a = await criar(db, opp({ status: 'Prospect' }))
+    const v2 = await atualizar(db, a.id, a.versao, opp({ status: 'Radar-TIC' }))
+    expect(await naFila(a.id)).toBe(0)
+    await atualizar(db, a.id, v2.versao, opp({ status: 'Go' }))
+    expect(await naFila(a.id)).toBe(1)
+  })
+
   it('mudança de status entra na fila (qualquer origem); outras edições e a carga da planilha não', async () => {
     const mudancas = async (id: number) => (await db.query<{ status_anterior: string | null; status_novo: string; alterado_por: string }>(
       `select status_anterior, status_novo, alterado_por from email_fila where oportunidade_id = $1 and tipo = 'status' order by id`, [id])).rows
