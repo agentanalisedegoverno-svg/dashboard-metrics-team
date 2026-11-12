@@ -29,7 +29,7 @@ const TABS = [
   ['meta', 'Metodologia & Maturidade'],
   ['plano', 'Plano de Ação'],
   ['oportunidades', 'Oportunidades'],
-  ['licitacoes', 'Licitações'],
+  ['licitacoes', 'Monitoramento das oportunidades'],
 ] as const
 
 export default function App() {

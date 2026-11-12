@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, RefreshCw, Search, S
 import { useMe, useOpcoes, useOportunidades } from '@/features/oportunidades/api'
 import { OportunidadeDrawer } from '@/features/oportunidades/OportunidadeDrawer'
 import type { Oportunidade } from '@/domain/oportunidade'
-import { FAIXAS, montar, type Faixa, type Linha, type Nivel } from './noc'
+import { FAIXAS, MOTIVOS, montar, type Faixa, type Linha, type Motivo, type Nivel } from './noc'
 
 type PncpItem = {
   numeroControlePNCP?: string; numeroCompra?: string; processo?: string; objetoCompra?: string; informacaoComplementar?: string
@@ -252,6 +252,11 @@ export default function MonitorLicitaçõesTab() {
   const [visao, setVisao] = useState<'certames' | 'contratos'>('certames')
   const [soAcao, setSoAcao] = useState(false)
   const [busca, setBusca] = useState('')
+  const [fStatus, setFStatus] = useState('')
+  const [fAnalista, setFAnalista] = useState('')
+  const [fUf, setFUf] = useState('')
+  const [fSegmento, setFSegmento] = useState('')
+  const [fMotivo, setFMotivo] = useState<Motivo | ''>('')
   const [fontes, setFontes] = useState(false)
   const [editando, setEditando] = useState<Oportunidade | null | undefined>(undefined)
   // Fontes públicas só rodam quando alguém abre o bloco "Fontes": a tela principal não depende delas e não faz rede à toa.
@@ -268,17 +273,30 @@ export default function MonitorLicitaçõesTab() {
   const agora = useMemo(() => new Date(), [lista.dataUpdatedAt])
   const todas = useMemo(() => montar(lista.data ?? [], agora), [lista.data, agora])
   const opsAtivas = useMemo(() => todas.map(l => l.o), [todas])
-  const certames = useMemo(() => todas.filter(l => l.a.grupo === 'certame'), [todas])
-  const contratos = useMemo(() => todas.filter(l => l.a.grupo === 'contrato'), [todas])
-  const visiveis = useMemo(() => {
+  const unicos = (f: (l: Linha) => string | null | undefined) => [...new Set(todas.map(f).map(v => String(v ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const opStatus = useMemo(() => unicos(l => l.o.status), [todas]) // eslint-disable-line react-hooks/exhaustive-deps
+  const opAnalista = useMemo(() => unicos(l => l.o.analista), [todas]) // eslint-disable-line react-hooks/exhaustive-deps
+  const opUf = useMemo(() => unicos(l => (l.o.uf ?? '').toUpperCase()), [todas]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Filtros de seleção valem para o placar, as abas e a lista: o placar sempre mostra o que sobra depois deles.
+  const filtradas = useMemo(() => {
     const q = fold(busca)
-    return (visao === 'certames' ? certames : contratos).filter(l =>
-      (!soAcao || l.a.nivel !== 'ok') &&
-      (visao !== 'certames' || !faixaSel || l.a.faixa === faixaSel) &&
+    return todas.filter(l =>
+      (!fStatus || l.o.status === fStatus) &&
+      (!fAnalista || l.o.analista === fAnalista) &&
+      (!fUf || (l.o.uf ?? '').toUpperCase() === fUf) &&
+      (!fSegmento || l.o.segmento === fSegmento) &&
       (!q || fold([l.o.codigo, l.o.sigla, l.o.orgao, l.o.processo, l.o.descritivo, l.o.objeto, l.o.uasg, l.o.analista].join(' ')).includes(q)))
-  }, [visao, certames, contratos, soAcao, faixaSel, busca])
+  }, [todas, busca, fStatus, fAnalista, fUf, fSegmento])
+  const comMotivo = useMemo(() => (fMotivo ? filtradas.filter(l => l.a.motivo === fMotivo) : filtradas), [filtradas, fMotivo])
+  const certames = useMemo(() => comMotivo.filter(l => l.a.grupo === 'certame'), [comMotivo])
+  const contratos = useMemo(() => comMotivo.filter(l => l.a.grupo === 'contrato'), [comMotivo])
+  const visiveis = useMemo(() => (visao === 'certames' ? certames : contratos).filter(l =>
+    (!soAcao || l.a.nivel !== 'ok') && (visao !== 'certames' || !faixaSel || l.a.faixa === faixaSel)), [visao, certames, contratos, soAcao, faixaSel])
   const nFaixa = (f: string) => certames.filter(l => l.a.faixa === f).length
-  const precisaAcao = todas.filter(l => l.a.nivel !== 'ok').length
+  const precisaAcao = filtradas.filter(l => l.a.nivel !== 'ok').length
+  const porMotivo = (Object.keys(MOTIVOS) as Motivo[]).map(m => ({ m, n: filtradas.filter(l => l.a.motivo === m).length })).filter(x => x.n > 0)
+  const temFiltro = Boolean(fStatus || fAnalista || fUf || fSegmento || fMotivo || busca || soAcao || faixaSel)
+  const limpar = () => { setFStatus(''); setFAnalista(''); setFUf(''); setFSegmento(''); setFMotivo(''); setBusca(''); setSoAcao(false); setFaixaSel('') }
   const atualizando = lista.isFetching || comprasGov.isFetching || conlicitacao.isFetching
   const atualizar = async () => {
     await Promise.all([
@@ -301,15 +319,26 @@ export default function MonitorLicitaçõesTab() {
     <button key={id} type="button" onClick={() => setVisao(id)} aria-pressed={visao === id} className={'rounded-lg border px-3 py-1.5 text-xs font-semibold ' + (visao === id ? 'border-gold bg-gold-soft text-ink' : 'border-line text-muted hover:bg-surface-2')}>{rotulo} ({n})</button>
   )
 
-  return <section className="mt-5 space-y-5" aria-label="Monitoramento de licitações">
+  return <section className="mt-5 space-y-5" aria-label="Monitoramento das oportunidades">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Painel de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento de licitações</h1><p className="mt-1 max-w-3xl text-sm text-muted">Placar por urgência das oportunidades em andamento: clique numa faixa para filtrar. Cada linha mostra a situação, a próxima ação e o que falta no cadastro.</p></div>
+      <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Painel de certames</p><h1 className="mt-1 text-2xl text-ink">Monitoramento das oportunidades</h1><p className="mt-1 max-w-3xl text-sm text-muted">Placar por urgência das oportunidades em andamento: clique numa faixa para filtrar. Cada linha mostra a situação, a próxima ação e o que falta no cadastro.</p></div>
       <div className="flex items-center gap-3"><span className="text-xs text-muted" aria-live="polite">Atualizado às {atualizadoEm} · relê a cada 2 min</span><button onClick={atualizar} disabled={atualizando} className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"><RefreshCw className={'size-4 ' + (atualizando ? 'animate-spin' : '')} /> Atualizar</button></div>
     </div>
     {lista.error && <div role="alert" className="rounded-lg border border-st-critical/30 bg-surface p-4 text-sm text-ink-soft">Não foi possível ler as oportunidades do Radar: {(lista.error as Error).message}</div>}
     <div role="group" aria-label="Placar por urgência (clique para filtrar)" className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
       {placar('acao', 'Precisam de ação', precisaAcao, 'atencao', soAcao, () => setSoAcao(v => !v))}
       {FAIXAS.map(f => placar(f.id, f.titulo, nFaixa(f.id), TOM_FAIXA[f.id], faixaSel === f.id, () => escolherFaixa(f.id)))}
+    </div>
+
+    {porMotivo.length > 0 && <div role="group" aria-label="Motivo da ação (clique para filtrar)" className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-semibold text-ink-soft">Por que precisam de ação:</span>
+      {porMotivo.map(({ m, n }) => <button key={m} type="button" aria-pressed={fMotivo === m} onClick={() => setFMotivo(x => (x === m ? '' : m))} className={'rounded-full border px-3 py-1 text-xs font-semibold ' + (fMotivo === m ? 'border-gold bg-gold-soft text-ink' : 'border-line text-ink-soft hover:bg-surface-2')}>{MOTIVOS[m]} ({n})</button>)}
+    </div>}
+
+    <div className="flex flex-wrap items-center gap-2">
+      {([['Filtrar por status', fStatus, setFStatus, opStatus, 'Todos os status'], ['Filtrar por pré-vendas', fAnalista, setFAnalista, opAnalista, 'Todos os pré-vendas'], ['Filtrar por UF', fUf, setFUf, opUf, 'Todas as UFs'], ['Filtrar por segmento', fSegmento, setFSegmento, ['Corporate', 'Público'], 'Todos os segmentos']] as const).map(([rotulo, valor, set, opcoesSel, todos]) =>
+        <select key={rotulo} aria-label={rotulo} value={valor} onChange={e => set(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink"><option value="">{todos}</option>{opcoesSel.map(v => <option key={v} value={v}>{v}</option>)}</select>)}
+      {temFiltro && <button type="button" onClick={limpar} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2">Limpar filtros</button>}
     </div>
 
     <div className="flex flex-wrap items-center gap-2">
