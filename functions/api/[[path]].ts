@@ -35,7 +35,7 @@ export const onRequest = async ({ request, env, params }: Ctx): Promise<Response
     const [status] = (await sql`
       -- total_linhas = oportunidades vigentes AGORA (a coluna da carga ficava velha e contava as "ausentes")
       select greatest(ultima_carga_em, (select max(atualizado_em) from oportunidades)) as ultima_carga_em, erro,
-             (select count(*)::int from oportunidades where arquivado_em is null and not ausente_na_planilha) as total_linhas
+             (select count(*)::int from oportunidades where arquivado_em is null and not ausente_na_planilha and status is distinct from 'Radar-TIC') as total_linhas
       from carga_status where id = 1`) as {
       ultima_carga_em: string | null
       total_linhas: number
@@ -49,7 +49,9 @@ export const onRequest = async ({ request, env, params }: Ctx): Promise<Response
                motivo_no_go as "motivoNoGo", motivo_lost as "motivoLost", conta_vinculada as "contaVinculada",
                orcamento::float8 as orcamento, valor_ctc::float8 as "valorCtc", valor_vencedor::float8 as "valorVencedor",
                sla::float8 as sla, processo, orgao, descritivo, data_pregao as "dataPregao", acao_ia as "acaoIA"
-        from oportunidades where arquivado_em is null and not ausente_na_planilha order by id`
+        from oportunidades where arquivado_em is null and not ausente_na_planilha
+          and status is distinct from 'Radar-TIC' -- status Radar-TIC não entra nas métricas nem nos filtros do painel
+        order by id`
       return send(200, { rows, updatedAt: lastSyncAt, isMock: false })
     }
     return send(200, { lastSyncAt, rowCount: status?.total_linhas ?? 0, error: status?.erro ?? null, isMock: false })

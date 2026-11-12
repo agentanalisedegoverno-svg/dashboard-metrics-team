@@ -57,6 +57,16 @@ describe('API de leitura (Postgres)', () => {
     expect(await res.json()).toEqual({ rows: [{ ano: '2026', status: 'Win', orcamento: 10 }], updatedAt: '2026-10-11T00:08:41.960Z', isMock: false })
   })
 
+  it('o status Radar-TIC fica fora das métricas: as duas consultas do painel o excluem', async () => {
+    sqlMock
+      .mockResolvedValueOnce([{ ultima_carga_em: null, total_linhas: 0, erro: null }])
+      .mockResolvedValueOnce([])
+    await call('rows')
+    const textos = sqlMock.mock.calls.map((c) => (c[0] as string[]).join(' '))
+    expect(textos).toHaveLength(2)
+    for (const t of textos) expect(t).toMatch(/status is distinct from 'Radar-TIC'/)
+  })
+
   it('status e sync respondem com contagem e erro da última carga', async () => {
     const row = { ultima_carga_em: '2026-10-11T00:08:41.960Z', total_linhas: 590, erro: null }
     sqlMock.mockResolvedValue([row])
