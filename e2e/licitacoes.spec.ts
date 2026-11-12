@@ -29,8 +29,8 @@ async function abrir(page: Page, pncpItens: unknown[] = []) {
   await page.route('**/comprasgov/**', (r) => { chamadas.push('comprasgov'); return r.fulfill({ json: { resultado: [] } }) })
   await page.route('**/conlicitacao', (r) => { chamadas.push('conlicitacao'); return r.fulfill({ json: { resultado: [] } }) })
   await page.goto('/')
-  await page.getByRole('tab', { name: 'Licitações' }).click()
-  await expect(page.getByRole('heading', { name: 'Monitoramento de licitações' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Monitoramento das oportunidades' }).click()
+  await expect(page.getByRole('heading', { name: 'Monitoramento das oportunidades' })).toBeVisible()
   return { chamadas }
 }
 
@@ -125,6 +125,6 @@ test('"Abrir cadastro" abre o formulário da oportunidade e o link do edital só
 
 test('acessibilidade do painel', async ({ page }) => {
   await abrir(page)
-  const r = await new AxeBuilder({ page }).include('section[aria-label="Monitoramento de licitações"]').analyze()
+  const r = await new AxeBuilder({ page }).include('section[aria-label="Monitoramento das oportunidades"]').analyze()
   expect(r.violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([])
 })

@@ -45,7 +45,7 @@ test('abre a aba com 5.000 linhas dentro do orçamento e só desenha as linhas v
   await api(page)
   await page.goto('/')
   const t0 = Date.now()
-  await page.getByRole('tab', { name: 'Oportunidades' }).click()
+  await page.getByRole('tab', { name: 'Oportunidades', exact: true }).click()
   await expect(page.getByText(new RegExp(`${N} de ${N} oportunidades`))).toBeVisible({ timeout: 15_000 })
   const ms = Date.now() - t0
   registra(`5.000 linhas visíveis em ${ms} ms`)
@@ -64,7 +64,7 @@ test('rolar até o fim, ordenar e buscar continuam fluidos, sem tarefas longas q
     new PerformanceObserver((lista) => lista.getEntries().forEach((e) => w.__longtasks.push(e.duration))).observe({ entryTypes: ['longtask'] })
   })
   await page.goto('/')
-  await page.getByRole('tab', { name: 'Oportunidades' }).click()
+  await page.getByRole('tab', { name: 'Oportunidades', exact: true }).click()
   await expect(page.getByText(new RegExp(`${N} de ${N} oportunidades`))).toBeVisible({ timeout: 15_000 })
 
   // rolar até o final da lista
@@ -102,7 +102,7 @@ test('consumo de memória do navegador com 5.000 linhas fica sob controle', asyn
   test.skip(browserName !== 'chromium', 'performance.memory só existe no Chromium')
   await api(page)
   await page.goto('/')
-  await page.getByRole('tab', { name: 'Oportunidades' }).click()
+  await page.getByRole('tab', { name: 'Oportunidades', exact: true }).click()
   await expect(page.getByText(new RegExp(`${N} de ${N} oportunidades`))).toBeVisible({ timeout: 15_000 })
   const mb = await page.evaluate(() => ((performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0) / 1024 / 1024)
   registra(`heap JS: ${mb.toFixed(0)} MB`)
