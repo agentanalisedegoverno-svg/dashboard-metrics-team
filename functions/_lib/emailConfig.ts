@@ -32,7 +32,7 @@ export async function salvarEmailConfig(sql: Sql, email: string, corpo: unknown)
   if (!parsed.success) return send(422, { error: 'Dados inválidos.', erros: errosZod(parsed.error) })
   const c = parsed.data
   try {
-    await sql`select salvar_email_config(${c.ativo}, ${c.status}::text[], ${JSON.stringify(c.destinatarios)}::jsonb, ${email}, ${c.avisar_pre_vendas})`
+    await sql`select salvar_email_config(${c.ativo}, (select coalesce(array_agg(x), '{}'::text[]) from jsonb_array_elements_text(${JSON.stringify(c.status)}::jsonb) as x), ${JSON.stringify(c.destinatarios)}::jsonb, ${email}, ${c.avisar_pre_vendas})`
     return send(200, { ok: true })
   } catch (e) {
     return erroBanco(e)

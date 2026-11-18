@@ -11,7 +11,7 @@
 //
 // Idempotente: cada oportunidade só gera novo evento quando sua `versao` aumenta.
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { neon } from '@neondatabase/serverless'
+import { neon } from './banco.mjs'
 import { montarEvento, nomeArquivo } from '../functions/_lib/planner.ts'
 
 const args = process.argv.slice(2)

@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless'
+import { neon } from '../_lib/banco'
 import { verifyAccessJwt } from '../_lib/access'
 
 type Env = { DATABASE_URL?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string; ACESSO_PUBLICO?: string }

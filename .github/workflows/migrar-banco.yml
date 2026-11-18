@@ -1,0 +1,66 @@
+name: Migrar banco
+
+# CI/CD do banco (Azure Database for PostgreSQL): aplica, em ordem, só as migrações de db/migrations/ que ainda não
+# constam na tabela schema_migracoes. Cada arquivo roda numa transação (ou tudo, ou nada) e só é registrado se der certo.
+# Dispara quando uma migração nova entra na main, ou manualmente (com a opção "só listar" para conferir antes).
+# O log deste repositório é público: só nomes de arquivo e contagens são impressos (nunca dados, endereços ou senhas).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'db/migrations/**'
+  workflow_dispatch:
+    inputs:
+      somente_listar:
+        description: 'Só listar o que seria aplicado (não altera o banco)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrar-banco
+  cancel-in-progress: false
+
+jobs:
+  migrar:
+    name: Aplicar migrações pendentes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL_MIGRACAO: ${{ secrets.DATABASE_URL_MIGRACAO }}
+      LISTAR: ${{ github.event_name == 'workflow_dispatch' && inputs.somente_listar }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Conferir configuração
+        run: |
+          if [ -z "$DATABASE_URL_MIGRACAO" ]; then
+            echo "::error::Segredo DATABASE_URL_MIGRACAO não configurado (dono do banco; ver docs/BACKUP.md)."
+            exit 1
+          fi
+
+      - name: Aplicar pendentes
+        run: |
+          set -euo pipefail
+          psqlc() { docker run --rm -i -e DATABASE_URL_MIGRACAO -v "$PWD/db/migrations:/m:ro" postgres:17 sh -c "$1"; }
+          aplicadas=$(psqlc 'psql "$DATABASE_URL_MIGRACAO" -At -c "select arquivo from schema_migracoes order by 1"')
+          echo "Já aplicadas: $(echo "$aplicadas" | grep -c . || true)"
+          pendentes=0
+          for f in $(ls db/migrations/*.sql | sort); do
+            nome=$(basename "$f")
+            if echo "$aplicadas" | grep -qx "$nome"; then continue; fi
+            pendentes=$((pendentes+1))
+            echo "Pendente: $nome"
+            if [ "$LISTAR" = "true" ]; then continue; fi
+            # ';;' separa os comandos nas migrações (para o PGlite e o driver); no psql basta um ';'.
+            sed 's/;;/;/g' "$f" > "/tmp/$nome"
+            docker run --rm -e DATABASE_URL_MIGRACAO -v "/tmp/$nome:/x.sql:ro" postgres:17 \
+              sh -c 'psql "$DATABASE_URL_MIGRACAO" -v ON_ERROR_STOP=1 --single-transaction -q -f /x.sql' >/dev/null
+            docker run --rm -e DATABASE_URL_MIGRACAO postgres:17 \
+              sh -c "psql \"\$DATABASE_URL_MIGRACAO\" -v ON_ERROR_STOP=1 -q -c \"insert into schema_migracoes (arquivo, origem) values ('$nome', 'github-actions')\""
+            echo "Aplicada: $nome"
+          done
+          echo "### Migrações pendentes: $pendentes" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$LISTAR" = "true" ]; then echo "(modo só listar: nada foi alterado)" >> "$GITHUB_STEP_SUMMARY"; fi
