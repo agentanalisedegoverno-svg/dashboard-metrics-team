@@ -1,4 +1,4 @@
-"""Estado do planner-auto no banco (Neon), para rodar na nuvem sem disco fixo (GitHub Actions: .github/workflows/planner-integracao.yml).
+"""Estado do planner-auto no banco (Postgres), para rodar na nuvem sem disco fixo (GitHub Actions: .github/workflows/planner-integracao.yml).
 
 Guarda no banco, CIFRADOS com a chave PLANNER_ESTADO_CHAVE (Fernet), os dois arquivos que ficam em ~/.planner_auto:
   token_cache.json   token do login Microsoft (contém o refresh token)
@@ -10,17 +10,18 @@ Comandos:
   preparar    cria config.json a partir das variáveis de ambiente (o job não tem o arquivo)
 
 Variáveis: DATABASE_URL_PLANNER, PLANNER_ESTADO_CHAVE, e (preparar) PLANNER_CLIENT_ID e PLANNER_TENANT_ID.
-O acesso ao banco usa a API SQL sobre HTTPS do Neon (só `requests`, sem driver de Postgres).
+O acesso ao banco usa o driver psycopg2 (TCP, SSL), compatível com qualquer Postgres (Azure, Neon, Supabase).
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
 
-import requests
+import psycopg2
+import psycopg2.extras
 
 BASE = Path(__file__).resolve().parent
 HOME_DIR = Path.home() / ".planner_auto"
@@ -52,18 +53,20 @@ def decifrar(token: str, chave: str) -> str:
 
 
 def sql(consulta: str, params: list | None = None) -> list[dict]:
-    """Executa uma consulta pela API SQL HTTP do Neon e devolve as linhas."""
+    """Executa uma consulta no Postgres (psycopg2) e devolve as linhas como dicionários.
+
+    Os parâmetros continuam no formato `$1, $2...` (como na versão HTTP antiga); são vinculados, nunca concatenados."""
     url = _env("DATABASE_URL_PLANNER")
-    host = urlparse(url).hostname
-    r = requests.post(
-        f"https://{host}/sql",
-        headers={"Neon-Connection-String": url, "Content-Type": "application/json"},
-        data=json.dumps({"query": consulta, "params": params or []}),
-        timeout=30,
-    )
-    if r.status_code != 200:
-        sys.exit(f"Banco recusou a consulta ({r.status_code}): {r.text[:200]}")
-    return r.json().get("rows", [])
+    ordem = [int(n) for n in re.findall(r"\$(\d+)", consulta)]
+    texto = re.sub(r"\$\d+", "%s", consulta)
+    valores = [(params or [])[n - 1] for n in ordem]
+    try:
+        with psycopg2.connect(url, connect_timeout=20) as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(texto, valores)
+                return [dict(r) for r in cur.fetchall()] if cur.description else []
+    except psycopg2.Error as e:
+        sys.exit(f"Banco recusou a consulta: {str(e).strip()[:200]}")
 
 
 def restaurar() -> None:
