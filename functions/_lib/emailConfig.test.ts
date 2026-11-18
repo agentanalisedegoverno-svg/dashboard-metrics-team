@@ -30,7 +30,7 @@ describe('salvarEmailConfig', () => {
     const res = await salvarEmailConfig(sql, 'adm@ctctech.com.br', valido)
     expect(res.status).toBe(200)
     const chamada = (sql as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(chamada.slice(1)).toEqual([true, ['Go'], JSON.stringify([{ email: 'ana@ctctech.com.br', tipo: 'para', ativo: true }]), 'adm@ctctech.com.br', true])
+    expect(chamada.slice(1)).toEqual([true, JSON.stringify(['Go']), JSON.stringify([{ email: 'ana@ctctech.com.br', tipo: 'para', ativo: true }]), 'adm@ctctech.com.br', true])
   })
   it('recusa e-mail inválido e excesso de destinatários sem tocar no banco', async () => {
     const sql = vi.fn() as unknown as Sql

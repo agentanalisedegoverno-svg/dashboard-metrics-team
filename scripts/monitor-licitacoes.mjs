@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { neon } from '@neondatabase/serverless'
+import { neon } from './banco.mjs'
 
 const databaseUrl = process.env.DATABASE_URL_MONITOR
 if (!databaseUrl) {

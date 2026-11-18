@@ -2,7 +2,7 @@
  * Infraestrutura comum das rotas de cadastro: identidade (Cloudflare Access), proteção CSRF,
  * mapeamento dos erros do Postgres (SQLSTATE próprios) para respostas HTTP.
  */
-import { neon } from '@neondatabase/serverless'
+import { neon } from './banco'
 import { verifyAccessIdentity } from './access'
 
 export type Env = {

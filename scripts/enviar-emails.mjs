@@ -11,7 +11,7 @@
 //   --simular  conta o que seria enviado, sem enviar e sem gravar nada (não precisa de SMTP).
 //
 // O arquivo de log do GitHub é PÚBLICO: aqui só saem contagens, nunca endereços nem dados de oportunidades.
-import { neon } from '@neondatabase/serverless'
+import { neon } from './banco.mjs'
 import nodemailer from 'nodemailer'
 import { processarFila } from '../functions/_lib/emailFila.ts'
 

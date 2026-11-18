@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sqlMock = vi.fn()
-vi.mock('@neondatabase/serverless', () => ({ neon: () => sqlMock }))
+vi.mock('../_lib/banco', () => ({ neon: () => sqlMock }))
 const verify = vi.fn()
 vi.mock('../_lib/access', () => ({ verifyAccessJwt: (...a: unknown[]) => verify(...a) }))
 

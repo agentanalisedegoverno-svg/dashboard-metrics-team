@@ -3,7 +3,7 @@
 //
 // Uso: DATABASE_URL=postgresql://... node scripts/medir-banco.mjs [--requisicoes 20] [--simultaneas 1,5,10]
 //      (qualquer papel com SELECT em oportunidades serve, ex.: radar_leitor)
-import { neon } from '@neondatabase/serverless'
+import { neon } from './banco.mjs'
 
 const args = process.argv.slice(2)
 const val = (f, d) => (args.includes(f) ? args[args.indexOf(f) + 1] : d)

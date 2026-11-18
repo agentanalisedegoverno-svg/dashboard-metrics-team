@@ -1,6 +1,8 @@
 name = "dashboard-metrics-team"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-10-09"
+# TCP para o Postgres (Azure) pelo driver "postgres"
+compatibility_flags = ["nodejs_compat"]
 
 # Cloudflare Access (Zero Trust): login por código enviado ao e-mail @ctctech.com.br.
 # Não são segredos. A API valida o JWT do Access em QUALQUER endereço do projeto
