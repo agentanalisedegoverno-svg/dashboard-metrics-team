@@ -20,8 +20,6 @@ import re
 import sys
 from pathlib import Path
 
-import psycopg2
-import psycopg2.extras
 
 BASE = Path(__file__).resolve().parent
 HOME_DIR = Path.home() / ".planner_auto"
@@ -56,6 +54,9 @@ def sql(consulta: str, params: list | None = None) -> list[dict]:
     """Executa uma consulta no Postgres (psycopg2) e devolve as linhas como dicionários.
 
     Os parâmetros continuam no formato `$1, $2...` (como na versão HTTP antiga); são vinculados, nunca concatenados."""
+    import psycopg2  # importado aqui: os testes (CI, sem dependências extras) não precisam do driver
+    import psycopg2.extras
+
     url = _env("DATABASE_URL_PLANNER")
     ordem = [int(n) for n in re.findall(r"\$(\d+)", consulta)]
     texto = re.sub(r"\$\d+", "%s", consulta)
