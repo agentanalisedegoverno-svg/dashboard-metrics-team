@@ -1,18 +1,18 @@
 name: Vigia do backup
 
-# Alerta (falha do workflow = e-mail do GitHub) se o backup diário não rodou com sucesso nas últimas N horas
-# ou se o último teste de restauração está velho. Roda todo dia depois da janela do backup.
+# Alerta (falha do workflow = e-mail do GitHub) se o backup (a cada 6 h) não rodou com sucesso nas últimas N horas
+# ou se o último teste de restauração (semanal) está velho. Roda a cada 6 horas, entre as janelas do backup.
 on:
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '23 3,9,15,21 * * *'
   workflow_dispatch:
     inputs:
       max_horas_backup:
         description: 'Idade máxima aceita do último backup bem-sucedido (horas). Use 0 para forçar uma falha de teste.'
-        default: '30'
+        default: '12'
       max_dias_restauracao:
         description: 'Idade máxima aceita do último teste de restauração (dias)'
-        default: '40'
+        default: '10'
 
 permissions:
   actions: read
@@ -25,8 +25,8 @@ jobs:
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
-      MAX_H: ${{ inputs.max_horas_backup || '30' }}
-      MAX_D: ${{ inputs.max_dias_restauracao || '40' }}
+      MAX_H: ${{ inputs.max_horas_backup || '12' }}
+      MAX_D: ${{ inputs.max_dias_restauracao || '10' }}
       DATABASE_URL_BACKUP: ${{ secrets.DATABASE_URL_BACKUP }}
     steps:
       - name: Último backup bem-sucedido

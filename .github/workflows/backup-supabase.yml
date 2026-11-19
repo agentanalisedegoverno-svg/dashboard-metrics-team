@@ -1,13 +1,13 @@
 name: Backup no Supabase
 
-# Segunda cópia do banco (redundância): restaura o Neon, uma vez por dia, num Postgres do Supabase.
+# Segunda cópia do banco (redundância): restaura o banco de produção (Azure), 4 vezes por dia, num Postgres do Supabase.
 # O backup criptografado no Google Drive (backup-banco.yml) continua sendo o principal; este é um espelho pronto para uso.
 # Também mantém o projeto do Supabase ativo (o plano gratuito pausa após 7 dias sem atividade): a restauração diária já é atividade
 # e, se SUPABASE_URL e SUPABASE_ANON_KEY existirem, um ping na API REST reforça. Ver docs/BACKUP.md.
 # O log deste repositório é público: só contagens são impressas (nunca dados, endereços ou senhas).
 on:
   schedule:
-    - cron: '30 7 * * *'
+    - cron: '13 3,9,15,21 * * *'
   workflow_dispatch:
 
 permissions:
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   espelho:
-    name: pg_dump (Neon) → restaurar no Supabase
+    name: pg_dump (produção) → restaurar no Supabase
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

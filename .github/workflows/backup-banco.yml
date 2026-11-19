@@ -1,10 +1,11 @@
 name: Backup do banco
 
 # Dump completo (schema, dados, funções e gatilhos) do Neon, criptografado, enviado ao Google Drive.
-# Diário às 03:00 (Brasília); aos domingos também grava uma cópia semanal. Ver docs/BACKUP.md.
+# A cada 6 horas (00:47, 06:47, 12:47 e 18:47 UTC; o minuto 47 foge do pico de atraso do GitHub); no domingo a primeira
+# execução também grava uma cópia semanal. Ver docs/BACKUP.md e docs/PLANO-DE-ACAO-BANCO.md (R2).
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '47 0,6,12,18 * * *'
   workflow_dispatch:
     inputs:
       semanal:
@@ -103,7 +104,8 @@ jobs:
           rc mkdir gd:semanal
           rc copy "/out/radar-$STAMP.dump.enc" gd:diario/
           rc copy "/out/radar-$STAMP.dump.enc.sha256" gd:diario/
-          if [ "$(date -u +%u)" = "7" ] || [ "$FORCAR_SEMANAL" = "true" ]; then
+          # Semanal: no domingo (execuções antes do meio-dia UTC) ou sob demanda.
+          if { [ "$(date -u +%u)" = "7" ] && [ "$(date -u +%H)" -lt 12 ]; } || [ "$FORCAR_SEMANAL" = "true" ]; then
             rc copy "/out/radar-$STAMP.dump.enc" gd:semanal/
             rc copy "/out/radar-$STAMP.dump.enc.sha256" gd:semanal/
           fi

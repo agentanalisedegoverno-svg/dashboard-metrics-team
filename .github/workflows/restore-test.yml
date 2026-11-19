@@ -1,20 +1,19 @@
 name: Teste de restauração do backup
 
-# Prova que o último backup do Drive abre e restaura, em DOIS destinos:
-#  - "temporario": Postgres 17 descartável no próprio runner;
-#  - "neon": um branch real do Neon (teste-restauracao, banco restore_drill, papel radar_restore isolado da produção).
+# Prova que o último backup do Drive abre e restaura num Postgres 17 descartável no próprio runner (não depende de
+# nenhum provedor de banco). Semanal (segunda, 12:30 UTC) e sob demanda.
 # Baixa, confere o hash, descriptografa, restaura, compara com a produção e executa um cadastro de verdade
-# (desfeito) para provar que funções e gatilhos funcionam. Mensal e sob demanda.
+# (desfeito) para provar que funções e gatilhos funcionam.
 on:
   schedule:
-    - cron: '0 12 1 * *'
+    - cron: '30 12 * * 1'
   workflow_dispatch:
     inputs:
       alvo:
         description: 'Onde restaurar'
         type: choice
-        options: [ambos, temporario, neon]
-        default: ambos
+        options: [temporario]
+        default: temporario
 
 permissions:
   contents: read
@@ -30,14 +29,8 @@ jobs:
       alvos: ${{ steps.escolher.outputs.alvos }}
     steps:
       - id: escolher
-        env:
-          ALVO: ${{ inputs.alvo }}
         run: |
-          if [ -z "$ALVO" ] || [ "$ALVO" = "ambos" ]; then
-            echo 'alvos=["temporario","neon"]' >> "$GITHUB_OUTPUT"
-          else
-            echo "alvos=[\"$ALVO\"]" >> "$GITHUB_OUTPUT"
-          fi
+          echo 'alvos=["temporario"]' >> "$GITHUB_OUTPUT"
 
   restaurar:
     name: Restaurar em ${{ matrix.alvo }}
@@ -100,21 +93,8 @@ jobs:
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:BACKUP_PASSPHRASE -in "$ARQUIVO" -out radar.dump
           echo "Dump descriptografado: $(stat -c %s radar.dump) bytes"
 
-      - name: Prepara o destino (${{ matrix.alvo }})
-        env:
-          DATABASE_URL_RESTORE: ${{ secrets.DATABASE_URL_RESTORE }}
-        run: |
-          if [ "${{ matrix.alvo }}" = "neon" ]; then
-            [ -n "$DATABASE_URL_RESTORE" ] || { echo "::error::Segredo DATABASE_URL_RESTORE não configurado"; exit 1; }
-            # O segredo aponta para o banco administrativo (neondb) do branch de teste; o drill usa o banco restore_drill.
-            ALVO=$(python3 -c "import os,urllib.parse as u; p=u.urlsplit(os.environ['DATABASE_URL_RESTORE']); print(p._replace(path='/restore_drill').geturl())")
-            echo "::add-mask::$ALVO"
-            echo "ALVO_URL=$ALVO" >> "$GITHUB_ENV"
-            docker run --rm --network host postgres:17 psql "$DATABASE_URL_RESTORE" -v ON_ERROR_STOP=1 \
-              -c "DROP DATABASE IF EXISTS restore_drill WITH (FORCE)" -c "CREATE DATABASE restore_drill"
-          else
-            echo "ALVO_URL=postgresql://postgres:teste@127.0.0.1:5432/restore" >> "$GITHUB_ENV"
-          fi
+      - name: Prepara o destino (Postgres temporário)
+        run: echo "ALVO_URL=postgresql://postgres:teste@127.0.0.1:5432/restore" >> "$GITHUB_ENV"
 
       - name: Restaura
         run: |

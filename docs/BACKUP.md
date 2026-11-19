@@ -77,3 +77,14 @@ Depois de restaurar, **recrie os papéis e permissões** (`radar_leitor`, `radar
 ## Manutenção do branch de teste
 
 O branch `teste-restauracao` e o banco `restore_drill` existem só para o drill e são sobrescritos a cada teste. O branch nasceu como cópia da produção (contém dados reais até o primeiro teste mensal, que os substitui pelo conteúdo do backup). Se for apagado ou recriado: criar o branch, criar o papel `radar_restore` **no branch** (`neonctl roles create --name radar_restore --branch teste-restauracao`), o banco `restore_drill` com esse dono e atualizar o secret `DATABASE_URL_RESTORE`. Confira sempre que o *host* da URL é o do branch, não o da produção.
+
+## Rotina vigente (a partir de 19/11/2026)
+
+| Workflow | Quando (UTC) | O que faz |
+|---|---|---|
+| *Backup do banco* | **a cada 6 h** (00:47, 06:47, 12:47, 18:47) | dump do Azure, criptografado, para o Drive (`diario/`; 1ª execução do domingo também em `semanal/`) |
+| *Backup no Supabase* | 4x/dia (03:13, 09:13, 15:13, 21:13) | espelho do Azure no Supabase |
+| *Teste de restauração* | **semanal** (segunda 12:30) | restaura o último backup do Drive num Postgres temporário e executa um cadastro de teste (desfeito) |
+| *Vigia do backup* | a cada 6 h (03:23, 09:23, 15:23, 21:23) | falha (e-mail do GitHub) se o último backup tem mais de **12 h** ou o último teste de restauração mais de **10 dias** |
+
+Meta: perder no máximo ~6 h de dados (RPO) e voltar em até 1 h (RTO, ver `PLANO-DE-ACAO-BANCO.md`). O Azure ainda guarda 7 dias de pontos de restauração próprios (restauração para um novo servidor). O minuto "quebrado" das agendas (:47, :13, :23) evita o pico de atraso do GitHub no início da hora. O destino "branch do Neon" do teste de restauração foi aposentado; o segredo `DATABASE_URL_RESTORE` não é mais usado.
