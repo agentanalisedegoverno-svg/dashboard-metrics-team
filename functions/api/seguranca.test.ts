@@ -90,6 +90,7 @@ describe('descoberta de rotas', () => {
       './oportunidades/[id]/arquivar.ts',
       './oportunidades/[id]/historico.ts',
       './oportunidades/[id]/restaurar.ts',
+      './oportunidades/arquivar-lote.ts',
       './oportunidades/index.ts',
       './pncp/[[path]].ts',
       './usuarios.ts',

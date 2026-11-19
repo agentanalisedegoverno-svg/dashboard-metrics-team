@@ -103,6 +103,15 @@ export const useArquivar = () => {
   })
 }
 
+/** Arquiva em lote (administradores): o servidor só aceita oportunidades ativas no status Radar-TIC. */
+export const useArquivarLote = () => {
+  const invalidar = useInvalidar()
+  return useMutation({
+    mutationFn: (ids: number[]) => chamar<{ arquivadas: number }>('/oportunidades/arquivar-lote', { method: 'POST', body: { ids } }),
+    onSuccess: invalidar,
+  })
+}
+
 export const useSalvarOpcao = () => {
   const invalidar = useInvalidar()
   return useMutation({ mutationFn: (o: { lista: string; valor: string; ativo: boolean; ordem: number }) => chamar('/opcoes', { method: 'PUT', body: o }), onSuccess: invalidar })

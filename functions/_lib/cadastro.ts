@@ -2,7 +2,7 @@
  * Casos de uso do cadastro de oportunidades. Cada função recebe o cliente SQL (tagged template do Neon)
  * e devolve uma Response; as regras de negócio ficam no banco (funções SECURITY DEFINER).
  */
-import { atualizacaoInput, errosZod, linhaTorreInput, opcaoInput, oportunidadeInput, usuarioInput } from '../../src/domain/oportunidade.ts'
+import { arquivarLoteInput, atualizacaoInput, errosZod, linhaTorreInput, opcaoInput, oportunidadeInput, STATUS_ARQUIVAR_EM_LOTE, usuarioInput } from '../../src/domain/oportunidade.ts'
 import { consultaCnpj, type ResultadoCnpj } from './cnpj.ts'
 import { erroBanco, send } from './http.ts'
 
@@ -126,6 +126,35 @@ export async function arquivar(sql: Sql, email: string, id: string, restaurar: b
   try {
     const [{ o }] = await sql`select arquivar_oportunidade(${id}::bigint, ${email}, ${restaurar}) as o`
     return send(200, o)
+  } catch (e) {
+    return erroBanco(e)
+  }
+}
+
+/** Arquiva várias oportunidades de uma vez, SOMENTE as ativas no status Radar-TIC. Tudo ou nada: se algum id não for elegível
+ *  (outro status, já arquivada ou inexistente) nada é alterado. A regra vale no servidor, não só na tela. */
+export async function arquivarLote(sql: Sql, email: string, corpo: unknown) {
+  const parsed = arquivarLoteInput.safeParse(corpo)
+  if (!parsed.success) return invalido(parsed.error)
+  const ids = [...new Set(parsed.data.ids)]
+  const lista = JSON.stringify(ids)
+  try {
+    const [{ admin }] = await sql`select eh_admin(${email}) as admin`
+    if (!admin) return send(403, { error: 'Somente administradores arquivam ou restauram.' })
+    const [{ elegiveis }] = await sql`
+      select count(*)::int as elegiveis from oportunidades
+      where id in (select jsonb_array_elements_text(${lista}::jsonb)::bigint) and status = ${STATUS_ARQUIVAR_EM_LOTE} and arquivado_em is null`
+    if (elegiveis !== ids.length) {
+      return send(422, {
+        error: `Só é possível arquivar em lote oportunidades ativas no status ${STATUS_ARQUIVAR_EM_LOTE}. Atualize a tela e selecione de novo.`,
+        erros: [{ campo: 'ids', mensagem: `${ids.length - elegiveis} de ${ids.length} não são elegíveis.` }],
+      })
+    }
+    // Uma única instrução: o Postgres a executa como uma transação (se uma falhar, nenhuma é arquivada).
+    const feitas = await sql`
+      select arquivar_oportunidade(id, ${email}, false) ->> 'id' as id from oportunidades
+      where id in (select jsonb_array_elements_text(${lista}::jsonb)::bigint) and status = ${STATUS_ARQUIVAR_EM_LOTE} and arquivado_em is null`
+    return send(200, { arquivadas: feitas.length })
   } catch (e) {
     return erroBanco(e)
   }
