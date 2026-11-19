@@ -207,3 +207,7 @@ Folga de ~18%. Por isso: **não encurte o intervalo abaixo de 5 minutos nem ampl
 - [CARGA-DE-DADOS.md](CARGA-DE-DADOS.md) e [AGENTE-DE-CARGA.md](AGENTE-DE-CARGA.md): carga da planilha
 - [`db/migrations/`](../db/migrations/): esquema, funções e privilégios
 - [README.md](../README.md): visão do projeto e esteira CI/CD
+
+## Arquivar Radar-TIC em lote (administradores)
+
+Na aba **Oportunidades**, as linhas no status **Radar-TIC** (e só elas) têm uma caixa de seleção. Marque uma ou mais (ou use "Selecionar todas as Radar-TIC da lista", que respeita os filtros), clique em **Arquivar selecionadas** e confirme. Máximo de 200 por vez. O servidor confere de novo que todas são Radar-TIC ativas: se alguma não for (outro status, já arquivada), **nada** é arquivado. Cada arquivamento entra no histórico; para desfazer, use "Incluir arquivadas" e **Restaurar** (uma a uma). Rota: `POST /api/oportunidades/arquivar-lote`.

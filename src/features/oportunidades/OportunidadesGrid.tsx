@@ -51,15 +51,21 @@ const LARGURA = colunas.reduce((n, c) => n + (c.size ?? 100), 0)
 const ALTURA_LINHA = 40
 const ALTURA_CARD = 96
 
-type Props = { dados: Oportunidade[]; onAbrir: (o: Oportunidade) => void; compacto: boolean }
+/** Seleção em lote (só administradores): `selecionavel` diz quais linhas aceitam a caixa; `marcados` são os ids marcados. */
+export type Selecao = { marcados: ReadonlySet<number>; selecionavel: (o: Oportunidade) => boolean; alternar: (id: number) => void; alternarTodas: (ids: number[], marcar: boolean) => void }
 
-export function OportunidadesGrid({ dados, onAbrir, compacto }: Props) {
+type Props = { dados: Oportunidade[]; onAbrir: (o: Oportunidade) => void; compacto: boolean; selecao?: Selecao }
+
+export function OportunidadesGrid({ dados, onAbrir, compacto, selecao }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'data_pregao_dt', desc: true }])
   const tabela = useReactTable({ data: dados, columns: colunas, state: { sorting }, onSortingChange: setSorting, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel() })
   const linhas = tabela.getRowModel().rows
   const pai = useRef<HTMLDivElement>(null)
   const virtual = useVirtualizer({ count: linhas.length, getScrollElement: () => pai.current, estimateSize: () => (compacto ? ALTURA_CARD : ALTURA_LINHA), overscan: 12 })
   const itens = virtual.getVirtualItems()
+  const elegiveis = selecao ? dados.filter(selecao.selecionavel).map((o) => o.id) : []
+  const marcadasElegiveis = selecao ? elegiveis.filter((id) => selecao.marcados.has(id)).length : 0
+  const todasMarcadas = elegiveis.length > 0 && marcadasElegiveis === elegiveis.length
 
   if (compacto) {
     return (
@@ -69,9 +75,21 @@ export function OportunidadesGrid({ dados, onAbrir, compacto }: Props) {
             const o = linhas[v.index].original
             return (
               <div key={o.id} role="listitem" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: v.size, transform: `translateY(${v.start}px)` }}>
+                {selecao?.selecionavel(o) && (
+                  <input
+                    type="checkbox"
+                    aria-label={`Selecionar ${o.codigo ?? o.orgao ?? 'oportunidade'} para arquivar`}
+                    className="absolute left-3 top-1/2 z-[1] size-5 -translate-y-1/2 cursor-pointer accent-[var(--gold)]"
+                    checked={selecao.marcados.has(o.id)}
+                    onChange={() => selecao.alternar(o.id)}
+                  />
+                )}
                 <button
                   onClick={() => onAbrir(o)}
-                  className="size-full cursor-pointer border-b border-line-soft px-4 py-2 text-left hover:bg-line-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold"
+                  className={cn(
+                    'size-full cursor-pointer border-b border-line-soft py-2 pr-4 text-left hover:bg-line-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold',
+                    selecao?.selecionavel(o) ? 'pl-11' : 'pl-4',
+                  )}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <Selo status={o.status} />
@@ -91,10 +109,24 @@ export function OportunidadesGrid({ dados, onAbrir, compacto }: Props) {
 
   return (
     <div ref={pai} className="h-[70vh] overflow-auto rounded-[10px] border border-line bg-surface">
-      <table className="w-full border-collapse text-[13px]" style={{ minWidth: LARGURA }} aria-rowcount={linhas.length + 1}>
+      <table className="w-full border-collapse text-[13px]" style={{ minWidth: LARGURA + (selecao ? 40 : 0) }} aria-rowcount={linhas.length + 1}>
         <thead className="sticky top-0 z-10 bg-surface-2">
           {tabela.getHeaderGroups().map((g) => (
             <tr key={g.id}>
+              {selecao && (
+                <th scope="col" style={{ width: 40 }} className="border-b border-line px-3 py-2 text-left">
+                  <input
+                    type="checkbox"
+                    aria-label="Selecionar todas as Radar-TIC da lista para arquivar"
+                    title="Seleciona todas as oportunidades Radar-TIC ativas que estão na lista (com os filtros aplicados)"
+                    className="size-4 cursor-pointer accent-[var(--gold)] disabled:cursor-not-allowed"
+                    disabled={elegiveis.length === 0}
+                    checked={todasMarcadas}
+                    ref={(el) => { if (el) el.indeterminate = marcadasElegiveis > 0 && !todasMarcadas }}
+                    onChange={(e) => selecao.alternarTodas(elegiveis, e.target.checked)}
+                  />
+                </th>
+              )}
               {g.headers.map((h) => {
                 const dir = h.column.getIsSorted()
                 const direita = (h.column.columnDef.meta as { direita?: boolean } | undefined)?.direita
@@ -130,6 +162,19 @@ export function OportunidadesGrid({ dados, onAbrir, compacto }: Props) {
                 style={{ height: ALTURA_LINHA }}
                 className="cursor-pointer border-b border-line-soft hover:bg-line-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold"
               >
+                {selecao && (
+                  <td className="px-3" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    {selecao.selecionavel(linha.original) && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${linha.original.codigo ?? linha.original.orgao ?? 'oportunidade'} para arquivar`}
+                        className="size-4 cursor-pointer accent-[var(--gold)]"
+                        checked={selecao.marcados.has(linha.original.id)}
+                        onChange={() => selecao.alternar(linha.original.id)}
+                      />
+                    )}
+                  </td>
+                )}
                 {linha.getVisibleCells().map((c) => (
                   <td key={c.id} className={cn('truncate px-3', (c.column.columnDef.meta as { direita?: boolean } | undefined)?.direita && 'text-right tabular-nums')}>
                     {flexRender(c.column.columnDef.cell ?? ((x) => x.getValue() ?? '—'), c.getContext())}

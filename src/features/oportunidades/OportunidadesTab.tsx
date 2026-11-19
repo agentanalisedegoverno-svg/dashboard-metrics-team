@@ -1,11 +1,11 @@
-import { Download, Plus } from 'lucide-react'
+import { Archive, Download, Plus } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import type { Oportunidade } from '@/domain/oportunidade'
-import { useMe, useOpcoes, useOportunidades } from './api'
+import { useArquivarLote, useMe, useOpcoes, useOportunidades } from './api'
 import { OportunidadeDrawer } from './OportunidadeDrawer'
-import { OportunidadesGrid } from './OportunidadesGrid'
+import { OportunidadesGrid, type Selecao } from './OportunidadesGrid'
 import { baixarCsv } from './exportarCsv'
-import { SEGMENTOS } from '@/domain/oportunidade'
+import { MAX_ARQUIVAR_EM_LOTE, SEGMENTOS, STATUS_ARQUIVAR_EM_LOTE } from '@/domain/oportunidade'
 import { nomesPreVendas } from '@/domain/preVendas'
 import { anosDisponiveis, intervaloInvertido, MESES, mesDe, mesesDoQuarter, noPeriodo, QUARTERS, semanaDe } from './periodo'
 
@@ -22,6 +22,9 @@ function useMenorQue(px: number) {
   }, [consulta])
   return v
 }
+
+/** Só as Radar-TIC ativas podem ser marcadas para arquivar em lote (o servidor confere de novo). */
+const selecionavel = (o: Oportunidade) => o.status === STATUS_ARQUIVAR_EM_LOTE && !o.arquivado_em
 
 const selectCls = 'rounded-lg border border-line bg-surface px-2.5 py-[7px] text-[13px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-gold/40'
 
@@ -41,6 +44,10 @@ export default function OportunidadesTab() {
   const [periodo, setPeriodo] = useState({ ano: '', quarter: '', mes: '', de: '', ate: '' })
   const [editando, setEditando] = useState<Oportunidade | null | undefined>(undefined)
   const compacto = useMenorQue(768)
+  const [marcados, setMarcados] = useState<Set<number>>(() => new Set())
+  const [confirmando, setConfirmando] = useState(false)
+  const [aviso, setAviso] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
+  const arquivarLote = useArquivarLote()
 
   const dados = useMemo(() => {
     const q = fold(buscaAdiada)
@@ -74,6 +81,31 @@ export default function OportunidadesTab() {
   const intervaloRuim = intervaloInvertido(periodo)
   const atalho = (de: string, ate: string) => setPeriodo((p) => ({ ...p, de, ate }))
   const hoje = new Date()
+
+  // Arquivamento em lote: só administradores; só Radar-TIC ativas; só o que está visível na lista (filtros aplicados).
+  const podeLote = me.data.admin && !me.data.somenteLeitura
+  const elegiveisLista = dados.filter(selecionavel)
+  const idsParaArquivar = dados.filter((o) => selecionavel(o) && marcados.has(o.id)).map((o) => o.id)
+  const selecao: Selecao | undefined = podeLote
+    ? {
+        marcados,
+        selecionavel,
+        alternar: (id) => setMarcados((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }),
+        alternarTodas: (ids, marcar) => setMarcados((prev) => { const n = new Set(prev); ids.forEach((id) => (marcar ? n.add(id) : n.delete(id))); return n }),
+      }
+    : undefined
+  const arquivarSelecionadas = async () => {
+    setAviso(null)
+    try {
+      const r = await arquivarLote.mutateAsync(idsParaArquivar)
+      setMarcados(new Set())
+      setAviso({ tipo: 'ok', texto: `${r.arquivadas} ${r.arquivadas === 1 ? 'oportunidade Radar-TIC arquivada' : 'oportunidades Radar-TIC arquivadas'}.` })
+    } catch (e) {
+      setAviso({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não foi possível arquivar.' })
+    } finally {
+      setConfirmando(false)
+    }
+  }
 
   const valores = (nome: string) => (opcoes.data.listas[nome] ?? []).map((o) => o.valor)
   const pendentes = ativas.filter((o) => (o.pendencias?.length ?? 0) > 0).length
@@ -179,7 +211,51 @@ export default function OportunidadesTab() {
       {intervaloRuim && (
         <p role="alert" className="mb-2 text-xs font-semibold text-st-critical">A data inicial é depois da final: nenhuma oportunidade cabe nesse intervalo.</p>
       )}
-      <OportunidadesGrid dados={dados} onAbrir={setEditando} compacto={compacto} />
+      {podeLote && compacto && elegiveisLista.length > 0 && (
+        <label className="mb-2 flex cursor-pointer items-center gap-2 text-[13px] text-ink-soft">
+          <input
+            type="checkbox"
+            className="size-5 accent-[var(--gold)]"
+            aria-label="Selecionar todas as Radar-TIC da lista para arquivar"
+            checked={elegiveisLista.every((o) => marcados.has(o.id))}
+            onChange={(e) => selecao?.alternarTodas(elegiveisLista.map((o) => o.id), e.target.checked)}
+          />
+          Selecionar todas as Radar-TIC da lista ({elegiveisLista.length})
+        </label>
+      )}
+      {podeLote && (idsParaArquivar.length > 0 || aviso) && (
+        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[13px]" role="region" aria-label="Arquivar Radar-TIC em lote">
+          {idsParaArquivar.length > 0 && (
+            <>
+              <span className="font-semibold text-ink" aria-live="polite">
+                {idsParaArquivar.length} {idsParaArquivar.length === 1 ? 'selecionada' : 'selecionadas'} ({STATUS_ARQUIVAR_EM_LOTE})
+              </span>
+              {idsParaArquivar.length > MAX_ARQUIVAR_EM_LOTE ? (
+                <span role="alert" className="text-st-critical">Máximo de {MAX_ARQUIVAR_EM_LOTE} por vez: desmarque algumas.</span>
+              ) : confirmando ? (
+                <>
+                  <span className="text-ink-soft">Arquivar {idsParaArquivar.length} {idsParaArquivar.length === 1 ? 'oportunidade' : 'oportunidades'}? Elas saem das contas e podem ser restauradas depois.</span>
+                  <button type="button" onClick={arquivarSelecionadas} disabled={arquivarLote.isPending} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 font-semibold text-page hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Archive className="size-4" /> {arquivarLote.isPending ? 'Arquivando…' : 'Confirmar'}
+                  </button>
+                  <button type="button" onClick={() => setConfirmando(false)} disabled={arquivarLote.isPending} className={`${selectCls} cursor-pointer hover:bg-surface`}>Cancelar</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => { setAviso(null); setConfirmando(true) }} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 font-semibold text-page hover:opacity-90">
+                    <Archive className="size-4" /> Arquivar selecionadas
+                  </button>
+                  <button type="button" onClick={() => setMarcados(new Set())} className={`${selectCls} cursor-pointer hover:bg-surface`}>Limpar seleção</button>
+                </>
+              )}
+            </>
+          )}
+          {aviso && (
+            <span role={aviso.tipo === 'erro' ? 'alert' : 'status'} className={aviso.tipo === 'erro' ? 'font-semibold text-st-critical' : 'font-semibold text-ink'}>{aviso.texto}</span>
+          )}
+        </div>
+      )}
+      <OportunidadesGrid dados={dados} onAbrir={setEditando} compacto={compacto} selecao={selecao} />
       <OportunidadeDrawer aberto={editando !== undefined} onFechar={() => setEditando(undefined)} registro={editando ?? null} opcoes={opcoes.data} me={me.data} />
     </section>
   )

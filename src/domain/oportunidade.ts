@@ -247,3 +247,8 @@ export function regrasNegocio(d: OportunidadeInput): ErroCampo[] {
   if (d.processo && d.processo.length > 60) erros.push({ campo: 'processo', mensagem: 'Máximo de 60 caracteres' })
   return erros
 }
+
+/** Arquivamento em lote: só ids de oportunidades ativas no status Radar-TIC (a regra é conferida no servidor). */
+export const STATUS_ARQUIVAR_EM_LOTE = 'Radar-TIC'
+export const MAX_ARQUIVAR_EM_LOTE = 200
+export const arquivarLoteInput = z.object({ ids: z.array(z.number().int().positive()).min(1, 'Selecione ao menos uma oportunidade').max(MAX_ARQUIVAR_EM_LOTE, `Máximo de ${MAX_ARQUIVAR_EM_LOTE} por vez`) })

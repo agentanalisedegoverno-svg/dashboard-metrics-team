@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { oportunidadeInput } from '../../src/domain/oportunidade.ts'
-import { arquivar, atualizar, criar, listar, me, opcoes, salvarUsuario } from './cadastro.ts'
+import { arquivar, arquivarLote, atualizar, criar, listar, me, opcoes, salvarUsuario } from './cadastro.ts'
 import type { ResultadoCnpj } from './cnpj.ts'
 import { csrfOk, erroBanco } from './http.ts'
 
@@ -208,5 +208,46 @@ describe('objeto e hora do pregão (formato)', () => {
     expect(oportunidadeInput.safeParse({ objeto: 'x'.repeat(5000) }).success).toBe(true)
     const r = oportunidadeInput.safeParse({ objeto: 'x'.repeat(5001) })
     expect(!r.success && r.error.issues[0].path[0]).toBe('objeto')
+  })
+})
+
+describe('arquivarLote (só Radar-TIC)', () => {
+  const textoSql = (c: unknown[]) => (c[0] as TemplateStringsArray).join('?')
+  it('recusa corpo inválido sem tocar no banco', async () => {
+    const sql = vi.fn()
+    expect((await corpo(await arquivarLote(sql, 'a@b.com', {}))).status).toBe(422)
+    expect((await corpo(await arquivarLote(sql, 'a@b.com', { ids: [] }))).status).toBe(422)
+    expect((await corpo(await arquivarLote(sql, 'a@b.com', { ids: ['x'] }))).status).toBe(422)
+    expect((await corpo(await arquivarLote(sql, 'a@b.com', { ids: Array.from({ length: 201 }, (_, i) => i + 1) }))).status).toBe(422)
+    expect(sql).not.toHaveBeenCalled()
+  })
+  it('não administrador recebe 403 e nada é arquivado', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{ admin: false }])
+    expect((await corpo(await arquivarLote(sql, 'a@b.com', { ids: [1, 2] }))).status).toBe(403)
+    expect(sql).toHaveBeenCalledTimes(1)
+  })
+  it('se algum id não é Radar-TIC ativo (outro status, arquivado ou inexistente), responde 422 e não arquiva nada', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{ admin: true }]).mockResolvedValueOnce([{ elegiveis: 1 }])
+    const r = await corpo(await arquivarLote(sql, 'a@b.com', { ids: [10, 11] }))
+    expect(r.status).toBe(422)
+    expect(r.json.erros[0].mensagem).toContain('1 de 2')
+    expect(sql).toHaveBeenCalledTimes(2) // eh_admin + contagem; a instrução de arquivar não roda
+  })
+  it('arquiva em uma única instrução, só Radar-TIC ativas, sem repetir ids, e devolve a contagem', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{ admin: true }]).mockResolvedValueOnce([{ elegiveis: 2 }]).mockResolvedValueOnce([{ id: '10' }, { id: '11' }])
+    const r = await corpo(await arquivarLote(sql, 'adm@b.com', { ids: [10, 11, 10] }))
+    expect(r).toEqual({ status: 200, json: { arquivadas: 2 } })
+    const [, contagem, arquivar] = sql.mock.calls
+    for (const c of [contagem, arquivar]) {
+      expect(textoSql(c)).toContain('status =')
+      expect(textoSql(c)).toContain('arquivado_em is null')
+      expect(c).toContain('Radar-TIC')
+      expect(c).toContain(JSON.stringify([10, 11])) // dedupe
+    }
+    expect(textoSql(arquivar)).toContain('arquivar_oportunidade(id')
+  })
+  it('traduz erro do banco (ex.: 403 vindo da função)', async () => {
+    const sql = vi.fn().mockResolvedValueOnce([{ admin: true }]).mockResolvedValueOnce([{ elegiveis: 1 }]).mockRejectedValueOnce(pgErr('P0403', 'Somente administradores arquivam ou restauram'))
+    expect((await corpo(await arquivarLote(sql, 'a@b.com', { ids: [1] }))).status).toBe(403)
   })
 })
