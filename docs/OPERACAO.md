@@ -1,5 +1,7 @@
 # Operação do Radar Pré-Vendas
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure; veja [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md) e [`PLANO-DE-ACAO-BANCO.md`](PLANO-DE-ACAO-BANCO.md).
+
 Guia do dia a dia: como o sistema roda, onde ficam as configurações, como resolver problemas e como fazer manutenção. A visão de arquitetura está em [ARQUITETURA.md](ARQUITETURA.md) e o que vem a seguir em [ROADMAP.md](ROADMAP.md).
 
 > **Regra de ouro:** nenhuma senha, token ou string de conexão vai para o Git. Este repositório é público.

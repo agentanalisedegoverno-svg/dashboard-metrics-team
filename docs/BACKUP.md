@@ -1,5 +1,7 @@
 # Backup do banco (Neon → Google Drive e espelho no Supabase)
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure; veja [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md) e [`PLANO-DE-ACAO-BANCO.md`](PLANO-DE-ACAO-BANCO.md).
+
 O Neon free guarda só 6 horas de histórico, então o backup é a nossa proteção real contra erro humano, carga errada ou perda do projeto. Além do backup criptografado no Drive, há um **espelho diário no Supabase** (segunda redundância).
 
 > **Estado (22/10/2026): funcional e comprovado.** Backups diários automáticos desde 21/10; restauração testada em Postgres temporário **e** em um branch real do Neon; cópia semanal e vigia de alerta ativos.
