@@ -2,7 +2,7 @@
  * Infraestrutura comum das rotas de cadastro: identidade (Cloudflare Access), proteção CSRF,
  * mapeamento dos erros do Postgres (SQLSTATE próprios) para respostas HTTP.
  */
-import { neon } from './banco'
+import { conectar } from './banco'
 import { verifyAccessIdentity } from './access'
 
 export type Env = {
@@ -43,7 +43,7 @@ export async function identificar(request: Request, env: Env): Promise<Identidad
   return { email: id.email }
 }
 
-export const bancoApp = (env: Env) => (env.DATABASE_URL_APP ? neon(env.DATABASE_URL_APP) : null)
+export const bancoApp = (env: Env) => (env.DATABASE_URL_APP ? conectar(env.DATABASE_URL_APP) : null)
 
 type ErroPg = { code?: string; message?: string }
 

@@ -11,7 +11,7 @@
 //   --simular  conta o que seria enviado, sem enviar e sem gravar nada (não precisa de SMTP).
 //
 // O arquivo de log do GitHub é PÚBLICO: aqui só saem contagens, nunca endereços nem dados de oportunidades.
-import { neon } from './banco.mjs'
+import { conectar } from './banco.mjs'
 import nodemailer from 'nodemailer'
 import { processarFila } from '../functions/_lib/emailFila.ts'
 
@@ -42,7 +42,7 @@ if (!simular) {
   enviar = (e) => transporte.sendMail({ from, to: e.to, cc: e.cc.length ? e.cc : undefined, subject: e.assunto, text: e.texto, html: e.html })
 }
 
-const r = await processarFila(neon(url), enviar, { url: process.env.APP_URL || 'https://radar-prevendas.pages.dev', simular })
+const r = await processarFila(conectar(url), enviar, { url: process.env.APP_URL || 'https://radar-prevendas.pages.dev', simular })
 console.log(`${simular ? '[simulação] ' : ''}pendentes ${r.pendentes} | enviados ${r.enviados} | ignorados ${r.ignorados} | nova tentativa ${r.novaTentativa} | falha definitiva ${r.falhaDefinitiva} | em outro processo ${r.emOutroProcesso}`)
 // Só falha o workflow (e dispara o e-mail de alerta do GitHub) quando uma mensagem esgotou as tentativas.
 if (r.falhaDefinitiva > 0) {

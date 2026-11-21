@@ -1,5 +1,7 @@
 # Módulo de monitoramento de licitações
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 ## Escopo desta entrega
 
 O módulo vive na aba **Licitações** do Radar Pré-Vendas e reutiliza a autenticação, o tema, os tokens de cor, a tipografia e os componentes de navegação existentes.

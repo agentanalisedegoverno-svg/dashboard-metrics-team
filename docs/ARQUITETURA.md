@@ -1,5 +1,7 @@
 # Arquitetura do Radar Pré-Vendas
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 Painel interno de pré-vendas (licitações) **e** cadastro de oportunidades. O banco **Postgres (Neon)** é a fonte da verdade e é alimentado **só pelo Radar web** (desde 27/10/2026 a planilha *BaseLicitacao.xlsx* deixou de alimentá-lo: [decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)). As rotinas (Planner, e-mail, backup, espelho) rodam na **nuvem do GitHub Actions**, acionadas pelo próprio Radar ao salvar, **sem depender de nenhum computador de pessoa**. Há um espelho diário do banco no Supabase.
 
 A operação do dia a dia está em [OPERACAO.md](OPERACAO.md); o que vem a seguir está em [ROADMAP.md](ROADMAP.md).

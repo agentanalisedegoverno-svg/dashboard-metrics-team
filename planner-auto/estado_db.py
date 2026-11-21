@@ -10,7 +10,7 @@ Comandos:
   preparar    cria config.json a partir das variáveis de ambiente (o job não tem o arquivo)
 
 Variáveis: DATABASE_URL_PLANNER, PLANNER_ESTADO_CHAVE, e (preparar) PLANNER_CLIENT_ID e PLANNER_TENANT_ID.
-O acesso ao banco usa o driver psycopg2 (TCP, SSL), compatível com qualquer Postgres (Azure, Neon, Supabase).
+O acesso ao banco usa o driver psycopg2 (TCP, SSL), compatível com qualquer Postgres (Azure, Supabase etc.).
 """
 from __future__ import annotations
 

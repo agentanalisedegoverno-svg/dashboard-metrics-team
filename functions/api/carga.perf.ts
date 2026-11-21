@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 
 const sqlMock = vi.fn()
-vi.mock('../_lib/banco', () => ({ neon: () => sqlMock }))
+vi.mock('../_lib/banco', () => ({ conectar: () => sqlMock }))
 vi.mock('../_lib/access', () => ({
   verifyAccessIdentity: async () => {
     await new Promise((r) => setImmediate(r)) // cede o turno do event loop, como a validação real do JWT (setTimeout seria distorcido pelo relógio do Windows)

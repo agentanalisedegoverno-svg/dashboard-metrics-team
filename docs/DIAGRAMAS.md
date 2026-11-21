@@ -1,5 +1,7 @@
 # Diagramas do Radar Pré-Vendas
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 | | |
 |---|---|
 | **Propósito** | Catálogo visual de todos os fluxos da aplicação, do contexto ao detalhe, para quem desenvolve, opera, audita ou aprova mudanças |
@@ -113,7 +115,7 @@ flowchart LR
     API["Pages Functions /api/*<br/>TypeScript no runtime Workers<br/>valida JWT, CSRF e Zod"]:::interno
   end
 
-  subgraph neon["Neon Postgres 17 (sa-east-1)"]
+  subgraph neon["Azure Postgres 17 (Brazil South)"]
     DB[("tabelas, funções SECURITY DEFINER<br/>e gatilhos")]:::dados
   end
 
@@ -174,9 +176,8 @@ flowchart TB
     end
   end
 
-  subgraph nn["Neon (sa-east-1)"]
-    MAIN[("branch main<br/>produção, banco neondb")]:::dados
-    TESTE[("branch teste-restauracao<br/>banco restore_drill<br/>reescrito a cada drill mensal")]:::dados
+  subgraph nn["Azure Database for PostgreSQL (Brazil South)"]
+    MAIN[("banco radar<br/>produção, backup nativo de 7 dias")]:::dados
   end
 
   subgraph sbx["Supabase (us-east-1, plano Free)"]
@@ -186,10 +187,10 @@ flowchart TB
   subgraph ghr["GitHub (runners efêmeros)"]
     P1{{"Planner integração<br/>ao salvar + 5 min, seg a sex 08h às 19h BRT"}}:::agenda
     S3{{"Enviar e-mails<br/>ao salvar + 15 min (dia), de hora em hora (noite e fins de semana)"}}:::agenda
-    S1{{"Backup diário 03:00 BRT<br/>(na prática ~08:30)"}}:::agenda
-    S7{{"Espelho no Supabase<br/>diário 04:30 BRT"}}:::agenda
-    S2{{"Vigia 12:00 BRT"}}:::agenda
-    S4{{"Restauração: dia 1 do mês"}}:::agenda
+    S1{{"Backup a cada 6 h<br/>(00:47, 06:47, 12:47, 18:47 UTC)"}}:::agenda
+    S7{{"Espelho no Supabase<br/>4x por dia"}}:::agenda
+    S2{{"Vigia a cada 6 h"}}:::agenda
+    S4{{"Restauração: toda segunda-feira (Postgres temporário)"}}:::agenda
     S5{{"Carga e segurança: segunda 06:00 BRT"}}:::agenda
     S6{{"CodeQL: segunda"}}:::agenda
   end
@@ -209,7 +210,6 @@ flowchart TB
   S7 -->|"radar_backup"| MAIN
   S7 --> ESPELHO
   S4 --> DRIVE
-  S4 -->|"radar_restore (isolado)"| TESTE
   S2 -.->|"confere idade do backup e do teste de restauração"| MAIN
 ```
 
@@ -555,7 +555,7 @@ flowchart LR
   classDef externo fill:#f2f2f2,stroke:#555555,stroke-dasharray:4 3,color:#1a1a1a
   classDef erro fill:#fde1e1,stroke:#a61f1f,color:#1a1a1a
 
-  WEB(["Radar web<br/>cadastro e edição<br/>única porta de entrada"]):::pessoa -->|"criar, atualizar, arquivar"| DB[("Neon Postgres<br/>fonte da verdade")]:::dados
+  WEB(["Radar web<br/>cadastro e edição<br/>única porta de entrada"]):::pessoa -->|"criar, atualizar, arquivar"| DB[("Azure Postgres<br/>fonte da verdade")]:::dados
   XLS["BaseLicitacao.xlsx<br/>deixou de alimentar o banco"]:::externo
   OLD["Tarefa Radar-Carga-Planilha<br/>DESATIVADA em 27/10/2026<br/>scripts removidos"]:::erro
   LEG["Legado no banco, sem uso:<br/>sincronizar_planilha, carga_status,<br/>chave_planilha, ausente_na_planilha"]:::externo
@@ -684,29 +684,27 @@ flowchart LR
   classDef alerta fill:#fde1e1,stroke:#a61f1f,color:#1a1a1a
   classDef meta fill:#fff4d6,stroke:#8a6d00,color:#1a1a1a
 
-  DB[("Neon: produção<br/>histórico de 6 h (plano gratuito)")]:::dados
-  BK{{"Backup diário<br/>03:00 BRT, na prática ~08:30"}}:::agenda --> DUMP["pg_dump completo<br/>radar_backup, somente leitura"]:::passo
+  DB[("Azure: produção<br/>backup nativo de 7 dias")]:::dados
+  BK{{"Backup a cada 6 h<br/>00:47, 06:47, 12:47, 18:47 UTC"}}:::agenda --> DUMP["pg_dump completo<br/>radar_backup, somente leitura"]:::passo
   DB --> DUMP
   DUMP --> CHK["verifica tamanho e tabelas"]:::passo --> ENC["AES-256 + PBKDF2<br/>+ hash SHA-256"]:::passo
   ENC --> DR[("Google Drive<br/>diario/ 14 dias<br/>semanal/ 12 semanas")]:::dados
 
-  ESP{{"Espelho no Supabase<br/>diário 04:30 BRT"}}:::agenda --> DUMP2["pg_dump + guarda do destino<br/>(só projeto dedicado ao Radar)"]:::passo
+  ESP{{"Espelho no Supabase<br/>4x por dia"}}:::agenda --> DUMP2["pg_dump + guarda do destino<br/>(só projeto dedicado ao Radar)"]:::passo
   DB --> DUMP2
   DUMP2 --> SUPA[("Supabase radar-backup<br/>estado mais recente<br/>falha se a contagem não bater")]:::dados
 
-  MES{{"Teste mensal<br/>dia 1"}}:::agenda --> DL["baixa o último, confere o hash, descriptografa"]:::passo
+  MES{{"Teste semanal<br/>segunda-feira"}}:::agenda --> DL["baixa o último, confere o hash, descriptografa"]:::passo
   DR --> DL
   DL --> R1["restaura em Postgres temporário"]:::passo
-  DL --> R2["restaura no branch Neon de teste"]:::passo
   R1 --> CMP["compara com a produção e faz um cadastro de teste (desfeito)"]:::passo
-  R2 --> CMP
 
-  VIG{{"Vigia diário 12:00 BRT"}}:::agenda
-  VIG -.-> A1["backup com mais de 30 h?"]:::alerta
-  VIG -.-> A2["teste de restauração com mais de 40 dias?"]:::alerta
+  VIG{{"Vigia a cada 6 h"}}:::agenda
+  VIG -.-> A1["backup com mais de 12 h?"]:::alerta
+  VIG -.-> A2["teste de restauração com mais de 10 dias?"]:::alerta
   A1 & A2 -.->|"falha do workflow: e-mail do GitHub"| N(["Quem administra é avisado"]):::alerta
 
-  M1["RPO: até ~24 h pelo backup diário (o vigia tolera 30 h)<br/>e até 6 h para engano recente, pelo histórico do Neon"]:::meta
+  M1["RPO: até ~6 h (backup a cada 6 h; o vigia tolera 12 h)<br/>e 7 dias de pontos de restauração nativos do Azure"]:::meta
   M2["RTO: ainda não definido formalmente<br/>(o espelho do Supabase encurta a recuperação, mas ainda não foi testado como banco ativo)"]:::meta
 ```
 
@@ -775,7 +773,7 @@ flowchart LR
   end
 
   subgraph z3["Zona 3: Dados (impõe regras e privilégios)"]
-    DB[("Neon Postgres<br/>funções por perfil, histórico imutável,<br/>papéis de mínimo privilégio")]:::dados
+    DB[("Azure Postgres<br/>funções por perfil, histórico imutável,<br/>papéis de mínimo privilégio")]:::dados
   end
 
   subgraph z4["Zona 4: Rotinas confiáveis com credencial própria"]

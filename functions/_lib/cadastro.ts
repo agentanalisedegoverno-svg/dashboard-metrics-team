@@ -1,5 +1,5 @@
 /**
- * Casos de uso do cadastro de oportunidades. Cada função recebe o cliente SQL (tagged template do Neon)
+ * Casos de uso do cadastro de oportunidades. Cada função recebe o cliente SQL (tagged template do cliente Postgres)
  * e devolve uma Response; as regras de negócio ficam no banco (funções SECURITY DEFINER).
  */
 import { arquivarLoteInput, atualizacaoInput, errosZod, linhaTorreInput, opcaoInput, oportunidadeInput, STATUS_ARQUIVAR_EM_LOTE, usuarioInput } from '../../src/domain/oportunidade.ts'

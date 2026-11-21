@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { reiniciarLimites } from '../_lib/apiExterna.ts'
 
 const sqlMock = vi.fn()
-vi.mock('../_lib/banco', () => ({ neon: () => sqlMock }))
+vi.mock('../_lib/banco', () => ({ conectar: () => sqlMock }))
 const verifyId = vi.fn()
 const verifyJwt = vi.fn()
 vi.mock('../_lib/access', () => ({

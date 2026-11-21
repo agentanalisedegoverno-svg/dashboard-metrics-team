@@ -1,5 +1,7 @@
 # Integração Radar → Microsoft Planner
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 > **Atualização (27/10/2026): a integração roda na nuvem, sem depender de nenhum computador.** O Radar (Cloudflare) aciona na hora o workflow `planner-integracao.yml` do GitHub ao cadastrar ou salvar; cartão e e-mail saem em cerca de 1 minuto. Veja [Rodar na nuvem](#rodar-na-nuvem-sem-depender-de-computador-github-actions). A tarefa do Windows descrita abaixo passa a ser só contingência.
 >
 > **Status (26/10/2026): em produção.** Exportador, `planner-auto` e agendamento estão ativos; o ciclo completo (oportunidade criada ou salva na web → cartão criado ou atualizado no Planner) roda **de 5 em 5 minutos**, em dias úteis, das 08h às 19h (desde 26/10/2026; antes era de 30 em 30). Esteve pausado de 22/10 a 26/10 às 08:00 e foi retomado nessa data.

@@ -244,7 +244,7 @@ function Fonte({ titulo, query, vazio, ops }: { titulo: string; query: { isError
   </div>
 }
 
-export default function MonitorLicitaçõesTab() {
+export default function MonitorLicitacoesTab() {
   const lista = useOportunidades(false)
   const me = useMe()
   const opcoes = useOpcoes()
