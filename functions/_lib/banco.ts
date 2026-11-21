@@ -1,5 +1,5 @@
 // Conexão com o Postgres (Azure Database for PostgreSQL). Mantém a forma `sql\`...\`` usada em todo o código
-// (antes vinha do driver HTTP do Neon): devolve um array de linhas; parâmetros sempre vinculados, nunca concatenados.
+// (antes vinha do driver HTTP do Neon, aposentado): devolve um array de linhas; parâmetros sempre vinculados, nunca concatenados.
 // No Cloudflare Pages Functions usa TCP (flag nodejs_compat). O cliente nasce por requisição.
 import postgres from 'postgres'
 
@@ -37,7 +37,7 @@ export function parseArrayTexto(entrada: string): (string | null)[] {
 export const serializarArrayTexto = (x: unknown) =>
   Array.isArray(x) ? `{${x.map((v) => (v === null ? 'NULL' : `"${String(v).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`)).join(',')}}` : String(x)
 
-export function neon(url: string) {
+export function conectar(url: string) {
   return postgres(url, {
     max: 1,
     ssl: 'require',

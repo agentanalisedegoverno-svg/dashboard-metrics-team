@@ -24,7 +24,7 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 | [planner-auto/](planner-auto/README.md) | Ferramenta que aplica os eventos do Radar no Planner |
 | [db/migrations/](db/migrations/) | Esquema, funções e privilégios do banco (migrações aditivas) |
 
-**Em uma frase:** o Postgres (Neon) é a fonte da verdade — o time cadastra oportunidades na aba **Oportunidades** (a planilha deixou de alimentar o banco em 27/10/2026); o painel de métricas, o Microsoft Planner, os e-mails de aviso, o backup diário e o espelho no Supabase leem desse banco. As rotinas rodam no **GitHub Actions**, acionadas pelo Radar ao salvar, sem depender de computador de pessoa. Tudo atrás do Cloudflare Access (login por código no e-mail `@ctctech.com.br`).
+**Em uma frase:** o Postgres (Azure) é a fonte da verdade — o time cadastra oportunidades na aba **Oportunidades** (a planilha deixou de alimentar o banco em 27/10/2026); o painel de métricas, o Microsoft Planner, os e-mails de aviso, o backup diário e o espelho no Supabase leem desse banco. As rotinas rodam no **GitHub Actions**, acionadas pelo Radar ao salvar, sem depender de computador de pessoa. Tudo atrás do Cloudflare Access (login por código no e-mail `@ctctech.com.br`).
 
 ## Rodar
 
@@ -92,7 +92,7 @@ scripts/
 - Cloudflare Access precisa ser habilitado no painel Cloudflare para proteger o site por e-mail. Se a API real usar outro host, ela também precisa exigir autenticação; proteger somente o frontend não protege os dados.
 - O backend real de leitura do SharePoint permanece pendente de configuração do tenant, app registration, permissões Graph e URL do workbook. Não configure esses valores em arquivos versionados; use variáveis/segredos no ambiente de execução.
 
-## Dados: Postgres (Neon) como fonte da verdade
+## Dados: Postgres (Azure) como fonte da verdade
 
 **Entradas:** (1) cadastro e edição na aba **Oportunidades** (API `functions/api/oportunidades/*`, regras no banco, histórico e bloqueio otimista); (a planilha `BaseLicitacao.xlsx` deixou de ser entrada em 27/10/2026).mjs` → `sincronizar_planilha`), que nunca sobrescreve o que foi editado na web. **Saídas:** painel de métricas (`GET /api/rows`), backup diário no Drive e integração com o Planner. Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e [docs/CARGA-DE-DADOS.md](docs/CARGA-DE-DADOS.md).
 
@@ -138,7 +138,7 @@ scripts/
 ## Fontes de licitações
 
 - As consultas públicas usam proxy server-side restrito e somente GET para evitar expor detalhes de rede no navegador.
-- Para habilitar a fonte privada ConLicitações, configure `CONLICITACAO_TOKEN` como variável de ambiente **Production** no projeto Vercel. Não coloque o token no código, em `VITE_*`, em arquivos versionados ou no navegador.
+- Para habilitar a fonte privada ConLicitações, configure `CONLICITACAO_TOKEN` como segredo de **produção** no projeto do Cloudflare Pages. Não coloque o token no código, em `VITE_*`, em arquivos versionados ou no navegador.
 - A documentação local da integração indica restrição por IP. Se a API responder HTTP 403, o fornecedor precisa autorizar o IP de saída do runtime usado pela aplicação; não contorne essa restrição. Se o token já apareceu em um arquivo compartilhado, rotacione-o e configure o novo valor diretamente no cofre de variáveis do deploy.
 - A fonte ConLicitações consulta os filtros e os boletins mais recentes disponíveis para a conta. O painel sinaliza falha de credencial ou IP; cobertura e correspondência precisam ser validadas com processos reais.
 

@@ -32,7 +32,7 @@ function parseArrayTexto(entrada) {
 const serializarArrayTexto = (x) =>
   Array.isArray(x) ? `{${x.map((v) => (v === null ? 'NULL' : `"${String(v).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`)).join(',')}}` : String(x)
 
-export function neon(url) {
+export function conectar(url) {
   return postgres(url, {
     max: 1, ssl: 'require', prepare: false, fetch_types: false, idle_timeout: 5, connect_timeout: 15,
     types: {

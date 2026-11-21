@@ -1,5 +1,7 @@
 # Decisão: o banco não é mais alimentado pela planilha do Excel
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 **Data:** 27/10/2026 · **Decidido por:** João Henrique (CTC Tech) · **Status:** em vigor
 
 ## Decisão

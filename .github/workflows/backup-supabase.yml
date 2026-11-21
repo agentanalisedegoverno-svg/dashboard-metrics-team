@@ -38,7 +38,7 @@ jobs:
             echo "pronto=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Dump do Neon (somente leitura)
+      - name: Dump do banco de produção (somente leitura)
         if: steps.cfg.outputs.pronto == 'true'
         run: |
           mkdir -p out

@@ -1,5 +1,7 @@
 # Radar Pré-Vendas — Requisitos mínimos de infraestrutura (máquina com IP fixo)
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 Versão 1.1 · 12/11/2026 · para o time de infraestrutura provisionar **uma máquina (VM)** que roda a consulta à API da ConLicitações a partir de um **IP público fixo**.
 
 > **O que este documento NÃO cobre:** o site, a API, o banco, os backups e as rotinas de e-mail/Planner/monitor continuam na nuvem (Cloudflare Pages, Neon, GitHub Actions, Supabase e Drive) e **não precisam de máquina própria**. Quem é dono de cada conta está em [CONTAS-E-SERVICOS.md](CONTAS-E-SERVICOS.md). O dimensionamento do outro projeto (Radar TIC, captador de editais) é separado e está no repositório dele.

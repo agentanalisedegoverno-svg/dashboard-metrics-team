@@ -1,5 +1,7 @@
 # Contas e serviços (mapa para centralização)
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 Este documento lista **em qual conta/organização cada serviço do Radar está hospedado**, para o dia em que tudo for centralizado em uma conta só (ver "Roteiro de centralização").
 
 > **O repositório é público.** Aqui ficam: serviço, plano, região, nomes de organização/projeto, IDs que já são públicos e **nomes** dos segredos. **Nunca** coloque neste arquivo e-mails de login pessoais, senhas, tokens, connection strings ou chaves. O e-mail/login dono de cada conta fica na coluna "Dono (login)" **somente no cofre de senhas da empresa**; aqui só se registra o *tipo* de conta (pessoal ou corporativa).

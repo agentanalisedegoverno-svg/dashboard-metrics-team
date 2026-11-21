@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto'
-import { neon } from './banco.mjs'
+import { conectar } from './banco.mjs'
 
 const databaseUrl = process.env.DATABASE_URL_MONITOR
 if (!databaseUrl) {
   console.error('DATABASE_URL_MONITOR não configurada; rotina encerrada sem executar consultas.')
   process.exit(1)
 }
-const sql = neon(databaseUrl)
+const sql = conectar(databaseUrl)
 const agora = new Date()
 const maxItens = Math.max(1, Math.min(Number(process.env.MONITOR_BATCH_SIZE || 30), 100))
 

@@ -20,7 +20,7 @@ const MetaTab = lazy(() => import('@/features/meta/MetaTab'))
 const PlanoTab = lazy(() => import('@/features/plano/PlanoTab'))
 const OportunidadesTab = lazy(() => import('@/features/oportunidades/OportunidadesTab'))
 const AdminTab = lazy(() => import('@/features/admin/AdminTab'))
-const MonitorLicitaçõesTab = lazy(() => import('@/features/licitacoes/MonitorLicitaçõesTab'))
+const MonitorLicitacoesTab = lazy(() => import('@/features/licitacoes/MonitorLicitacoesTab'))
 
 const TABS = [
   ['exec', 'Visão Executiva'],
@@ -74,7 +74,7 @@ export default function App() {
             <TabsContent value="plano"><Suspense fallback={<EmptyNote>Carregando…</EmptyNote>}><PlanoTab /></Suspense></TabsContent>
             {ehAdmin && <TabsContent value="admin"><Suspense fallback={<EmptyNote>Carregando…</EmptyNote>}><AdminTab /></Suspense></TabsContent>}
             <TabsContent value="oportunidades"><Suspense fallback={<EmptyNote>Carregando…</EmptyNote>}><OportunidadesTab /></Suspense></TabsContent>
-            <TabsContent value="licitacoes"><Suspense fallback={<EmptyNote>Carregando módulo de licitações…</EmptyNote>}><MonitorLicitaçõesTab /></Suspense></TabsContent>
+            <TabsContent value="licitacoes"><Suspense fallback={<EmptyNote>Carregando módulo de licitações…</EmptyNote>}><MonitorLicitacoesTab /></Suspense></TabsContent>
           </Tabs>
         </>
       )}

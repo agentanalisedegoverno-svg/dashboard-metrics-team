@@ -1,6 +1,6 @@
 name: Backup do banco
 
-# Dump completo (schema, dados, funções e gatilhos) do Neon, criptografado, enviado ao Google Drive.
+# Dump completo (schema, dados, funções e gatilhos) do banco de produção (Azure), criptografado, enviado ao Google Drive.
 # A cada 6 horas (00:47, 06:47, 12:47 e 18:47 UTC; o minuto 47 foge do pico de atraso do GitHub); no domingo a primeira
 # execução também grava uma cópia semanal. Ver docs/BACKUP.md e docs/PLANO-DE-ACAO-BANCO.md (R2).
 on:
