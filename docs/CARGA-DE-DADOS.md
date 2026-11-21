@@ -1,5 +1,7 @@
 # Carga de dados (planilha → Postgres, por merge)
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 > **DESCONTINUADO em 27/10/2026.** O banco não é mais alimentado pela planilha do Excel; tudo é feito no Radar web. A tarefa foi desativada e os scripts removidos. Este documento fica **só como histórico**. Ver [DECISAO-FIM-DA-CARGA-DA-PLANILHA.md](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md).
 
 

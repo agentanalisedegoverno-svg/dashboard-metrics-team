@@ -27,3 +27,19 @@ skills-lock.json
 *.xlsx
 *.xlsm
 *.xls
+
+# Cópias do banco e segredos de operação: nunca versionar (backup real tem dados reais)
+*.dump
+*.dump.enc
+*.dump.enc.sha256
+*.pgpass
+SEGREDOS*
+pg-*.secret
+pg-*.url
+pg-roles.*
+
+# Ferramentas locais do agente e rascunhos
+.claude/
+.remember/
+scratch*
+tmp-*.test.ts

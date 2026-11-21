@@ -1,4 +1,4 @@
-import { neon } from '../_lib/banco'
+import { conectar } from '../_lib/banco'
 import { verifyAccessJwt } from '../_lib/access'
 
 type Env = { DATABASE_URL?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string; ACESSO_PUBLICO?: string }
@@ -8,7 +8,7 @@ const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-cont
 const send = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers })
 
 /**
- * API de leitura do painel. Os dados vêm do Postgres (Neon), alimentado por um agente externo
+ * API de leitura do painel. Os dados vêm do Postgres (Azure), alimentado por um agente externo
  * que substitui a base a cada carga. A conexão usa um papel somente-leitura (`radar_leitor`).
  * Falha fechada: sem Cloudflare Access configurado e um JWT válido, nada é devolvido.
  */
@@ -31,7 +31,7 @@ export const onRequest = async ({ request, env, params }: Ctx): Promise<Response
   if (!isRead && !(request.method === 'POST' && route === 'sync')) return send(404, { error: 'Rota não encontrada.' })
 
   try {
-    const sql = neon(env.DATABASE_URL)
+    const sql = conectar(env.DATABASE_URL)
     const [status] = (await sql`
       -- total_linhas = oportunidades vigentes AGORA (a coluna da carga ficava velha e contava as "ausentes")
       select greatest(ultima_carga_em, (select max(atualizado_em) from oportunidades)) as ultima_carga_em, erro,

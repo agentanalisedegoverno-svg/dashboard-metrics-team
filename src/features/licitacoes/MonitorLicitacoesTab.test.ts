@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { consultarComprasGov, consultarPncp, consultarPncpUf, fonteNaoAtivada, normalizarCompras, oportunidadeDe, pncpUrl } from './MonitorLicitaçõesTab'
+import { consultarComprasGov, consultarPncp, consultarPncpUf, fonteNaoAtivada, normalizarCompras, oportunidadeDe, pncpUrl } from './MonitorLicitacoesTab'
 
 afterEach(() => {
   vi.unstubAllGlobals()

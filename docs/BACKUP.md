@@ -1,4 +1,4 @@
-# Backup do banco (Neon → Google Drive e espelho no Supabase)
+# Backup do banco (Azure → Google Drive e espelho no Supabase)
 
 > **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure; veja [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md) e [`PLANO-DE-ACAO-BANCO.md`](PLANO-DE-ACAO-BANCO.md).
 

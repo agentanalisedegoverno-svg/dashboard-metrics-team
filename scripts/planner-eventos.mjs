@@ -2,7 +2,7 @@
 // para a pasta `eventos/entrada` do planner-auto, que cria/atualiza os cartões.
 //
 // Uso:
-//   DATABASE_URL_PLANNER=postgresql://radar_planner:...@host/neondb?sslmode=require \
+//   DATABASE_URL_PLANNER=postgresql://radar_planner:...@host/radar?sslmode=require \
 //     node scripts/planner-eventos.mjs --saida "C:\...\planner-auto\eventos\entrada" [--dry-run] [--ativar]
 //
 //   --ativar   grava o marco (agora). Só oportunidades criadas DEPOIS dele são enviadas;
@@ -11,7 +11,7 @@
 //
 // Idempotente: cada oportunidade só gera novo evento quando sua `versao` aumenta.
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { neon } from './banco.mjs'
+import { conectar } from './banco.mjs'
 import { montarEvento, nomeArquivo } from '../functions/_lib/planner.ts'
 
 const args = process.argv.slice(2)
@@ -26,7 +26,7 @@ if (!url || (!saida && !dryRun && !args.includes('--ativar'))) {
 }
 
 const mapa = JSON.parse(await readFile(new URL('../config/planner-mapa.json', import.meta.url), 'utf8'))
-const sql = neon(url)
+const sql = conectar(url)
 
 if (args.includes('--ativar')) {
   const [m] = await sql`update planner_marco set marco = coalesce(marco, now()) where id = 1 returning marco`

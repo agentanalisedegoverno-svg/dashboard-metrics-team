@@ -1,9 +1,9 @@
-// Mede a latência do banco real (Neon) com as MESMAS leituras que a aplicação faz. Só SELECT, em volume pequeno
+// Mede a latência do banco real com as MESMAS leituras que a aplicação faz. Só SELECT, em volume pequeno
 // (dezenas de consultas): não altera dados e não pesa no plano gratuito.
 //
 // Uso: DATABASE_URL=postgresql://... node scripts/medir-banco.mjs [--requisicoes 20] [--simultaneas 1,5,10]
 //      (qualquer papel com SELECT em oportunidades serve, ex.: radar_leitor)
-import { neon } from './banco.mjs'
+import { conectar } from './banco.mjs'
 
 const args = process.argv.slice(2)
 const val = (f, d) => (args.includes(f) ? args[args.indexOf(f) + 1] : d)
@@ -14,7 +14,7 @@ if (!url) {
 }
 const requisicoes = Number(val('--requisicoes', 20))
 const niveis = val('--simultaneas', '1,5,10').split(',').map(Number)
-const sql = neon(url)
+const sql = conectar(url)
 
 const consultas = {
   'listagem completa (GET /api/oportunidades)': () => sql`select coalesce(jsonb_agg(to_jsonb(o) order by o.id), '[]'::jsonb) as rows from oportunidades o where o.arquivado_em is null`,
@@ -27,7 +27,7 @@ const consultas = {
 const pct = (v, p) => v[Math.min(v.length - 1, Math.ceil(v.length * p) - 1)]
 const fmt = (v) => `p50 ${pct(v, 0.5).toFixed(0)} ms · p95 ${pct(v, 0.95).toFixed(0)} ms · máx ${v.at(-1).toFixed(0)} ms`
 
-await consultas['status da carga']() // aquece a conexão e acorda o banco (Neon suspende o computador ocioso)
+await consultas['status da carga']() // aquece a conexão e acorda o banco (bancos serverless suspendem o computador ocioso)
 const [{ n }] = await sql`select count(*)::int as n from oportunidades where arquivado_em is null`
 console.log(`Banco com ${n} oportunidades vigentes. ${requisicoes} requisições por nível; níveis de simultaneidade: ${niveis.join(', ')}\n`)
 

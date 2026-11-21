@@ -1,5 +1,7 @@
 # Roadmap de melhorias
 
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+
 Estado em 28/10/2026 (monitoramento de licitações atualizado em 02/11/2026) e o que vem a seguir. Cada item traz o **porquê** e o **tamanho** aproximado (P = horas, M = dias, G = semanas). A prioridade é uma sugestão para validação do time.
 
 ## 1. Onde estamos
