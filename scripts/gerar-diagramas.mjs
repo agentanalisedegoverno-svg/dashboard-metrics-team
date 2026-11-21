@@ -2,7 +2,7 @@
 // Os SVG são artefatos gerados: não edite à mão; mude o diagrama no documento e rode `npm run diagramas`.
 //
 // Requisitos: o Chromium do Playwright (npx playwright install chromium; já usado nos testes e2e) e o mermaid-cli,
-// baixado sob demanda pelo npx (não é dependência do projeto). Para usar uma cópia local do mmdc: MMDC=caminho\mmdc.
+// baixado sob demanda pelo npx (não é dependência do projeto). Para usar uma cópia local do mmdc: MMDC=caminho\mmdc. Para usar outro Chromium/Chrome já instalado: CHROMIUM_PATH=caminho\chrome.exe.
 //
 // Uso: node scripts/gerar-diagramas.mjs [--verificar]
 //   --verificar  não grava nada: só confere se a lista de nomes abaixo bate com os blocos do documento.
@@ -52,7 +52,7 @@ if (process.argv.includes('--verificar')) {
 const tmp = mkdtempSync(join(tmpdir(), 'radar-diagramas-'))
 try {
   const config = join(tmp, 'puppeteer.json')
-  writeFileSync(config, JSON.stringify({ executablePath: chromium.executablePath(), args: ['--no-sandbox'] }))
+  writeFileSync(config, JSON.stringify({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] }))
   const entrada = join(tmp, 'diagramas.md')
   writeFileSync(entrada, doc)
 
