@@ -1,6 +1,6 @@
 # Diagramas do Radar Pré-Vendas
 
-> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Onde este documento diz "Neon", leia o banco do Azure (o restante segue valendo). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
+> **Atenção (18/11/2026):** o banco de produção migrou do Neon para o **Azure Database for PostgreSQL**. Os diagramas D2, D3, D12, D15 e D17 já refletem o Azure (backup a cada 6 h, restauração semanal, espelho no Supabase 4x por dia). Ver [`MIGRACAO-AZURE.md`](MIGRACAO-AZURE.md).
 
 | | |
 |---|---|
@@ -79,7 +79,7 @@ flowchart TB
   gmail["Gmail (SMTP)"]:::externo
   receita["APIs públicas de CNPJ<br/>dados da Receita Federal"]:::externo
   drive["Google Drive<br/>backups criptografados"]:::externo
-  supa["Supabase<br/>espelho diário do banco"]:::externo
+  supa["Supabase<br/>espelho do banco (4x por dia)"]:::externo
 
   adm --> access
   edt --> access
@@ -91,8 +91,8 @@ flowchart TB
   gh -.->|"cria e atualiza cartões (sentido único)"| planner
   gh -.->|"envia os avisos"| gmail
   gmail -.->|"entrega o e-mail"| dest
-  gh -.->|"dump diário criptografado"| drive
-  gh -.->|"restaura o espelho diário"| supa
+  gh -.->|"dump criptografado a cada 6 h"| drive
+  gh -.->|"restaura o espelho 4x por dia"| supa
 ```
 
 ### D2 · Contêineres (C4 nível 2)
@@ -115,7 +115,7 @@ flowchart LR
     API["Pages Functions /api/*<br/>TypeScript no runtime Workers<br/>valida JWT, CSRF e Zod"]:::interno
   end
 
-  subgraph neon["Azure Postgres 17 (Brazil South)"]
+  subgraph pg["Azure Postgres 17 (Brazil South)"]
     DB[("tabelas, funções SECURITY DEFINER<br/>e gatilhos")]:::dados
   end
 
@@ -123,8 +123,8 @@ flowchart LR
     PLN{{"Planner integração<br/>disparo ao salvar + 5 min, seg a sex<br/>Node + Python"}}:::agenda
     MAIL{{"Enviar e-mails<br/>disparo ao salvar + 15 min<br/>nodemailer"}}:::agenda
     WF{{"Pipeline CI/CD"}}:::agenda
-    BKP{{"Backup diário, restauração mensal e vigia"}}:::agenda
-    ESP{{"Espelho no Supabase<br/>diário"}}:::agenda
+    BKP{{"Backup a cada 6 h, restauração semanal e vigia"}}:::agenda
+    ESP{{"Espelho no Supabase<br/>4x por dia"}}:::agenda
     NF{{"Testes de carga e segurança<br/>semanal"}}:::agenda
   end
 
@@ -737,9 +737,9 @@ flowchart LR
   DEP -.->|"rollback: rodar o pipeline com o commit anterior"| PIPE
 
   SEM{{"Semanal: carga e segurança"}}:::agenda --> NF["Carga do banco e da API<br/>sondagem de segurança do site (de fora)<br/>latência do banco real"]:::passo
-  DIA{{"Diário: vigia"}}:::agenda --> VG["backup e teste de restauração em dia"]:::passo
+  DIA{{"A cada 6 h: vigia"}}:::agenda --> VG["backup e teste de restauração em dia"]:::passo
   INT{{"Ao salvar na web + agenda<br/>Planner integração e Enviar e-mails"}}:::agenda --> RT["cartão no Planner e e-mail em cerca de 1 minuto<br/>(verificar: confere login e colunas sem gravar)"]:::passo
-  ESD{{"Diário: espelho no Supabase"}}:::agenda --> ES["restaura o banco no projeto dedicado"]:::passo
+  ESD{{"4x por dia: espelho no Supabase"}}:::agenda --> ES["restaura o banco no projeto dedicado"]:::passo
 ```
 
 ---
@@ -1029,6 +1029,7 @@ Para regenerar depois de mudar um diagrama: `npm run diagramas` (usa o Chromium 
 
 | Versão | Data | Mudança |
 |---|---|---|
+| 1.4 | 21/11/2026 | Banco migrado do Neon para o Azure Postgres e rotina de backup a cada 6 h (D2, D3, D12, D15, D17); proxy de licitações consolidado | 
 | 1.3 | 28/10/2026 | API externa para criar oportunidades (D1, D2, D4, D17, D18, D19): chave por aplicação, autoria `api:<cliente>`, solicitante e idempotência |
 | 1.2 | 28/10/2026 | Rotinas na nuvem (GitHub Actions disparado pelo Radar ao salvar; sem máquina de pessoa); fim da carga da planilha (D12); espelho diário no Supabase (D2, D3, D15, D17); e-mail também na mudança de status e com todas as informações (D14); estado do Planner cifrado no banco (D13, D18, D19); novos campos (sigla, duração do contrato) |
 | 1.1 | 25/10/2026 | D10b deixa de sugerir um ciclo de status e passa a mostrar só o que o sistema faz: lista fechada sem ordem imposta, exigências por status e efeitos do status (Planner, e-mail, painel) |
