@@ -11,7 +11,7 @@ Mapa dos **77 endpoints** da API pública de dados abertos do Compras.gov.br, ge
 
 ## O que o Radar já usa
 
-Apenas 3 endpoints, por meio do proxy `functions/api/pncp/[[path]].ts` (lista de permissão `COMPRAS_ALLOWED`), no bloco "Fontes públicas" da aba Monitoramento das oportunidades:
+Apenas 3 endpoints, por meio do proxy `functions/_lib/fontesExternas.ts` (lista de permissão `COMPRAS_ALLOWED`; as rotas `/comprasgov`, `/pncp`, `/conlicitacao` e `/api/pncp` só repassam para ele), no bloco "Fontes públicas" da aba Monitoramento das oportunidades:
 
 | Endpoint | Uso no Radar |
 |---|---|
