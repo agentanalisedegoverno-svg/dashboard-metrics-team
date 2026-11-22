@@ -33,7 +33,7 @@ export async function aplicarMigracao(db: Db, arquivo: string) {
     try {
       await db.exec(s)
     } catch (e) {
-      throw new Error(`Falha em ${arquivo}: ${(e as Error).message}\n--- instrução ---\n${s.slice(0, 300)}`)
+      throw new Error(`Falha em ${arquivo}: ${(e as Error).message}\n--- instrução ---\n${s.slice(0, 300)}`, { cause: e })
     }
   }
 }
@@ -70,7 +70,6 @@ export const opp = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Reg = Record<string, any>
 
 export async function criar(db: Db, payload: Record<string, unknown>, email = ADMIN): Promise<Reg> {

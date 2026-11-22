@@ -45,7 +45,6 @@ describeLegacy('paridade com o painel HTML atual', () => {
   const end = html.indexOf('const PLANO')
   const legacyCode = html.slice(start, end)
   const NVc = NV
-  // eslint-disable-next-line no-new-func
   const legacy = new Function('NV', 'pct', `${legacyCode}; return { computeMetrics, computeMaturity };`)(NVc, (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`)
 
   const cases: [string, Filters][] = [

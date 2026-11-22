@@ -3,7 +3,7 @@
 //
 // Uso:
 //   DATABASE_URL_PLANNER=postgresql://radar_planner:...@host/radar?sslmode=require \
-//     node scripts/planner-eventos.mjs --saida "C:\...\planner-auto\eventos\entrada" [--dry-run] [--ativar]
+//     node scripts/planner-eventos.mjs --saida "C:\...\planner-auto\eventos/entrada" [--dry-run] [--ativar]
 //
 //   --ativar   grava o marco (agora). Só oportunidades criadas DEPOIS dele são enviadas;
 //              as que já existiam (planilha) nunca vão para o Planner.
@@ -21,7 +21,7 @@ const saida = val('--saida', process.env.PLANNER_EVENTOS_DIR)
 const url = process.env.DATABASE_URL_PLANNER
 
 if (!url || (!saida && !dryRun && !args.includes('--ativar'))) {
-  console.error('Uso: DATABASE_URL_PLANNER=... node scripts/planner-eventos.mjs --saida <pasta eventos\entrada> [--dry-run] [--ativar]')
+  console.error('Uso: DATABASE_URL_PLANNER=... node scripts/planner-eventos.mjs --saida <pasta eventos/entrada> [--dry-run] [--ativar]')
   process.exit(2)
 }
 

@@ -27,7 +27,7 @@ export const useFilters = create<State>((set) => ({
   setMany: (dim, values, on, rows) =>
     set(({ filters }) => {
       const next = new Set(filters[dim])
-      for (const v of values) (on ? next.add(v) : next.delete(v))
+      for (const v of values) { if (on) next.add(v); else next.delete(v) }
       return { filters: withDim(filters, dim, next, rows) }
     }),
   clear: () => set({ filters: emptyFilters() }),

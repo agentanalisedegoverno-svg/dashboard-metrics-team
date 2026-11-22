@@ -34,10 +34,12 @@ export type DadosEmail = {
 
 export type Mensagem = { assunto: string; texto: string; html: string }
 
+// eslint-disable-next-line no-control-regex -- remover caracteres de controle é a finalidade
 const limpa = (v: unknown, max = 200) => String(v ?? '').replace(/[\r\n\t\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, max)
 const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 /** Valor com quebras de linha preservadas (observações, objeto), sem caracteres de controle. */
+// eslint-disable-next-line no-control-regex -- remover caracteres de controle é a finalidade
 const valorCheio = (v: string) => v.replace(/\r\n/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ').trim()
 
 const dataBr = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—')

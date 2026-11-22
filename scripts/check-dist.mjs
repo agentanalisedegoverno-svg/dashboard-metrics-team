@@ -33,7 +33,7 @@ if (css / 1024 > BUDGET_CSS_GZIP_KB) errors.push(`CSS inicial acima do orçament
 
 // 2) Nenhum dado real: todo JSON de linhas publicado deve ser a base sintética (processo "DEMO-*").
 for await (const file of walk(DIST)) {
-  if (/(^|[\/])(\.local|\.env)/.test(file) || file.endsWith('.map') === false && /\.(xlsx?|xlsm|csv)$/i.test(file)) {
+  if (/(^|[/])(\.local|\.env)/.test(file) || file.endsWith('.map') === false && /\.(xlsx?|xlsm|csv)$/i.test(file)) {
     errors.push(`Arquivo proibido em dist/: ${file}`)
   }
   if (!file.endsWith('.json')) continue

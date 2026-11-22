@@ -143,8 +143,8 @@ function Testar({ base, metodo, caminho, corpoInicial }: { base: string; metodo:
 export function ApiDocs({ opcoes }: { opcoes: Opcoes }) {
   const base = `${window.location.origin}/api/externo`
   const campos = useMemo(() => catalogoCampos(opcoes.listas ?? {}), [opcoes.listas])
-  const statusLista = campos.find((c) => c.nome === 'status')?.valores ?? []
-  const ufLista = campos.find((c) => c.nome === 'uf')?.valores ?? []
+  const statusLista = useMemo(() => campos.find((c) => c.nome === 'status')?.valores ?? [], [campos])
+  const ufLista = useMemo(() => campos.find((c) => c.nome === 'uf')?.valores ?? [], [campos])
   const exemplo = useMemo(
     () => ({
       solicitante: 'Maria Souza (Contratos)',

@@ -90,7 +90,7 @@ async function fetchDataset(signal: AbortSignal): Promise<Dataset> {
     if (signal.aborted) throw fallbackError
     const apiMessage = apiError instanceof Error ? apiError.message : 'erro desconhecido'
     const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'erro desconhecido'
-    throw new Error(`API e fallback indisponíveis. API: ${apiMessage}. Fallback: ${fallbackMessage}`)
+    throw new Error(`API e fallback indisponíveis. API: ${apiMessage}. Fallback: ${fallbackMessage}`, { cause: fallbackError })
   }
 }
 
