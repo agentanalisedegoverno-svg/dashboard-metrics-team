@@ -20,6 +20,7 @@
 - [MONITORAMENTO-LICITACOES.md](MONITORAMENTO-LICITACOES.md): Módulo de monitoramento de licitações
 - [API-EXTERNA.md](API-EXTERNA.md): API externa: criar oportunidades a partir de outra aplicação
 - [API-LEITURA.md](API-LEITURA.md): API de leitura: consultar as oportunidades (somente visualização, para agentes e relatórios)
+- [MCP-REMOTO.md](MCP-REMOTO.md): MCP remoto somente leitura (Claude.ai, Copilot Studio, Gemini, GPT personalizado): como liberar para outras pessoas
 - [../mcp/README.md](../mcp/README.md): servidor MCP somente leitura (agentes de IA consultam as oportunidades; depende da API de leitura)
 - [API-COMPRAS-GOV-ENDPOINTS.md](API-COMPRAS-GOV-ENDPOINTS.md): API Compras.gov.br (Dados Abertos) — mapa dos endpoints
 
@@ -39,4 +40,5 @@
 ## Observações
 
 - `api-externa.openapi.json`: especificação OpenAPI da API externa (gerada; ver API-EXTERNA.md).
+- `api-leitura.openapi.json`: especificação OpenAPI só de leitura, para importar em um GPT personalizado (gerada; mesmo comando `UPDATE_OPENAPI=1`).
 - `diagramas/`: diagramas SVG gerados por `scripts/gerar-diagramas.mjs`. Os diagramas D02, D03, D12, D15 e D17 ainda mostram o Neon e devem ser regerados.

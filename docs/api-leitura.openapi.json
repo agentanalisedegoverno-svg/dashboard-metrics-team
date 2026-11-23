@@ -1,0 +1,261 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Radar Pré-Vendas: consulta de oportunidades",
+    "version": "1.0.0",
+    "description": "Somente leitura. Exige chave de LEITURA (Bearer rdr_...)."
+  },
+  "servers": [
+    {
+      "url": "https://radar-prevendas.pages.dev/api/externo"
+    }
+  ],
+  "security": [
+    {
+      "chaveApi": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "chaveApi": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Chave rdr_... criada em Administração → API (alternativa: cabeçalho x-api-key)."
+      }
+    },
+    "schemas": {
+      "Erro": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "erros": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "campo": {
+                  "type": "string"
+                },
+                "mensagem": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/oportunidades": {
+      "get": {
+        "summary": "Lista oportunidades (todos os campos, paginado)",
+        "description": "Filtros por texto, status, torre, UF, órgão, valor e período. Use proximo_offset para a próxima página.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Busca em código, sigla, órgão, processo, descritivo, objeto, UASG, pré-vendas e linha de serviço."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "torre",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uf",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 2
+            }
+          },
+          {
+            "name": "linha_servico",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "segmento",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Corporate",
+                "Público"
+              ]
+            }
+          },
+          {
+            "name": "analista",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Contém o nome informado."
+          },
+          {
+            "name": "orgao",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Contém o texto informado."
+          },
+          {
+            "name": "pregao_de",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "pregao_ate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "valor_min",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            },
+            "description": "Orçamento mínimo em reais, com ponto decimal. Sem orçamento (ou sigiloso) não entra quando há faixa."
+          },
+          {
+            "name": "valor_max",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "atualizado_desde",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Para sincronizar só o que mudou."
+          },
+          {
+            "name": "arquivadas",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ total, limite, offset, proximo_offset (null no fim), itens: [oportunidade com todos os campos] }"
+          },
+          "401": {
+            "description": "Chave ausente, inválida ou revogada."
+          },
+          "403": {
+            "description": "A chave é de escrita: use uma chave de leitura."
+          },
+          "422": {
+            "description": "Parâmetros inválidos (lista \"erros\" com campo e mensagem).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listarOportunidades"
+      }
+    },
+    "/oportunidades/{codigo}": {
+      "get": {
+        "summary": "Uma oportunidade pelo código AAAA-NNNN ou id",
+        "parameters": [
+          {
+            "name": "codigo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-0001"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A oportunidade com todos os campos."
+          },
+          "401": {
+            "description": "Chave ausente, inválida ou revogada."
+          },
+          "403": {
+            "description": "A chave é de escrita: use uma chave de leitura."
+          },
+          "404": {
+            "description": "Oportunidade não encontrada."
+          }
+        },
+        "operationId": "verOportunidade",
+        "description": "Devolve a oportunidade com todos os campos."
+      }
+    },
+    "/campos": {
+      "get": {
+        "summary": "Campos e valores válidos dos filtros",
+        "responses": {
+          "200": {
+            "description": "campos, extras e regras"
+          },
+          "401": {
+            "description": "Chave ausente, inválida ou revogada."
+          }
+        },
+        "operationId": "listarCampos",
+        "description": "Catálogo de campos e listas válidas (status, torre, UF, linha de serviço)."
+      }
+    }
+  }
+}

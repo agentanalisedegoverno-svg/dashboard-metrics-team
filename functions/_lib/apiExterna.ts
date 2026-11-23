@@ -95,7 +95,7 @@ export async function autenticar(sql: Sql, request: Request): Promise<ClienteApi
 }
 
 // O catálogo de campos e o OpenAPI moram em src/domain/catalogoApi.ts (a tela de documentação também os usa).
-export { catalogoCampos, openApi, REGRAS, type CampoApi } from '../../src/domain/catalogoApi.ts'
+export { catalogoCampos, openApi, openApiLeitura, REGRAS, type CampoApi } from '../../src/domain/catalogoApi.ts'
 
 // ---------------------------------------------------------------- rota com chave de API
 
