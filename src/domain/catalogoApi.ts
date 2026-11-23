@@ -75,6 +75,33 @@ export const REGRAS = [
   'Valores monetários não podem ser negativos; orcamento_sigiloso=true esconde o orçamento no e-mail e no Planner.',
 ] as const
 
+/**
+ * OpenAPI 3.0 SÓ DE LEITURA (docs/api-leitura.openapi.json), para importar em um GPT personalizado (Actions) ou em qualquer ferramenta
+ * que deva apenas consultar: sem o POST, com `operationId` e descrições curtas (o GPT limita o texto de cada operação).
+ */
+export function openApiLeitura(catalogo: CampoApi[]) {
+  const base = openApi(catalogo)
+  const lista = base.paths['/oportunidades'].get
+  return {
+    openapi: base.openapi,
+    info: { title: 'Radar Pré-Vendas: consulta de oportunidades', version: base.info.version, description: 'Somente leitura. Exige chave de LEITURA (Bearer rdr_...).' },
+    servers: base.servers,
+    security: base.security,
+    components: { securitySchemes: base.components.securitySchemes, schemas: { Erro: base.components.schemas.Erro } },
+    paths: {
+      '/oportunidades': {
+        get: { ...lista, operationId: 'listarOportunidades', summary: 'Lista oportunidades (todos os campos, paginado)', description: 'Filtros por texto, status, torre, UF, órgão, valor e período. Use proximo_offset para a próxima página.' },
+      },
+      '/oportunidades/{codigo}': {
+        get: { ...base.paths['/oportunidades/{codigo}'].get, operationId: 'verOportunidade', summary: 'Uma oportunidade pelo código AAAA-NNNN ou id', description: 'Devolve a oportunidade com todos os campos.' },
+      },
+      '/campos': {
+        get: { ...base.paths['/campos'].get, operationId: 'listarCampos', summary: 'Campos e valores válidos dos filtros', description: 'Catálogo de campos e listas válidas (status, torre, UF, linha de serviço).' },
+      },
+    },
+  }
+}
+
 /** Esquema OpenAPI 3.0 da API externa, gerado do catálogo (docs/api-externa.openapi.json; um teste confere que está em dia). */
 export function openApi(catalogo: CampoApi[]) {
   const tipoJson = (c: CampoApi): Record<string, unknown> => {

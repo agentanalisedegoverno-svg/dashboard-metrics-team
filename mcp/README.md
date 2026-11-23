@@ -1,5 +1,7 @@
 # Servidor MCP do Radar Pré-Vendas (somente leitura)
 
+> **Para liberar a outras pessoas sem instalar nada**, use o [MCP remoto](../docs/MCP-REMOTO.md) (mesma consulta, hospedada no Radar). Este servidor local serve para quem prefere rodar na própria máquina.
+
 Permite que um **agente de IA** (Claude Desktop, Claude Code, ou qualquer cliente MCP) **consulte as oportunidades** do Radar. É só visualização: o servidor **não tem nenhuma ferramenta de escrita** e não acessa o banco; ele apenas repassa consultas à [API de leitura](../docs/API-LEITURA.md) usando uma **chave de leitura**.
 
 ```

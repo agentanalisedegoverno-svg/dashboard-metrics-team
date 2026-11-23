@@ -28,7 +28,7 @@ vi.mock('./http.ts', async (importOriginal) => ({
   },
 }))
 
-import { catalogoCampos, chaveDaRequisicao, chaveIdempotencia, gerarChave, hashChave, openApi, rotaExterna, separarSolicitante } from './apiExterna.ts'
+import { catalogoCampos, chaveDaRequisicao, chaveIdempotencia, gerarChave, hashChave, openApi, openApiLeitura, rotaExterna, separarSolicitante } from './apiExterna.ts'
 import { criar } from './cadastro.ts'
 import { onRequest as rotaOportunidades } from '../api/externo/oportunidades.ts'
 import { LIMITE_FALHAS_POR_MINUTO, LIMITE_POR_MINUTO, limitar, previa, querSimular, reiniciarLimites } from './apiExterna.ts'
@@ -160,6 +160,18 @@ describe('especificação OpenAPI (docs/api-externa.openapi.json)', () => {
   it('está em dia com o formulário (se falhar: rode UPDATE_OPENAPI=1 npx vitest run functions/_lib/apiExterna.test.ts e faça commit do arquivo)', () => {
     if (process.env.UPDATE_OPENAPI) writeFileSync(arquivo, esperado, 'utf8')
     expect(readFileSync(arquivo, 'utf8').replace(/\r\n/g, '\n')).toBe(esperado)
+  })
+  it('a especificação só de leitura (docs/api-leitura.openapi.json) está em dia e não tem nenhuma operação de escrita', () => {
+    const arq = new URL('../../docs/api-leitura.openapi.json', import.meta.url)
+    const leitura = openApiLeitura(catalogoCampos({}))
+    const texto = JSON.stringify(leitura, null, 2) + '\n'
+    if (process.env.UPDATE_OPENAPI) writeFileSync(arq, texto, 'utf8')
+    expect(readFileSync(arq, 'utf8').replace(/\r\n/g, '\n')).toBe(texto)
+    const operacoes = Object.values(leitura.paths).flatMap((p) => Object.entries(p))
+    expect(operacoes.map(([metodo]) => metodo)).toEqual(['get', 'get', 'get'])
+    expect(operacoes.map(([, o]) => (o as { operationId: string }).operationId)).toEqual(['listarOportunidades', 'verOportunidade', 'listarCampos'])
+    for (const [, o] of operacoes) expect(((o as { description: string }).description + (o as { summary: string }).summary).length).toBeLessThan(300)
+    expect(texto).not.toMatch(/Idempotency|simular|solicitante/)
   })
   it('exige exatamente os campos obrigatórios do catálogo e aceita todos os campos do formulário', () => {
     const o = openApi(catalogoCampos({})) as { components: { schemas: { Oportunidade: { required: string[]; properties: Record<string, unknown> } } } }

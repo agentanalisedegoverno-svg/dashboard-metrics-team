@@ -24,7 +24,7 @@ const rotas = Object.entries(modulos)
   .map(([arquivo, m]) => ({ arquivo, onRequest: m.onRequest }))
 
 /** Rotas da API externa: chamadas servidor a servidor com chave de API (o Cloudflare Access tem Bypass só neste caminho). */
-const EXTERNAS = ['./externo/campos.ts', './externo/oportunidades.ts', './externo/oportunidades/[codigo].ts']
+const EXTERNAS = ['./externo/campos.ts', './externo/mcp.ts', './externo/oportunidades.ts', './externo/oportunidades/[codigo].ts']
 const protegidas = rotas.filter((r) => !EXTERNAS.includes(r.arquivo))
 const externas = rotas.filter((r) => EXTERNAS.includes(r.arquivo))
 
@@ -81,6 +81,7 @@ describe('descoberta de rotas', () => {
       './email-config.ts',
       './email-config/teste.ts',
       './externo/campos.ts',
+      './externo/mcp.ts',
       './externo/oportunidades.ts',
       './externo/oportunidades/[codigo].ts',
       './linhas-torre.ts',
@@ -320,6 +321,90 @@ describe('API de leitura: escopo da chave, papel só-leitura e parâmetros', () 
     const erro = Object.assign(new Error('function autenticar_api_chave does not exist'), { code: '42883' })
     sqlMock.mockRejectedValueOnce(erro).mockResolvedValue([{ nome: 'sistema-antigo' }])
     expect((await ler(lista(), 'oportunidades')).status).toBe(403) // é de escrita: não lê
+  })
+})
+
+describe('MCP remoto: chave de leitura, papel só-leitura e origem', () => {
+  const CHAVE = 'rdr_' + 'C'.repeat(43)
+  const mcp = () => externas.find((r) => r.arquivo === './externo/mcp.ts')!
+  const comEscopo = (escopo: 'leitura' | 'escrita') => sqlMock.mockResolvedValue([{ r: { nome: 'agente-mcp', escopo } }])
+  const rpc = (corpo: unknown, o: { method?: string; headers?: Record<string, string>; env?: Record<string, string | undefined>; chave?: boolean } = {}) =>
+    mcp().onRequest({
+      request: new Request('https://radar.test/api/externo/mcp', {
+        method: o.method ?? 'POST',
+        headers: { ...(o.chave === false ? {} : { authorization: `Bearer ${CHAVE}` }), 'content-type': 'application/json', ...(o.headers ?? {}) },
+        body: (o.method ?? 'POST') === 'POST' ? JSON.stringify(corpo) : undefined,
+      }),
+      env: o.env ?? ENV,
+      params: {},
+    })
+  const chamarFerramenta = (name: string, args: unknown = {}) => rpc({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
+
+  it('sem chave -> 401 e o banco de consulta não é tocado', async () => {
+    const res = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { chave: false })
+    expect(res.status).toBe(401)
+    expect(res.headers.get('www-authenticate')).toMatch(/Bearer/)
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it('chave de ESCRITA não usa o MCP de leitura (403)', async () => {
+    comEscopo('escrita')
+    const res = await chamarFerramenta('listar_oportunidades')
+    expect(res.status).toBe(403)
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it('chave de leitura: initialize e tools/list respondem sem consultar o banco; só a autenticação usa o radar_app', async () => {
+    comEscopo('leitura')
+    const ini = await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } })
+    expect(ini.status).toBe(200)
+    expect((await ini.json()).result.serverInfo.name).toBe('radar-prevendas')
+    expect(ini.headers.get('cache-control')).toBe('private, no-store')
+    const lista = await rpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' })
+    expect((await lista.json()).result.tools).toHaveLength(3)
+    expect(sqlLeitor).not.toHaveBeenCalled()
+    expect(sqlMock.mock.calls.every((c) => c[0].join('?').includes('autenticar_api_chave'))).toBe(true)
+  })
+
+  it('consulta pelo papel radar_leitor (nunca pelo radar_app) e devolve todos os campos', async () => {
+    comEscopo('leitura')
+    sqlLeitor.mockResolvedValue([{ total: 1, itens: [{ id: 1, codigo: '2026-0001', valor_ctc: 123 }] }])
+    const res = await chamarFerramenta('listar_oportunidades', { status: 'Go' })
+    const corpo = await res.json()
+    expect(JSON.parse(corpo.result.content[0].text).itens[0]).toMatchObject({ valor_ctc: 123 })
+    expect(sqlLeitor).toHaveBeenCalledTimes(1)
+    expect(sqlMock).toHaveBeenCalledTimes(1) // só a autenticação
+  })
+
+  it('sem o banco de consulta configurado -> 503', async () => {
+    comEscopo('leitura')
+    const res = await chamarFerramenta('listar_oportunidades', {})
+    const sem = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { env: { ...ENV, DATABASE_URL: undefined } })
+    expect(res.status).toBe(200)
+    expect(sem.status).toBe(503)
+  })
+
+  it('requisição de navegador de outro site (Origin) é recusada; GET e DELETE não existem (405)', async () => {
+    comEscopo('leitura')
+    expect((await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { headers: { origin: 'https://site-malicioso.test' } })).status).toBe(403)
+    expect((await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { headers: { origin: 'https://radar.test' } })).status).toBe(200)
+    for (const method of ['GET', 'DELETE', 'PUT']) expect((await rpc(null, { method })).status).toBe(405)
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it('corpo que não é JSON -> 400; corpo grande demais -> 413', async () => {
+    comEscopo('leitura')
+    const naoJson = await mcp().onRequest({ request: new Request('https://radar.test/api/externo/mcp', { method: 'POST', headers: { authorization: `Bearer ${CHAVE}` }, body: '{oops' }), env: ENV, params: {} })
+    expect(naoJson.status).toBe(400)
+    const grande = await mcp().onRequest({ request: new Request('https://radar.test/api/externo/mcp', { method: 'POST', headers: { authorization: `Bearer ${CHAVE}` }, body: 'x'.repeat(70 * 1024) }), env: ENV, params: {} })
+    expect(grande.status).toBe(413)
+  })
+
+  it('a chave nunca aparece na resposta', async () => {
+    comEscopo('leitura')
+    sqlLeitor.mockRejectedValue(new Error(`falha ${CHAVE}`))
+    const res = await chamarFerramenta('listar_oportunidades')
+    expect(await res.text()).not.toContain(CHAVE)
   })
 })
 
