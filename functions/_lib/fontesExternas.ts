@@ -6,6 +6,10 @@
  */
 import { identificar, send, type Env } from './http.ts'
 
+/** JSON de fonte externa, sem esquema garantido: cada campo é tratado como opcional. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Obj = Record<string, any>
+
 export type EnvFontes = Env & { CONLICITACAO_TOKEN?: string }
 
 const COMPRAS_ALLOWED = new Set([
@@ -25,7 +29,7 @@ const motivoTecnico = (e: unknown) => {
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
 
 /** Registro de um boletim da ConLicitações no formato que o front-end já consome (campos do PNCP). */
-export function mapearItemConlicitacao(item: Record<string, any>, filtro: Record<string, any>, boletimId: unknown) {
+export function mapearItemConlicitacao(item: Obj, filtro: Obj, boletimId: unknown) {
   const orgao = item.orgao && typeof item.orgao === 'object' ? item.orgao : {}
   const modalidade = item.modalidade && typeof item.modalidade === 'object' ? item.modalidade.descricao : item.modalidade
   return {
@@ -60,7 +64,7 @@ async function consultarConlicitacao(token: string): Promise<Response> {
       signal: AbortSignal.timeout(20_000),
     })
     if (!response.ok) throw Object.assign(new Error('ConLicitações respondeu HTTP ' + response.status), { status: response.status })
-    return response.json() as Promise<Record<string, any>>
+    return response.json() as Promise<Obj>
   }
   const statusDe = (e: unknown) => {
     const s = (e as { status?: number } | undefined)?.status
@@ -68,7 +72,7 @@ async function consultarConlicitacao(token: string): Promise<Response> {
   }
   try {
     const catalogo = await get('/filtros')
-    const filtros: Record<string, any>[] = Array.isArray(catalogo.filtros) ? catalogo.filtros : []
+    const filtros: Obj[] = Array.isArray(catalogo.filtros) ? catalogo.filtros : []
     const boletins = await Promise.allSettled(filtros.map(async (filtro) => {
       const boletimId = filtro?.ultimo_boletim?.id
       if (boletimId == null) return []

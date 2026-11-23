@@ -7,7 +7,7 @@ export type FormValores = Record<Exclude<Nome, 'orcamento_sigiloso' | 'pendencia
 const fmtNum = (n: number) => String(n).replace('.', ',')
 
 /** Valor em reais para o campo do formulário: "R$ 1.234,56". */
-export const fmtReal = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ')
+export const fmtReal = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/\u00a0/g, ' ')
 
 /** Máscara de digitação em reais: só os dígitos contam e os dois últimos são os centavos ("123456" -> "R$ 1.234,56"). */
 export function mascaraReal(texto: string): string {

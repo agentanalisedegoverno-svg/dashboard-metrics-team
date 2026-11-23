@@ -4,7 +4,7 @@
     var escolha = localStorage.getItem('radar-tema'); // 'claro' | 'escuro' | 'sistema' (ou vazio)
     var escuro = escolha === 'escuro' || (escolha !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.setAttribute('data-theme', escuro ? 'dark' : 'light');
-  } catch (e) {
+  } catch {
     /* sem armazenamento: o CSS cai no tema do sistema */
   }
 })();

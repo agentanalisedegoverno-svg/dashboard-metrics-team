@@ -26,6 +26,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm run test:coverage
       - name: Testes do planner-auto (Python, sem rede)
         run: python3 -m unittest discover -s planner-auto/tests
