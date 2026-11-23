@@ -16,6 +16,6 @@ export default defineConfig({
   // Keep the Pages build isolated from machine-level PostCSS configuration.
   css: { postcss: { plugins: [] } },
   build: { target: 'es2022' },
-  test: { environment: 'node', testTimeout: 20_000, include: ['src/**/*.test.ts', 'functions/**/*.test.ts', 'db/**/*.test.ts'],
+  test: { environment: 'node', testTimeout: 20_000, include: ['src/**/*.test.ts', 'functions/**/*.test.ts', 'db/**/*.test.ts', 'mcp/**/*.test.mjs'],
     coverage: { provider: 'v8', include: ['src/domain/**', 'functions/**'], exclude: ['**/*.test.ts', '**/*.perf.ts'], reporter: ['text', 'lcov'] } },
 })
