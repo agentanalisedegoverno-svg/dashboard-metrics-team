@@ -1,0 +1,20 @@
+{
+  "name": "radar-prevendas-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor MCP somente leitura do Radar Pré-Vendas: repassa consultas à API de leitura (docs/API-LEITURA.md), sem acesso ao banco.",
+  "type": "module",
+  "bin": {
+    "radar-prevendas-mcp": "server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  }
+}
