@@ -5,6 +5,7 @@ import { useRef, useState } from 'react'
 import { STATUS_EMOJI } from '@/domain/metrics'
 import type { Oportunidade } from '@/domain/oportunidade'
 import { cn } from '@/lib/utils'
+import { Dica, DicaOportunidade, ID_DICA } from './DicaOportunidade'
 import { brl, pct, pregaoBr } from './formato'
 
 /** Texto sempre em tinta padrão (contraste AA); a cor do status vai no ponto. */
@@ -61,6 +62,7 @@ export function OportunidadesGrid({ dados, onAbrir, compacto, selecao }: Props) 
   const tabela = useReactTable({ data: dados, columns: colunas, state: { sorting }, onSortingChange: setSorting, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel() })
   const linhas = tabela.getRowModel().rows
   const pai = useRef<HTMLDivElement>(null)
+  const [dica, setDica] = useState<Dica | null>(null)
   const virtual = useVirtualizer({ count: linhas.length, getScrollElement: () => pai.current, estimateSize: () => (compacto ? ALTURA_CARD : ALTURA_LINHA), overscan: 12 })
   const itens = virtual.getVirtualItems()
   const elegiveis = selecao ? dados.filter(selecao.selecionavel).map((o) => o.id) : []
@@ -108,7 +110,8 @@ export function OportunidadesGrid({ dados, onAbrir, compacto, selecao }: Props) 
   }
 
   return (
-    <div ref={pai} className="h-[70vh] overflow-auto rounded-[10px] border border-line bg-surface">
+    <div ref={pai} onScroll={() => setDica(null)} className="h-[70vh] overflow-auto rounded-[10px] border border-line bg-surface">
+      <DicaOportunidade dica={dica} />
       <table className="w-full border-collapse text-[13px]" style={{ minWidth: LARGURA + (selecao ? 40 : 0) }} aria-rowcount={linhas.length + 1}>
         <thead className="sticky top-0 z-10 bg-surface-2">
           {tabela.getHeaderGroups().map((g) => (
@@ -158,6 +161,11 @@ export function OportunidadesGrid({ dados, onAbrir, compacto, selecao }: Props) 
                 tabIndex={0}
                 aria-rowindex={v.index + 2}
                 onClick={() => onAbrir(linha.original)}
+                onMouseEnter={(e) => setDica({ o: linha.original, x: e.clientX, y: e.clientY })}
+                onMouseLeave={() => setDica(null)}
+                onFocus={(e) => { const r = e.currentTarget.getBoundingClientRect(); setDica({ o: linha.original, x: r.left + 24, y: r.top + r.height / 2 }) }}
+                onBlur={() => setDica(null)}
+                aria-describedby={dica?.o.id === linha.original.id ? ID_DICA : undefined}
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onAbrir(linha.original))}
                 style={{ height: ALTURA_LINHA }}
                 className="cursor-pointer border-b border-line-soft hover:bg-line-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold"
