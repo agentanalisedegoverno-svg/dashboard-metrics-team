@@ -11,6 +11,11 @@ updates:
       # A v9 troca a API (createCoreRowModel/ReactTable); a grade usa a v8. Migrar só de forma planejada.
       - dependency-name: '@tanstack/react-table'
         update-types: ['version-update:semver-major']
+      # A v4 reescreveu o pool/conexao/socket e a v3.4.x e a que a documentacao do Cloudflare (Workers/Hyperdrive) recomenda.
+      # Apos a v4 entrar em producao (23/11/2026), /api/rows passou a devolver 503 para alguns usuarios; voltamos a 3.4.x.
+      # Migrar so de forma planejada, testando em preview com carga real (809+ linhas) antes.
+      - dependency-name: postgres
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }
