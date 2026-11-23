@@ -11,6 +11,7 @@
  * pediu na aplicação externa. O resto do fluxo (validação, gatilhos, histórico, e-mail e Planner) é o do cadastro manual.
  */
 import { z } from 'zod'
+import { conectar } from './banco.ts'
 import type { Sql } from './cadastro.ts'
 import { dispararEnvioEmails } from './dispararEmails.ts'
 import { dispararPlanner } from './dispararPlanner.ts'
@@ -72,12 +73,25 @@ export function chaveDaRequisicao(request: Request): string | null {
   return bruta && /^rdr_[A-Za-z0-9_-]{20,80}$/.test(bruta) ? bruta : null
 }
 
-/** Devolve o nome do cliente dono da chave, ou null (chave ausente, inválida ou revogada). */
-export async function autenticar(sql: Sql, request: Request): Promise<string | null> {
+/** Escopo da chave: `escrita` cria oportunidades; `leitura` só consulta (nenhuma das duas faz o que é da outra). */
+export type Escopo = 'escrita' | 'leitura'
+export type ClienteApi = { nome: string; escopo: Escopo }
+
+/** Devolve o cliente dono da chave (nome e escopo), ou null (chave ausente, inválida ou revogada). */
+export async function autenticar(sql: Sql, request: Request): Promise<ClienteApi | null> {
   const chave = chaveDaRequisicao(request)
   if (!chave) return null
-  const [r] = await sql`select autenticar_api_cliente(${await hashChave(chave)}) as nome`
-  return (r?.nome as string | null) ?? null
+  const hash = await hashChave(chave)
+  try {
+    const [r] = await sql`select autenticar_api_chave(${hash}) as r`
+    const v = r?.r as { nome?: string; escopo?: string } | null | undefined
+    return v?.nome ? { nome: v.nome, escopo: v.escopo === 'leitura' ? 'leitura' : 'escrita' } : null
+  } catch (e) {
+    // Migração 029 ainda não aplicada (deploy na frente do banco): as chaves existentes são todas de escrita.
+    if ((e as { code?: string })?.code !== '42883') throw e
+    const [r] = await sql`select autenticar_api_cliente(${hash}) as nome`
+    return r?.nome ? { nome: r.nome as string, escopo: 'escrita' } : null
+  }
 }
 
 // O catálogo de campos e o OpenAPI moram em src/domain/catalogoApi.ts (a tela de documentação também os usa).
@@ -85,7 +99,7 @@ export { catalogoCampos, openApi, REGRAS, type CampoApi } from '../../src/domain
 
 // ---------------------------------------------------------------- rota com chave de API
 
-type ArgsExterno = { sql: Sql; cliente: string; request: Request; env: Env; corpo: () => Promise<unknown> }
+type ArgsExterno = { sql: Sql; leitor: Sql | null; cliente: string; request: Request; env: Env; corpo: () => Promise<unknown> }
 type Ctx = { request: Request; env: Env; waitUntil?: (p: Promise<unknown>) => void }
 
 /**
@@ -93,7 +107,7 @@ type Ctx = { request: Request; env: Env; waitUntil?: (p: Promise<unknown>) => vo
  * resposta sem cache. Depois de criar (201), aciona e-mail e Planner na hora, como o cadastro manual.
  */
 export const rotaExterna =
-  (metodos: Record<string, (a: ArgsExterno) => Promise<Response>>) =>
+  (metodos: Record<string, (a: ArgsExterno) => Promise<Response>>, escopos: Partial<Record<string, Escopo | 'qualquer'>> = {}) =>
   async ({ request, env, waitUntil }: Ctx): Promise<Response> => {
     const handler = metodos[request.method]
     if (!handler) return send(405, { error: 'Método não permitido.' })
@@ -103,8 +117,9 @@ export const rotaExterna =
     const espera = limitar(`ip:${ip}`, LIMITE_POR_MINUTO) || limitar(`falha:${ip}`, LIMITE_FALHAS_POR_MINUTO - 1, Date.now(), false)
     if (espera) return respostaLimite(espera)
     try {
-      const cliente = await autenticar(sql, request)
-      if (!cliente) {
+      const dono = await autenticar(sql, request)
+      const cliente = dono?.nome
+      if (!dono || !cliente) {
         limitar(`falha:${ip}`, LIMITE_FALHAS_POR_MINUTO) // só as chamadas sem chave válida contam aqui
         const r = send(401, { error: 'Chave de API ausente, inválida ou revogada.' })
         r.headers.set('www-authenticate', 'Bearer realm="radar-prevendas"')
@@ -112,8 +127,17 @@ export const rotaExterna =
       }
       const esperaCliente = limitar(`cliente:${cliente}`, LIMITE_POR_MINUTO)
       if (esperaCliente) return respostaLimite(esperaCliente)
+      // Sem declaração, criar (POST) exige chave de escrita e o restante (catálogo) aceita qualquer chave válida.
+      const exigido = escopos[request.method] ?? (request.method === 'POST' ? 'escrita' : 'qualquer')
+      if (exigido !== 'qualquer' && dono.escopo !== exigido) {
+        return send(403, { error: exigido === 'leitura' ? 'Esta chave é de escrita: use uma chave de leitura para consultar.' : 'Esta chave é só de leitura: não pode criar oportunidades.' })
+      }
+      // Consultas usam o papel radar_leitor (só SELECT): mesmo um erro no código não consegue gravar.
+      const leitor = exigido === 'leitura' && env.DATABASE_URL ? (conectar(env.DATABASE_URL) as unknown as Sql) : null
+      if (exigido === 'leitura' && !leitor) return send(503, { error: 'Banco de dados de consulta não configurado.' })
       const resposta = await handler({
         sql,
+        leitor,
         cliente,
         request,
         env,
@@ -189,7 +213,7 @@ export function chaveIdempotencia(request: Request): string | null | Response {
 
 // ---------------------------------------------------------------- administração das chaves (Cloudflare Access + administrador)
 
-const novoCliente = z.object({ nome: z.string().trim().toLowerCase() })
+const novoCliente = z.object({ nome: z.string().trim().toLowerCase(), escopo: z.enum(['escrita', 'leitura']).optional().default('escrita') })
 
 export async function listarClientes(sql: Sql, email: string) {
   try {
@@ -208,7 +232,7 @@ export async function criarCliente(sql: Sql, email: string, corpo: unknown) {
   }
   const chave = gerarChave()
   try {
-    const [r] = await sql`select criar_api_cliente(${p.data.nome}, ${await hashChave(chave)}, ${email}) as r`
+    const [r] = await sql`select criar_api_cliente(${p.data.nome}, ${await hashChave(chave)}, ${email}, ${p.data.escopo}) as r`
     return send(201, { cliente: r.r, chave })
   } catch (e) {
     return erroBanco(e)

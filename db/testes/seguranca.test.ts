@@ -103,6 +103,7 @@ const FUNCAO_PERMITIDA: Record<string, string[] | 'PUBLIC'> = {
   salvar_email_config: ['radar_app'],
   enfileirar_email_teste: ['radar_app'],
   autenticar_api_cliente: ['radar_app'],
+  autenticar_api_chave: ['radar_app'],
   criar_oportunidade_api: ['radar_app'],
   simular_oportunidade_api: ['radar_app'],
   listar_api_clientes: ['radar_app'],

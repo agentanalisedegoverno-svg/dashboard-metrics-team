@@ -96,7 +96,7 @@ export function openApi(catalogo: CampoApi[]) {
     info: {
       title: 'Radar Pré-Vendas: API externa',
       version: '1.0.0',
-      description: 'Cria oportunidades no Radar como o cadastro manual (e-mail e cartão no Planner seguem o fluxo normal). Autenticação por chave de API (Bearer rdr_...). Texto completo: docs/API-EXTERNA.md.',
+      description: 'Chave de leitura: consulta as oportunidades, só para visualização. Chave de escrita: cria oportunidades no Radar como o cadastro manual (e-mail e cartão no Planner seguem o fluxo normal). Autenticação por chave de API (Bearer rdr_...). Texto completo: docs/API-EXTERNA.md.',
     },
     servers: [{ url: 'https://radar-prevendas.pages.dev/api/externo' }],
     security: [{ chaveApi: [] }],
@@ -116,6 +116,34 @@ export function openApi(catalogo: CampoApi[]) {
     },
     paths: {
       '/oportunidades': {
+        get: {
+          summary: 'Lista as oportunidades (só leitura; exige chave de LEITURA)',
+          description: 'Todos os campos de cada oportunidade, ordenados por id e paginados. Parâmetros desconhecidos ou inválidos são recusados com 422. Arquivadas ficam de fora, salvo arquivadas=true.',
+          parameters: [
+            { name: 'q', in: 'query', schema: { type: 'string', maxLength: 100 }, description: 'Busca em código, sigla, órgão, processo, descritivo, objeto, UASG, pré-vendas e linha de serviço.' },
+            { name: 'status', in: 'query', schema: { type: 'string' } },
+            { name: 'torre', in: 'query', schema: { type: 'string' } },
+            { name: 'uf', in: 'query', schema: { type: 'string', maxLength: 2 } },
+            { name: 'linha_servico', in: 'query', schema: { type: 'string' } },
+            { name: 'segmento', in: 'query', schema: { type: 'string', enum: ['Corporate', 'Público'] } },
+            { name: 'analista', in: 'query', schema: { type: 'string' }, description: 'Contém o nome informado.' },
+            { name: 'orgao', in: 'query', schema: { type: 'string' }, description: 'Contém o texto informado.' },
+            { name: 'pregao_de', in: 'query', schema: { type: 'string', format: 'date' } },
+            { name: 'pregao_ate', in: 'query', schema: { type: 'string', format: 'date' } },
+            { name: 'valor_min', in: 'query', schema: { type: 'number' }, description: 'Orçamento mínimo em reais, com ponto decimal. Sem orçamento (ou sigiloso) não entra quando há faixa.' },
+            { name: 'valor_max', in: 'query', schema: { type: 'number' } },
+            { name: 'atualizado_desde', in: 'query', schema: { type: 'string', format: 'date-time' }, description: 'Para sincronizar só o que mudou.' },
+            { name: 'arquivadas', in: 'query', schema: { type: 'boolean' } },
+            { name: 'limite', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 } },
+            { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          ],
+          responses: {
+            '200': { description: '{ total, limite, offset, proximo_offset (null no fim), itens: [oportunidade com todos os campos] }' },
+            '401': { description: 'Chave ausente, inválida ou revogada.' },
+            '403': { description: 'A chave é de escrita: use uma chave de leitura.' },
+            '422': { description: 'Parâmetros inválidos (lista "erros" com campo e mensagem).', content: { 'application/json': { schema: { $ref: '#/components/schemas/Erro' } } } },
+          },
+        },
         post: {
           summary: 'Cria uma oportunidade',
           parameters: [
@@ -130,6 +158,18 @@ export function openApi(catalogo: CampoApi[]) {
             '401': { description: 'Chave ausente, inválida ou revogada.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Erro' } } } },
             '413': { description: 'Corpo acima de 64 KB.' },
             '422': { description: 'Dados inválidos (lista "erros" com campo e mensagem).', content: { 'application/json': { schema: { $ref: '#/components/schemas/Erro' } } } },
+          },
+        },
+      },
+      '/oportunidades/{codigo}': {
+        get: {
+          summary: 'Uma oportunidade pelo código (AAAA-NNNN) ou id (só leitura; exige chave de LEITURA)',
+          parameters: [{ name: 'codigo', in: 'path', required: true, schema: { type: 'string' }, example: '2026-0001' }],
+          responses: {
+            '200': { description: 'A oportunidade com todos os campos.' },
+            '401': { description: 'Chave ausente, inválida ou revogada.' },
+            '403': { description: 'A chave é de escrita: use uma chave de leitura.' },
+            '404': { description: 'Oportunidade não encontrada.' },
           },
         },
       },

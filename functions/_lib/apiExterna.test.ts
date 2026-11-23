@@ -21,7 +21,7 @@ vi.mock('./http.ts', async (importOriginal) => ({
     const texto = strings.join('?')
     chamadas.sql.push(texto)
     chamadas.valores.push(valores)
-    if (texto.includes('autenticar_api_cliente')) return [{ nome: chamadas.nomeDaChave }]
+    if (texto.includes('autenticar_api_chave')) return [{ r: chamadas.nomeDaChave ? { nome: chamadas.nomeDaChave, escopo: 'escrita' } : null }]
     if (texto.includes('simular_oportunidade_api')) return [{ o: { ...REGISTRO, simulado: true } }]
     if (texto.includes('criar_oportunidade_api')) return [{ o: REGISTRO }]
     return []

@@ -1,5 +1,7 @@
 # API externa: criar oportunidades a partir de outra aplicação
 
+> Para só **consultar** as oportunidades (agentes, relatórios), veja [API-LEITURA.md](API-LEITURA.md): usa uma chave de escopo **leitura**.
+
 Uma aplicação externa cria oportunidades no Radar Pré-Vendas **como se fosse um cadastro manual**: mesmos campos, mesmas validações e o mesmo fluxo (histórico, **e-mail de nova oportunidade** e **cartão no Planner**). A diferença é a autoria: a oportunidade fica registrada como criada por `api:<nome-da-aplicação>` e, se a aplicação informar, com o **solicitante** (quem pediu lá no sistema de origem).
 
 > ## ⚠️ Lembrete para quem mexe no Radar
@@ -189,4 +191,5 @@ Extra da API: `solicitante` (texto, até 120 caracteres, opcional): quem pediu a
 
 | Data | Mudança |
 |---|---|
+| 23/11/2026 | Chaves passam a ter **escopo**: escrita (cria, como as existentes) e leitura (só consulta; ver [API-LEITURA.md](API-LEITURA.md)). Uma chave não faz o que é da outra. |
 | 28/10/2026 | Versão inicial: `POST /api/externo/oportunidades`, `GET /api/externo/campos`, chaves por aplicação, idempotência e solicitante. |

@@ -19,6 +19,7 @@
 - [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md): Integração Radar → Microsoft Planner
 - [MONITORAMENTO-LICITACOES.md](MONITORAMENTO-LICITACOES.md): Módulo de monitoramento de licitações
 - [API-EXTERNA.md](API-EXTERNA.md): API externa: criar oportunidades a partir de outra aplicação
+- [API-LEITURA.md](API-LEITURA.md): API de leitura: consultar as oportunidades (somente visualização, para agentes e relatórios)
 - [API-COMPRAS-GOV-ENDPOINTS.md](API-COMPRAS-GOV-ENDPOINTS.md): API Compras.gov.br (Dados Abertos) — mapa dos endpoints
 
 ## Arquitetura e testes
