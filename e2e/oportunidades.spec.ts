@@ -69,7 +69,7 @@ async function api(page: Page, admin = false, forcarConflito = false, visualizad
     atualizado_em: null as string | null,
     recentes: [{ id: 7, tipo: 'nova', situacao: 'enviado', tentativas: 1, ultimo_erro: null, criado_em: '2026-10-23T12:00:00Z', enviado_em: '2026-10-23T12:05:00Z', codigo: '2026-0007', orgao: 'Órgão Sete' }],
   }
-  const clientesApi = [{ id: 1, nome: 'sistema-x', ativo: true, criado_em: '2026-10-28T12:00:00Z', criado_por: 'joao.henrique@ctctech.com.br', ultimo_uso_em: null, revogado_em: null }]
+  const clientesApi = [{ id: 1, nome: 'sistema-x', escopo: 'escrita', ativo: true, criado_em: '2026-10-28T12:00:00Z', criado_por: 'joao.henrique@ctctech.com.br', ultimo_uso_em: null, revogado_em: null }]
   await page.route('**/api/api-clientes/*', (r) => {
     const c = clientesApi.find((x) => x.id === Number(new URL(r.request().url()).pathname.split('/').pop()))
     if (c) c.ativo = false
@@ -77,9 +77,9 @@ async function api(page: Page, admin = false, forcarConflito = false, visualizad
   })
   await page.route('**/api/api-clientes', (r) => {
     if (r.request().method() === 'POST') {
-      const { nome } = r.request().postDataJSON() as { nome: string }
-      enviados.push({ api_cliente: nome } as unknown as Reg)
-      clientesApi.push({ id: clientesApi.length + 1, nome, ativo: true, criado_em: '2026-10-28T13:00:00Z', criado_por: 'joao.henrique@ctctech.com.br', ultimo_uso_em: null, revogado_em: null })
+      const { nome, escopo } = r.request().postDataJSON() as { nome: string; escopo: string }
+      enviados.push({ api_cliente: nome, escopo } as unknown as Reg)
+      clientesApi.push({ id: clientesApi.length + 1, nome, escopo, ativo: true, criado_em: '2026-10-28T13:00:00Z', criado_por: 'joao.henrique@ctctech.com.br', ultimo_uso_em: null, revogado_em: null })
       return r.fulfill({ status: 201, json: { cliente: clientesApi.at(-1), chave: 'rdr_CHAVE_DE_TESTE_MOSTRADA_UMA_VEZ' } })
     }
     return r.fulfill({ json: { clientes: clientesApi } })
@@ -735,6 +735,22 @@ test('Administração → API: cria a chave de uma aplicação (mostrada uma vez
   page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: 'Revogar' }).first().click()
   await expect(page.getByText('Chave revogada.')).toBeVisible()
+})
+
+test('Administração → API: chave de LEITURA (só consulta) é criada com o tipo escolhido e aparece marcada na lista', async ({ page }) => {
+  const { enviados } = await api(page, true)
+  await abrirAba(page)
+  await page.getByRole('tab', { name: 'Administração' }).click()
+  await page.getByRole('button', { name: 'API', exact: true }).click()
+  // Por padrão a chave é de escrita; a existente aparece marcada como escrita.
+  await expect(page.getByLabel('Tipo da chave')).toHaveValue('escrita')
+  await page.getByLabel('Nome da aplicação').fill('agente-consulta')
+  await page.getByLabel('Tipo da chave').selectOption('leitura')
+  await page.getByRole('button', { name: 'Criar chave' }).click()
+  await expect(page.getByText('rdr_CHAVE_DE_TESTE_MOSTRADA_UMA_VEZ')).toBeVisible()
+  expect(enviados.at(-1)).toMatchObject({ api_cliente: 'agente-consulta', escopo: 'leitura' })
+  const linha = page.getByRole('listitem').filter({ hasText: 'agente-consulta' })
+  await expect(linha).toContainText('leitura')
 })
 
 test('Administração → API → Como chamar: documentação gerada dos campos e painel de teste que simula por padrão', async ({ page }) => {

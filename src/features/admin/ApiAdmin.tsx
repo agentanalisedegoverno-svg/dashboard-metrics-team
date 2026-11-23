@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { ApiError, useApiClientes, useCriarApiCliente, useRevogarApiCliente, type Opcoes } from '../oportunidades/api'
+import { ApiError, useApiClientes, useCriarApiCliente, useRevogarApiCliente, type EscopoApi, type Opcoes } from '../oportunidades/api'
 import { ApiDocs } from './ApiDocs'
 import { dataHoraBr } from '../oportunidades/formato'
 
@@ -51,6 +51,7 @@ function ChavesApi() {
   const criar = useCriarApiCliente()
   const revogar = useRevogarApiCliente()
   const [nome, setNome] = useState('')
+  const [escopo, setEscopo] = useState<EscopoApi>('escrita')
   const [erroForm, setErroForm] = useState<string | null>(null)
   const [novaChave, setNovaChave] = useState<{ nome: string; chave: string } | null>(null)
 
@@ -58,7 +59,7 @@ function ChavesApi() {
     const n = nome.trim().toLowerCase()
     if (!NOME_OK.test(n)) return setErroForm('Use de 3 a 40 caracteres: letras minúsculas, números, - e _')
     setErroForm(null)
-    criar.mutate(n, {
+    criar.mutate({ nome: n, escopo }, {
       onSuccess: (r) => {
         setNovaChave({ nome: r.cliente.nome, chave: r.chave })
         setNome('')
@@ -80,9 +81,9 @@ function ChavesApi() {
     <div>
       <h2 className="font-serif text-lg font-semibold text-ink">API para outras aplicações</h2>
       <p className="mt-0.5 max-w-[75ch] text-xs text-muted">
-        Cada aplicação externa recebe uma <strong>chave</strong> para criar oportunidades no Radar como se fosse um cadastro manual (mesmos campos e regras; o e-mail e o Planner
-        saem igual). A autoria aparece como <code>api:nome-da-aplicação</code>. A chave é mostrada <strong>uma única vez</strong>: guarde-a em local seguro. Documentação:{' '}
-        <code>docs/API-EXTERNA.md</code>.
+        Cada aplicação externa recebe uma <strong>chave</strong>. Chave de <strong>escrita</strong>: cria oportunidades no Radar como se fosse um cadastro manual (mesmos campos e regras; o e-mail e o Planner
+        saem igual; a autoria aparece como <code>api:nome-da-aplicação</code>). Chave de <strong>leitura</strong>: só consulta as oportunidades (para agentes e relatórios), sem poder criar nem alterar nada.
+        Uma chave nunca faz o que é da outra. A chave é mostrada <strong>uma única vez</strong>: guarde-a em local seguro. Documentação: <code>docs/API-EXTERNA.md</code> e <code>docs/API-LEITURA.md</code>.
       </p>
 
       {novaChave && (
@@ -112,6 +113,13 @@ function ChavesApi() {
           Nome da aplicação
           <input className={cn(campo, 'mt-1 block w-full')} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="ex.: sistema-contratos" maxLength={40} autoComplete="off" />
         </label>
+        <label className="text-xs font-semibold text-ink-soft">
+          Tipo da chave
+          <select className={cn(campo, 'mt-1 block')} value={escopo} onChange={(e) => setEscopo(e.target.value as EscopoApi)} aria-label="Tipo da chave">
+            <option value="escrita">Escrita (cria oportunidades)</option>
+            <option value="leitura">Leitura (só consulta)</option>
+          </select>
+        </label>
         <Button type="submit" disabled={criar.isPending}>
           <Plus className="size-4" aria-hidden /> Criar chave
         </Button>
@@ -138,6 +146,7 @@ function ChavesApi() {
               <KeyRound className="size-4 shrink-0 text-muted" aria-hidden />
               <span className="font-semibold text-ink">{c.nome}</span>
               <span className={cn('rounded px-1.5 py-0.5 text-[11px]', c.ativo ? 'bg-line-soft text-ink' : 'bg-line-soft text-muted')}>{c.ativo ? 'ativa' : 'revogada'}</span>
+              <span className="rounded bg-line-soft px-1.5 py-0.5 text-[11px] text-ink">{c.escopo === 'leitura' ? 'leitura' : 'escrita'}</span>
               <span className="text-xs text-muted">
                 criada por {c.criado_por} em {dataHoraBr(c.criado_em)} · último uso: {c.ultimo_uso_em ? dataHoraBr(c.ultimo_uso_em) : 'nunca'}
               </span>
@@ -147,7 +156,7 @@ function ChavesApi() {
                   className="ml-auto"
                   disabled={revogar.isPending}
                   onClick={() => {
-                    if (window.confirm(`Revogar a chave de “${c.nome}”? A aplicação deixa de conseguir criar oportunidades.`)) {
+                    if (window.confirm(`Revogar a chave de “${c.nome}”? A aplicação deixa de conseguir usar a API.`)) {
                       revogar.mutate(c.id, { onSuccess: () => toast.success('Chave revogada.'), onError: (e) => toast.error(mensagemErro(e)) })
                     }
                   }}

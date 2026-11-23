@@ -47,6 +47,37 @@ describe('chaves da API (só administrador)', () => {
   })
 })
 
+describe('escopo da chave (migração 029): leitura x escrita', () => {
+  const HASH_L = 'c'.repeat(64)
+  const HASH_E = 'd'.repeat(64)
+  const auth = async (h: string) => (await db.query<{ r: { nome: string; escopo: string } | null }>('select autenticar_api_chave($1) as r', [h])).rows[0].r
+
+  it('chave nasce de escrita por padrão (compatível com quem chama com 3 argumentos) e de leitura quando pedido', async () => {
+    const e = (await db.query<{ r: { escopo: string } }>('select criar_api_cliente($1, $2, $3) as r', ['app-escrita', HASH_E, ADMIN])).rows[0].r
+    const l = (await db.query<{ r: { escopo: string } }>('select criar_api_cliente($1, $2, $3, $4) as r', ['agente-leitura', HASH_L, ADMIN, 'leitura'])).rows[0].r
+    expect([e.escopo, l.escopo]).toEqual(['escrita', 'leitura'])
+    expect(await auth(HASH_E)).toEqual({ nome: 'app-escrita', escopo: 'escrita' })
+    expect(await auth(HASH_L)).toEqual({ nome: 'agente-leitura', escopo: 'leitura' })
+    expect(await auth('f'.repeat(64))).toBeNull()
+  })
+
+  it('a listagem mostra o escopo e chave revogada deixa de autenticar', async () => {
+    const lista = (await db.query<{ r: { id: number; nome: string; escopo: string }[] }>('select listar_api_clientes($1) as r', [ADMIN])).rows[0].r
+    expect(lista.find((x) => x.nome === 'agente-leitura')?.escopo).toBe('leitura')
+    const id = lista.find((x) => x.nome === 'agente-leitura')!.id
+    await db.query('select revogar_api_cliente($1::bigint, $2)', [id, ADMIN])
+    expect(await auth(HASH_L)).toBeNull()
+  })
+
+  it('escopo inválido é recusado e só administrador cria chave de leitura', async () => {
+    expect(camposComErro(await falha(db.query('select criar_api_cliente($1, $2, $3, $4)', ['escopo-ruim', 'e'.repeat(64), ADMIN, 'admin'])))).toContain('escopo')
+    expect((await falha(db.query('select criar_api_cliente($1, $2, $3, $4)', ['intruso-leitura', 'e'.repeat(64), EDITOR, 'leitura'])))?.code).toBe('P0403')
+  })
+
+  it('o banco recusa escopo fora da lista direto na tabela', async () => {
+    expect(await falha(db.query("update api_clientes set escopo = 'dono' where nome = 'app-escrita'"))).toBeTruthy()
+  })
+})
 describe('criar_oportunidade_api: mesmo fluxo do cadastro manual', () => {
   it('cria como web, com autoria api:<cliente> e o solicitante; o cadastro manual não tem solicitante', async () => {
     const o = await api(opp({ status: 'Prospect' }), 'sistema-x', 'Maria (Contratos)')

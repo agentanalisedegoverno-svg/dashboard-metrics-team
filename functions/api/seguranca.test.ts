@@ -7,7 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { reiniciarLimites } from '../_lib/apiExterna.ts'
 
 const sqlMock = vi.fn()
-vi.mock('../_lib/banco', () => ({ conectar: () => sqlMock }))
+/** Conexão do papel radar_leitor (DATABASE_URL): só as consultas da API de leitura passam por ela. */
+const sqlLeitor = vi.fn()
+vi.mock('../_lib/banco', () => ({ conectar: (url: string) => (url.includes('leitor') ? sqlLeitor : sqlMock) }))
 const verifyId = vi.fn()
 const verifyJwt = vi.fn()
 vi.mock('../_lib/access', () => ({
@@ -22,7 +24,7 @@ const rotas = Object.entries(modulos)
   .map(([arquivo, m]) => ({ arquivo, onRequest: m.onRequest }))
 
 /** Rotas da API externa: chamadas servidor a servidor com chave de API (o Cloudflare Access tem Bypass só neste caminho). */
-const EXTERNAS = ['./externo/campos.ts', './externo/oportunidades.ts']
+const EXTERNAS = ['./externo/campos.ts', './externo/oportunidades.ts', './externo/oportunidades/[codigo].ts']
 const protegidas = rotas.filter((r) => !EXTERNAS.includes(r.arquivo))
 const externas = rotas.filter((r) => EXTERNAS.includes(r.arquivo))
 
@@ -62,6 +64,7 @@ const rotaDe = (trecho: string) => {
 beforeEach(() => {
   reiniciarLimites() // o limite de requisições da API externa é por instância; cada teste começa com a contagem zerada
   sqlMock.mockReset()
+  sqlLeitor.mockReset()
   verifyId.mockReset().mockResolvedValue({ email: 'jwt@ctctech.com.br' })
   verifyJwt.mockReset().mockResolvedValue(true)
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -79,6 +82,7 @@ describe('descoberta de rotas', () => {
       './email-config/teste.ts',
       './externo/campos.ts',
       './externo/oportunidades.ts',
+      './externo/oportunidades/[codigo].ts',
       './linhas-torre.ts',
       './me.ts',
       './monitor-licitacoes/[id].ts',
@@ -156,7 +160,7 @@ describe('API externa: sem chave válida nada passa (todas as rotas externas, to
   })
 
   it.each(externas.map((r) => [r.arquivo, r] as const))('%s: chave com formato válido mas desconhecida ou revogada -> 401', async (_n, r) => {
-    sqlMock.mockResolvedValue([{ nome: null }])
+    sqlMock.mockResolvedValue([{ r: null }])
     for (const method of ['GET', 'POST']) {
       const res = await chamarExt(r, { method, headers: { authorization: `Bearer ${CHAVE}` }, body: method === 'GET' ? undefined : '{}' })
       expect([401, 405]).toContain(res.status)
@@ -170,7 +174,7 @@ describe('API externa: sem chave válida nada passa (todas as rotas externas, to
   })
 
   it('chave válida cria sem o cabeçalho CSRF (é servidor a servidor), mas corpo inválido é recusado antes de gravar', async () => {
-    sqlMock.mockResolvedValue([{ nome: 'sistema-x' }])
+    sqlMock.mockResolvedValue([{ r: { nome: 'sistema-x', escopo: 'escrita' } }])
     const ruim = await chamarExt(externa('oportunidades'), { method: 'POST', headers: { authorization: `Bearer ${CHAVE}` }, body: JSON.stringify({ orcamento: 'abc' }) })
     expect(ruim.status).toBe(422)
     expect(sqlMock).toHaveBeenCalledTimes(1) // só a autenticação da chave; nada foi gravado
@@ -179,7 +183,7 @@ describe('API externa: sem chave válida nada passa (todas as rotas externas, to
   })
 
   it('a autoria vem da chave (nunca do corpo) e o solicitante e a Idempotency-Key chegam ao banco', async () => {
-    sqlMock.mockResolvedValueOnce([{ nome: 'sistema-x' }]).mockResolvedValue([{ o: { id: 1, codigo: '2026-0001' } }])
+    sqlMock.mockResolvedValueOnce([{ r: { nome: 'sistema-x', escopo: 'escrita' } }]).mockResolvedValue([{ o: { id: 1, codigo: '2026-0001' } }])
     const res = await chamarExt(externa('oportunidades'), {
       method: 'POST',
       headers: { authorization: `Bearer ${CHAVE}`, 'idempotency-key': 'pedido-1' },
@@ -201,6 +205,125 @@ describe('API externa: sem chave válida nada passa (todas as rotas externas, to
   })
 })
 
+describe('API de leitura: escopo da chave, papel só-leitura e parâmetros', () => {
+  const CHAVE = 'rdr_' + 'B'.repeat(43)
+  const lista = () => externas.find((r) => r.arquivo === './externo/oportunidades.ts')!
+  const detalhe = () => externas.find((r) => r.arquivo === './externo/oportunidades/[codigo].ts')!
+  const comEscopo = (escopo: 'leitura' | 'escrita') => sqlMock.mockResolvedValue([{ r: { nome: 'agente-x', escopo } }])
+  const ler = (rota: ReturnType<typeof lista>, caminho: string, o: { method?: string; env?: Record<string, string | undefined>; params?: Record<string, string> } = {}) =>
+    rota.onRequest({ request: new Request(`https://radar.test/api/externo/${caminho}`, { method: o.method ?? 'GET', headers: { authorization: `Bearer ${CHAVE}` }, body: o.method === 'POST' ? '{}' : undefined }), env: o.env ?? ENV, params: o.params ?? {} })
+
+  it('chave de ESCRITA não lê a listagem nem o detalhe (403) e o banco de consulta não é tocado', async () => {
+    comEscopo('escrita')
+    for (const [rota, caminho, params] of [[lista(), 'oportunidades', {}], [detalhe(), 'oportunidades/2026-0001', { codigo: '2026-0001' }]] as const) {
+      const res = await ler(rota, caminho, { params })
+      expect(res.status).toBe(403)
+      expect(res.headers.get('cache-control')).toBe('private, no-store')
+    }
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it('chave de LEITURA não cria oportunidade (403) e nada é gravado', async () => {
+    comEscopo('leitura')
+    const res = await ler(lista(), 'oportunidades', { method: 'POST' })
+    expect(res.status).toBe(403)
+    expect(sqlMock).toHaveBeenCalledTimes(1) // só a autenticação
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it('chave de leitura lista pelo papel radar_leitor (nunca pelo radar_app) e devolve total, paginação e itens', async () => {
+    comEscopo('leitura')
+    sqlLeitor.mockResolvedValue([{ total: 250, itens: [{ id: 1, codigo: '2026-0001', valor_ctc: 123, orcamento_sigiloso: false }] }])
+    const res = await ler(lista(), 'oportunidades?status=Go&limite=100&offset=100')
+    expect(res.status).toBe(200)
+    const corpo = await res.json()
+    expect(corpo).toMatchObject({ total: 250, limite: 100, offset: 100, proximo_offset: 200 })
+    expect(corpo.itens[0]).toMatchObject({ codigo: '2026-0001', valor_ctc: 123 }) // todos os campos, inclusive os internos
+    expect(sqlLeitor).toHaveBeenCalledTimes(1)
+    expect(sqlMock).toHaveBeenCalledTimes(1) // o radar_app só autenticou a chave
+    expect(sqlMock.mock.calls[0][0].join('?')).toContain('autenticar_api_chave')
+  })
+
+  it('sem o banco de consulta configurado -> 503, sem tocar no banco', async () => {
+    comEscopo('leitura')
+    const res = await ler(lista(), 'oportunidades', { env: { ...ENV, DATABASE_URL: undefined } })
+    expect(res.status).toBe(503)
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['parâmetro desconhecido (erro de digitação não pode virar "devolva tudo")', 'oportunidades?statos=Go'],
+    ['parâmetro repetido', 'oportunidades?status=Go&status=Win'],
+    ['limite acima do máximo', 'oportunidades?limite=501'],
+    ['limite zero', 'oportunidades?limite=0'],
+    ['offset negativo', 'oportunidades?offset=-1'],
+    ['data inválida', 'oportunidades?pregao_de=2026-13-45'],
+    ['data fora do formato', 'oportunidades?pregao_de=10/12/2026'],
+    ['intervalo de datas invertido', 'oportunidades?pregao_de=2026-12-10&pregao_ate=2026-01-01'],
+    ['valor com vírgula', 'oportunidades?valor_min=1.500,00'],
+    ['faixa de valor invertida', 'oportunidades?valor_min=200&valor_max=100'],
+    ['texto longo demais', `oportunidades?q=${'a'.repeat(101)}`],
+    ['injeção de SQL no filtro vira só texto, mas lixo em campo numérico é recusado', "oportunidades?limite=1;drop table oportunidades"],
+  ])('%s -> 422 e a consulta nem roda', async (_n, caminho) => {
+    comEscopo('leitura')
+    const res = await ler(lista(), caminho)
+    expect(res.status).toBe(422)
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it('texto de busca é parâmetro vinculado e os curingas do LIKE são escapados (nada de concatenar no SQL)', async () => {
+    comEscopo('leitura')
+    sqlLeitor.mockResolvedValue([{ total: 0, itens: [] }])
+    const injecao = "x'; drop table oportunidades; --"
+    await ler(lista(), `oportunidades?q=${encodeURIComponent('50%_a\\')}&orgao=${encodeURIComponent(injecao)}`)
+    const [strings, ...valores] = sqlLeitor.mock.calls[0] as [TemplateStringsArray, ...unknown[]]
+    const sql = strings.join('?')
+    expect(sql).not.toContain('drop table')
+    expect(sql).not.toContain('50%')
+    expect(valores).toContain('50\\%\\_a\\\\')
+    expect(valores).toContain(escaparEsperado(injecao))
+    expect(valores.slice(-2)).toEqual([100, 0]) // limite padrão e offset
+  })
+
+  it('o SQL da consulta só lê (select) e esconde arquivadas por padrão', async () => {
+    comEscopo('leitura')
+    sqlLeitor.mockResolvedValue([{ total: 0, itens: [] }])
+    await ler(lista(), 'oportunidades')
+    const sql = (sqlLeitor.mock.calls[0][0] as TemplateStringsArray).join('?').toLowerCase()
+    expect(sql).not.toMatch(/\b(insert|update|delete|drop|alter|truncate)\b/)
+    expect(sql).toContain('arquivado_em is null')
+    sqlLeitor.mockClear()
+    await ler(lista(), 'oportunidades?arquivadas=true')
+    expect(sqlLeitor.mock.calls[0].slice(1)[0]).toBe(true) // primeiro parâmetro: incluir arquivadas
+  })
+
+  it('detalhe: código ou id válidos consultam; formato estranho -> 404 sem tocar no banco; não achou -> 404', async () => {
+    comEscopo('leitura')
+    sqlLeitor.mockResolvedValueOnce([{ r: { id: 7, codigo: '2026-0007', orcamento: 10 } }]).mockResolvedValueOnce([]).mockResolvedValueOnce([{ r: { id: 9 } }])
+    expect((await ler(detalhe(), 'oportunidades/2026-0007', { params: { codigo: '2026-0007' } })).status).toBe(200)
+    expect((await ler(detalhe(), 'oportunidades/2026-0099', { params: { codigo: '2026-0099' } })).status).toBe(404)
+    expect((await ler(detalhe(), 'oportunidades/9', { params: { codigo: '9' } })).status).toBe(200)
+    sqlLeitor.mockClear()
+    for (const codigo of ["1'; drop table x;--", '../../etc/passwd', '2026-', 'abc', '']) {
+      expect((await ler(detalhe(), 'oportunidades/x', { params: { codigo } })).status, codigo).toBe(404)
+    }
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it('chave revogada ou desconhecida não lê nada (401)', async () => {
+    sqlMock.mockResolvedValue([{ r: null }])
+    expect((await ler(lista(), 'oportunidades')).status).toBe(401)
+    expect(sqlLeitor).not.toHaveBeenCalled()
+  })
+
+  it('deploy na frente da migração: chave antiga continua autenticando como escrita (cria) e não lê', async () => {
+    const erro = Object.assign(new Error('function autenticar_api_chave does not exist'), { code: '42883' })
+    sqlMock.mockRejectedValueOnce(erro).mockResolvedValue([{ nome: 'sistema-antigo' }])
+    expect((await ler(lista(), 'oportunidades')).status).toBe(403) // é de escrita: não lê
+  })
+})
+
+const escaparEsperado = (s: string) => s.replace(/[\\%_]/g, '\\$&')
 describe('CSRF: escritas só do próprio site', () => {
   const escritas = [
     ['./oportunidades/index.ts', 'POST'],

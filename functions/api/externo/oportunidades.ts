@@ -1,13 +1,16 @@
 import { chaveIdempotencia, comPrevia, querSimular, rotaExterna, separarSolicitante } from '../../_lib/apiExterna.ts'
 import { criar } from '../../_lib/cadastro.ts'
+import { listarParaLeitura } from '../../_lib/leituraOportunidades.ts'
 import { consultaCnpj } from '../../_lib/cnpj.ts'
 
 /**
  * POST /api/externo/oportunidades: cria uma oportunidade como o cadastro manual (mesmos campos, validações, e-mail e Planner).
+ * GET /api/externo/oportunidades: consulta só leitura (chave de escopo `leitura`); ver docs/API-LEITURA.md.
  * Corpo: os campos da oportunidade + `solicitante` (opcional). Cabeçalho opcional `Idempotency-Key`. Ver docs/API-EXTERNA.md.
  * `?simular=true`: só valida e devolve como ficaria (com a prévia do e-mail e do cartão); NÃO grava, não envia e-mail e não cria cartão.
  */
 export const onRequest = rotaExterna({
+  GET: async ({ leitor, request }) => listarParaLeitura(leitor!, new URL(request.url)),
   POST: async ({ sql, cliente, request, corpo }) => {
     const idem = chaveIdempotencia(request)
     if (idem instanceof Response) return idem
@@ -18,4 +21,4 @@ export const onRequest = rotaExterna({
     if (querSimular(request)) return comPrevia(await criar(sql, `api:${cliente}`, sep.dados, consultaCnpj, { cliente, solicitante: sep.solicitante, idem: null, simular: true }))
     return criar(sql, `api:${cliente}`, sep.dados, consultaCnpj, { cliente, solicitante: sep.solicitante, idem })
   },
-})
+}, { GET: 'leitura' })

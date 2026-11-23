@@ -143,7 +143,8 @@ export const useEmailTeste = () => {
   return useMutation({ mutationFn: () => chamar('/email-config/teste', { method: 'POST' }), onSuccess: () => qc.invalidateQueries({ queryKey: ['email-config'] }) })
 }
 
-export type ApiCliente = { id: number; nome: string; ativo: boolean; criado_em: string; criado_por: string; ultimo_uso_em: string | null; revogado_em: string | null }
+export type EscopoApi = 'escrita' | 'leitura'
+export type ApiCliente = { id: number; nome: string; escopo?: EscopoApi; ativo: boolean; criado_em: string; criado_por: string; ultimo_uso_em: string | null; revogado_em: string | null }
 
 export const useApiClientes = () =>
   useQuery({ queryKey: ['api-clientes'], queryFn: ({ signal }) => chamar<{ clientes: ApiCliente[] }>('/api-clientes', { signal }).then((r) => r.clientes), staleTime: 15_000, retry: false })
@@ -152,7 +153,7 @@ export const useApiClientes = () =>
 export const useCriarApiCliente = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (nome: string) => chamar<{ cliente: ApiCliente; chave: string }>('/api-clientes', { method: 'POST', body: { nome } }),
+    mutationFn: (v: { nome: string; escopo: EscopoApi }) => chamar<{ cliente: ApiCliente; chave: string }>('/api-clientes', { method: 'POST', body: v }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['api-clientes'] }),
   })
 }
