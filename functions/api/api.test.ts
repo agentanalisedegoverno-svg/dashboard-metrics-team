@@ -57,6 +57,20 @@ describe('API de leitura (Postgres)', () => {
     expect(await res.json()).toEqual({ rows: [{ ano: '2026', status: 'Win', orcamento: 10 }], updatedAt: '2026-10-11T00:08:41.960Z', isMock: false })
   })
 
+  it('rows informa as etapas no Server-Timing (status, linhas com a contagem, json com o tamanho) e serializa uma vez', async () => {
+    sqlMock
+      .mockResolvedValueOnce([{ ultima_carga_em: null, total_linhas: 2, erro: null }])
+      .mockResolvedValueOnce([{ ano: '2026' }, { ano: '2025' }])
+    const res = await call('rows')
+    expect(res.headers.get('server-timing')).toMatch(/^status;dur=\d+, linhas;dur=\d+;desc="2 linhas", json;dur=\d+;desc="\d+ KB"$/)
+    expect(res.headers.get('content-type')).toContain('application/json')
+    expect(res.headers.get('cache-control')).toContain('no-store')
+    sqlMock.mockResolvedValue([{ ultima_carga_em: null, total_linhas: 7, erro: null }])
+    const st = await call('status')
+    expect(st.headers.get('server-timing')).toMatch(/^status;dur=\d+$/)
+    expect(await st.json()).toMatchObject({ rowCount: 7 })
+  })
+
   it('o status Radar-TIC fica fora das métricas: as duas consultas do painel o excluem', async () => {
     sqlMock
       .mockResolvedValueOnce([{ ultima_carga_em: null, total_linhas: 0, erro: null }])

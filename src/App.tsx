@@ -1,5 +1,6 @@
 import { Suspense, lazy, useDeferredValue, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
+import { DiagnosticoErro } from '@/components/DiagnosticoErro'
 import { DrillDialog } from '@/components/DrillDialog'
 import { FilterBar } from '@/components/FilterBar'
 import { Header } from '@/components/Header'
@@ -57,6 +58,7 @@ export default function App() {
         <div role="alert" className="mt-6 rounded-[10px] border border-st-critical/40 bg-surface p-4 text-[13px] text-ink-soft">
           Não foi possível carregar os dados. {error.message}{' '}
           <button className="cursor-pointer font-semibold text-gold underline" onClick={() => refetch()}>Tentar novamente</button>
+          <DiagnosticoErro error={error} />
         </div>
       ) : isPending || !allRows ? (
         <div className="mt-6"><EmptyNote>Carregando dados…</EmptyNote></div>

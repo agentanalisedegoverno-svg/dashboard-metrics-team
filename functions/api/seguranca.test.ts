@@ -18,7 +18,8 @@ vi.mock('../_lib/access', () => ({
 }))
 
 type Rota = (c: { request: Request; env: Record<string, string | undefined>; params: Record<string, string | string[] | undefined> }) => Promise<Response>
-const modulos = import.meta.glob<{ onRequest: Rota }>(['./**/*.ts', '!./**/*.test.ts', '!./**/*.perf.ts'], { eager: true })
+// _middleware.ts não é uma rota (envolve todas); tem teste próprio em functions/_lib/diagnostico.test.ts.
+const modulos = import.meta.glob<{ onRequest: Rota }>(['./**/*.ts', '!./**/*.test.ts', '!./**/*.perf.ts', '!./**/_middleware.ts'], { eager: true })
 const rotas = Object.entries(modulos)
   .filter(([arquivo]) => !arquivo.endsWith('.test.ts'))
   .map(([arquivo, m]) => ({ arquivo, onRequest: m.onRequest }))
@@ -78,6 +79,7 @@ describe('descoberta de rotas', () => {
       './api-clientes.ts',
       './api-clientes/[id].ts',
       './cnpj/[cnpj].ts',
+      './diagnostico.ts',
       './email-config.ts',
       './email-config/teste.ts',
       './externo/campos.ts',
