@@ -2,7 +2,7 @@ import { conectar } from '../_lib/banco'
 import type { Sql } from '../_lib/cadastro.ts'
 import { dentroDoLimite, entradaTempo } from '../_lib/diagnostico.ts'
 import { bancoApp, send } from '../_lib/http.ts'
-import { consultarLinhas } from '../_lib/painel.ts'
+import { consultarPainel, corpoDoPainel } from '../_lib/painel.ts'
 import { rota } from '../_lib/rota.ts'
 
 /** Só o tipo do erro (código do driver ou nome), nunca a mensagem: ela pode trazer host, usuário ou trecho de SQL. */
@@ -40,8 +40,8 @@ export const onRequest = rota(
         checks.push(await verificar('banco (papel do painel)', async () => void (await leitor`select 1`)))
         checks.push(
           await verificar('consulta do painel (/api/rows)', async () => {
-            const linhas = await consultarLinhas(leitor)
-            return `${linhas.length} linhas, ${Math.round(JSON.stringify(linhas).length / 1024)} KB`
+            const p = await consultarPainel(leitor)
+            return `${p.total} linhas, ${Math.round(corpoDoPainel(p).length / 1024)} KB`
           }),
         )
       } else {

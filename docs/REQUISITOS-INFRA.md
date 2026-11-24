@@ -30,7 +30,7 @@ Os diagramas de apoio estão em [DIAGRAMAS.md](DIAGRAMAS.md): **D20** (camadas, 
 
 | Item | Requisito / estado atual |
 |---|---|
-| Plataforma | Cloudflare Pages, projeto `radar-prevendas`, endereço `https://radar-prevendas.pages.dev` (sem domínio próprio). Plano **Free (confirmar)** |
+| Plataforma | Cloudflare Pages, projeto `radar-prevendas`, endereço `https://radar-prevendas.pages.dev` (sem domínio próprio). Plano **Free** (confirmado pelo responsável em 23/11/2026; não há orçamento para mudar de plano) |
 | Conteúdo | SPA com React 19, TypeScript, Vite 8 e Tailwind 4, servida como arquivos estáticos. Sem servidor de aplicação |
 | Build | **Node 22** (`.nvmrc`; `engines >= 22`) e **npm 10** (o `package-lock.json` precisa ser gerado com npm 10, senão o `npm ci` do CI falha). Saída em `dist/`, com orçamento de tamanho do bundle conferido no CI |
 | Entrega | `wrangler pages deploy dist` pelo workflow *Pipeline* (push na `main` = produção; cada PR = pré-visualização `pr-N.pages.dev`). Rollback: rodar o Pipeline com o commit anterior |
@@ -166,8 +166,8 @@ Toda resposta do Radar leva `x-radar-origem`, `x-radar-req` e `server-timing` ([
 
 | Recurso | Limite | Uso / risco |
 |---|---|---|
-| Functions: CPU por requisição | 10 ms no plano Free **(confirmar o plano)** | `/api/rows` decodifica todas as linhas do painel (hoje cerca de 800); é a rota mais pesada e cresce com a base. Monitorar "Exceeded CPU" |
-| Functions: requisições por dia | 100.000 no plano Free **(confirmar)** | folga grande para o uso atual |
+| Functions: CPU por requisição | 10 ms no plano Free (confirmado) | `/api/rows` é a rota mais pesada (hoje cerca de 800 linhas) e cresce com a base. **Mitigado sem custo:** o Postgres devolve as linhas já em JSON e o Worker só repassa o texto (`functions/_lib/painel.ts`), o que reduziu em cerca de **47% o trabalho do driver** na medição local (`npm run medir:painel`). Continuar monitorando "CPU time" e "Exceeded CPU" nas métricas do Cloudflare |
+| Functions: requisições por dia | 100.000 no plano Free (confirmado) | folga grande para o uso atual |
 | Banco: conexões | 20 por papel; sem PgBouncer | cada requisição abre uma conexão curta; Hyperdrive resolve se o uso crescer |
 | Banco: tamanho | 32 GB | em uso, cerca de 11 MB |
 | Banco: transferência | 100 GB/mês gratuitos | cerca de 4,5 GB/mês |
@@ -183,7 +183,7 @@ Toda resposta do Radar leva `x-radar-origem`, `x-radar-req` e `server-timing` ([
 | 1 | **Assinatura Free Trial do Azure**: o crédito de 30 dias acaba em cerca de **17/12/2026** e o Postgres gratuito vale 12 meses (≈ 17/11/2027). Decidir: converter para pay-as-you-go ou migrar | até 10/12/2026 | [PLANO-DE-ACAO-BANCO.md](PLANO-DE-ACAO-BANCO.md) (D1, D4) |
 | 2 | **Firewall do banco aberto** para qualquer origem (protegido só por TLS e senha) | adotar Hyperdrive | R8 |
 | 3 | **`BACKUP_PASSPHRASE` só existe como segredo do GitHub** (não dá para ler de volta) | guardar no cofre, com 2 pessoas | R1 |
-| 4 | **Plano do Cloudflare** e teto de CPU das Functions; `/api/rows` é a rota mais pesada | confirmar o plano; monitorar | D.2 |
+| 4 | **Cloudflare no plano Free** (sem orçamento para pagar): o teto de CPU das Functions (10 ms) é o limite mais apertado e `/api/rows` é a rota mais pesada | já mitigado no código (D.2); monitorar "CPU time" no painel. Se ainda estourar: Hyperdrive (tem camada gratuita) | D.2 |
 | 5 | **Banco e repositório em contas fora da organização corporativa** | centralizar | [CONTAS-E-SERVICOS.md](CONTAS-E-SERVICOS.md) |
 | 6 | **Login do Planner é de uma pessoa** e expira em ~90 dias sem uso | app do Entra com permissão de aplicativo | [INTEGRACAO-PLANNER.md](INTEGRACAO-PLANNER.md) |
 | 7 | **Gmail como remetente** (senha de app, limite de envio) | remetente Workspace ou serviço transacional | [CONTAS-E-SERVICOS.md](CONTAS-E-SERVICOS.md) |

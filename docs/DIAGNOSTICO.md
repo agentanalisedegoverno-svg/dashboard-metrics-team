@@ -14,7 +14,7 @@ Toda resposta gerada pelo código do Radar (`/api/*`) leva:
 |---|---|
 | `x-radar-origem: funcao` | a resposta foi gerada pelo Radar |
 | `x-radar-req: a1b2c3d4` | código da requisição: procure no log |
-| `server-timing` | tempo total (`app`) e etapas (em `/api/rows`: `status`, `linhas` com a contagem, `json` com o tamanho) |
+| `server-timing` | tempo total (`app`) e etapa (em `/api/rows`: `consulta`, com a contagem de linhas e o tamanho da resposta; em `/api/status`: `status`) |
 
 **Regra de ouro:** um erro **sem** `x-radar-origem` **não foi gerado pelo Radar**. Veio do Cloudflare (Access, limites do Worker, queda da plataforma) ou da rede do usuário (proxy, firewall, VPN).
 
@@ -34,7 +34,7 @@ Toda resposta gerada pelo código do Radar (`/api/*`) leva:
 O Radar escreve **uma linha JSON** só para o que importa: **5xx e 429** (nível erro) e **respostas lentas, a partir de 1,5 s** (nível aviso). Erros comuns (401, 403, 404, 422) não entram. A linha não tem e-mail, query string nem corpo.
 
 ```json
-{"evt":"api","req":"a1b2c3d4","s":503,"ms":312,"m":"GET","rota":"/api/rows","ray":"8f2abc-GRU","colo":"GRU","pais":"BR","st":"status;dur=7, linhas;dur=290;desc=\"809 linhas\""}
+{"evt":"api","req":"a1b2c3d4","s":503,"ms":312,"m":"GET","rota":"/api/rows","ray":"8f2abc-GRU","colo":"GRU","pais":"BR","st":"consulta;dur=290;desc=\"809 linhas, 520 KB\""}
 ```
 
 Para ver: Cloudflare → Workers & Pages → o projeto → **Functions → Real-time logs** (Begin log stream) e procure pelo `req` informado. Pelo terminal: `npx wrangler pages deployment tail --project-name dashboard-metrics-team --format json` (exige `wrangler login`). O log em tempo real só mostra o que acontece enquanto está aberto; o `req` e o `cf-ray` que o usuário copia permitem achar o evento nele.

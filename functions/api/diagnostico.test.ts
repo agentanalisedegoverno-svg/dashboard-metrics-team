@@ -24,7 +24,7 @@ beforeEach(() => {
 
 describe('GET /api/diagnostico', () => {
   it('tudo certo: relatório com config, os dois bancos e a consulta do painel (linhas, KB e tempo)', async () => {
-    sqlLeitor.mockResolvedValueOnce([{ '?column?': 1 }]).mockResolvedValueOnce([{ ano: '2026', descritivo: 'x'.repeat(2048) }, { ano: '2026', descritivo: 'y' }])
+    sqlLeitor.mockResolvedValueOnce([{ '?column?': 1 }]).mockResolvedValueOnce([{ atualizado_em: null, total: 2, linhas: JSON.stringify([{ ano: '2026', descritivo: 'x'.repeat(2048) }, { ano: '2026', descritivo: 'y' }]) }])
     const res = await chamar()
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('private, no-store')
