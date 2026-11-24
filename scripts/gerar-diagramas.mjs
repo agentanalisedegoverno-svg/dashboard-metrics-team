@@ -36,6 +36,9 @@ export const NOMES = [
   'D17-fluxo-de-dados-stride',
   'D18-papeis-do-banco',
   'D19-modelo-de-dados',
+  'D20-arquitetura-em-camadas',
+  'D21-rede-e-portas',
+  'D22-anatomia-de-uma-requisicao',
 ]
 
 const doc = readFileSync('docs/DIAGRAMAS.md', 'utf8')
@@ -52,7 +55,8 @@ if (process.argv.includes('--verificar')) {
 const tmp = mkdtempSync(join(tmpdir(), 'radar-diagramas-'))
 try {
   const config = join(tmp, 'puppeteer.json')
-  writeFileSync(config, JSON.stringify({ executablePath: chromium.executablePath(), args: ['--no-sandbox'] }))
+  // CHROMIUM_PATH: usa um Chromium já instalado quando a revisão que o Playwright espera não está na máquina.
+  writeFileSync(config, JSON.stringify({ executablePath: process.env.CHROMIUM_PATH || chromium.executablePath(), args: ['--no-sandbox'] }))
   const entrada = join(tmp, 'diagramas.md')
   writeFileSync(entrada, doc)
 

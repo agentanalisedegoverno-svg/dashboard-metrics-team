@@ -14,7 +14,7 @@ Reescrita do painel atual (HTML único) em **React 19 + TypeScript + Tailwind v4
 | [docs/EMAIL-NOVAS-OPORTUNIDADES.md](docs/EMAIL-NOVAS-OPORTUNIDADES.md) | E-mail a cada nova oportunidade: regras na Administração, envio por SMTP do Gmail |
 | [docs/DIAGRAMAS.md](docs/DIAGRAMAS.md) | Catálogo de diagramas (19, em camadas, com SVG): contexto, fluxos, segurança e dados |
 | [docs/TESTES.md](docs/TESTES.md) | Bateria de testes: regressão, segurança, carga e desempenho; como rodar e achados |
-| [docs/REQUISITOS-INFRA.md](docs/REQUISITOS-INFRA.md) | Requisitos mínimos da máquina com IP fixo para a consulta à ConLicitações (para o time de infraestrutura) |
+| [docs/REQUISITOS-INFRA.md](docs/REQUISITOS-INFRA.md) | **Arquitetura atual e requisitos de infraestrutura**, separados em front, workers e banco (rede, segredos, capacidade e riscos); inclui, na Parte E, a máquina com IP fixo para a ConLicitações (para o time de infraestrutura) |
 | [docs/API-COMPRAS-GOV-ENDPOINTS.md](docs/API-COMPRAS-GOV-ENDPOINTS.md) | Mapa dos 77 endpoints da API de dados abertos do Compras.gov.br: o que existe, o que o Radar já usa e o que não existe (esclarecimentos) |
 | [docs/CONTAS-E-SERVICOS.md](docs/CONTAS-E-SERVICOS.md) | Em qual conta está cada serviço (site, bancos, backups, e-mail) e roteiro para centralizar |
 | [docs/BACKUP.md](docs/BACKUP.md) | Backup diário criptografado no Drive, restauração e teste |
