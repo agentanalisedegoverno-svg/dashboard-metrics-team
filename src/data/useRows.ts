@@ -84,11 +84,22 @@ function parseDataset(json: unknown, lastModified: string | null = null, isMockF
   return { rows: parsed.data, updatedAt: (updatedAt ? formatHttpDate(updatedAt) ?? updatedAt : null) ?? formatHttpDate(lastModified), isMock }
 }
 
+/**
+ * O servidor guarda /api/rows por ~20 s (ver functions/_lib/cachePainel.ts). Depois de uma gravação a próxima leitura precisa vir
+ * do banco, senão quem acabou de salvar veria o dado antigo: `?fresco=1` pula a cópia guardada e a substitui para todos.
+ */
+let proximaLeituraFresca = false
+export const marcarDadosDesatualizados = () => {
+  proximaLeituraFresca = true
+}
+
 async function fetchDataset(signal: AbortSignal): Promise<Dataset> {
   let apiError: unknown
 
   try {
-    return parseDataset(await requestJson('/rows', signal))
+    const fresca = proximaLeituraFresca
+    proximaLeituraFresca = false
+    return parseDataset(await requestJson(fresca ? '/rows?fresco=1' : '/rows', signal))
   } catch (error) {
     if (signal.aborted) throw error
     apiError = error
@@ -155,7 +166,9 @@ export const useSyncStatus = () =>
   useQuery({
     queryKey: ['syncStatus'],
     queryFn: ({ signal }) => fetchSyncStatus(signal),
-    staleTime: 30_000,
-    refetchInterval: 30_000,
+    // O status só muda a cada carga da planilha: não precisa de consulta a cada 30 s por aba (o servidor também guarda por 60 s).
+    // Em aba escondida o react-query já não consulta (refetchIntervalInBackground é falso por padrão).
+    staleTime: 60_000,
+    refetchInterval: 120_000,
     retry: false,
   })

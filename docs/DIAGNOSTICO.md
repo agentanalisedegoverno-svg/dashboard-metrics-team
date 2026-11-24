@@ -29,6 +29,19 @@ Toda resposta gerada pelo código do Radar (`/api/*`) leva:
 | `origem: tempo` | o servidor não respondeu em 5 s | `server-timing` e `/api/diagnostico` |
 | `origem: rede` | o navegador nem recebeu resposta | conexão, VPN, proxy, extensões |
 
+### Cache de curta duração (`x-radar-cache`)
+
+`/api/rows` (20 s) e `/api/status` (60 s) são guardados no Cache API do Cloudflare, **depois** da validação do Access, para que o pico de usuários não abra uma conexão com o banco por requisição (era o que estourava o CPU: "Exceeded CPU Time Limits"). A resposta é igual para todos os usuários.
+
+| `x-radar-cache` | Significa |
+|---|---|
+| `hit` | veio da cópia guardada (sem conexão nem consulta); `server-timing: cache;desc="copia de N s"` |
+| `miss` | não havia cópia: leu do banco e guardou |
+| `fresco` | `?fresco=1` ou botão atualizar: leu do banco e **substituiu** a cópia (o front pede isso logo depois de gravar) |
+| `off` | sem Cache API neste ambiente: leu do banco, como antes |
+
+Se `x-radar-cache` for sempre `miss`/`off` em produção, o Cache API não está valendo nesse domínio e o ganho não existe; nesse caso o próximo passo é o Hyperdrive. Acompanhe **CPU time (p99)** e **Errors** em Workers & Pages → Metrics.
+
 ## 3. O log
 
 O Radar escreve **uma linha JSON** só para o que importa: **5xx e 429** (nível erro) e **respostas lentas, a partir de 1,5 s** (nível aviso). Erros comuns (401, 403, 404, 422) não entram. A linha não tem e-mail, query string nem corpo.

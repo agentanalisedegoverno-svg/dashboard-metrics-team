@@ -2,9 +2,10 @@ import { conectar } from '../_lib/banco'
 import { verifyAccessJwt } from '../_lib/access'
 import { entradaTempo } from '../_lib/diagnostico.ts'
 import { consultarPainel, consultarStatus, corpoDoPainel } from '../_lib/painel.ts'
+import { respostaComCache, TTL_ROWS_S, TTL_STATUS_S } from '../_lib/cachePainel.ts'
 
 type Env = { DATABASE_URL?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string; ACESSO_PUBLICO?: string }
-type Ctx = { request: Request; env: Env; params: { path?: string | string[] } }
+type Ctx = { request: Request; env: Env; params: { path?: string | string[] }; waitUntil?: (p: Promise<unknown>) => void }
 
 const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'private, no-store' }
 const send = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers })
@@ -14,7 +15,7 @@ const send = (status: number, body: unknown) => new Response(JSON.stringify(body
  * que substitui a base a cada carga. A conexão usa um papel somente-leitura (`radar_leitor`).
  * Falha fechada: sem Cloudflare Access configurado e um JWT válido, nada é devolvido.
  */
-export const onRequest = async ({ request, env, params }: Ctx): Promise<Response> => {
+export const onRequest = async ({ request, env, params, waitUntil }: Ctx): Promise<Response> => {
     if (env.ACESSO_PUBLICO !== 'true') {
     if (!env.CF_ACCESS_TEAM_DOMAIN || !env.CF_ACCESS_AUD) {
       return send(503, { error: 'Autenticação (Cloudflare Access) não configurada.' })
@@ -32,22 +33,35 @@ export const onRequest = async ({ request, env, params }: Ctx): Promise<Response
   // `sync` não tem mais o que fazer (a carga é feita pelo agente); responde como `status` para o botão do painel.
   if (!isRead && !(request.method === 'POST' && route === 'sync')) return send(404, { error: 'Rota não encontrada.' })
 
+  // `sync` (botão atualizar) e `?fresco=1` (logo após uma gravação) pulam a cópia guardada e a substituem (ver cachePainel.ts).
+  const fresco = route === 'sync' || new URL(request.url).searchParams.has('fresco')
+  const databaseUrl = env.DATABASE_URL
+
   try {
-    const sql = conectar(env.DATABASE_URL)
-    // A etapa é medida e vai no cabeçalho Server-Timing (ver docs/DIAGNOSTICO.md): mostra o tempo da consulta e o tamanho da resposta.
-    const t = Date.now()
     if (route === 'rows') {
-      // Uma única consulta; o Postgres devolve as linhas já em JSON e o Worker só repassa o texto (poupa CPU: ver painel.ts).
-      const painel = await consultarPainel(sql)
-      const corpo = corpoDoPainel(painel)
-      const etapa = entradaTempo('consulta', Date.now() - t, `${painel.total} linhas, ${Math.round(corpo.length / 1024)} KB`)
-      return new Response(corpo, { status: 200, headers: { ...headers, 'server-timing': etapa } })
+      return await respostaComCache({
+        rota: 'rows', ttl: TTL_ROWS_S, fresco, cabecalhos: headers, waitUntil,
+        gerar: async () => {
+          // A etapa é medida e vai no Server-Timing (ver docs/DIAGNOSTICO.md): tempo da consulta e tamanho da resposta.
+          const t = Date.now()
+          // Uma única consulta; o Postgres devolve as linhas já em JSON e o Worker só repassa o texto (poupa CPU: ver painel.ts).
+          const painel = await consultarPainel(conectar(databaseUrl))
+          const corpo = corpoDoPainel(painel)
+          return { corpo, tempo: entradaTempo('consulta', Date.now() - t, `${painel.total} linhas, ${Math.round(corpo.length / 1024)} KB`) }
+        },
+      })
     }
-    const status = await consultarStatus(sql)
-    const lastSyncAt = status?.ultima_carga_em ? new Date(status.ultima_carga_em).toISOString() : null
-    return new Response(JSON.stringify({ lastSyncAt, rowCount: status?.total_linhas ?? 0, error: status?.erro ?? null, isMock: false }), {
-      status: 200,
-      headers: { ...headers, 'server-timing': entradaTempo('status', Date.now() - t) },
+    return await respostaComCache({
+      rota: 'status', ttl: TTL_STATUS_S, fresco, cabecalhos: headers, waitUntil,
+      gerar: async () => {
+        const t = Date.now()
+        const status = await consultarStatus(conectar(databaseUrl))
+        const lastSyncAt = status?.ultima_carga_em ? new Date(status.ultima_carga_em).toISOString() : null
+        return {
+          corpo: JSON.stringify({ lastSyncAt, rowCount: status?.total_linhas ?? 0, error: status?.erro ?? null, isMock: false }),
+          tempo: entradaTempo('status', Date.now() - t),
+        }
+      },
     })
   } catch (error) {
     console.error('Erro na API de leitura:', error instanceof Error ? error.message : error)

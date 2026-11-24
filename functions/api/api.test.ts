@@ -9,7 +9,7 @@ import { onRequest } from './[[path]]'
 
 const env = { DATABASE_URL: 'postgres://leitor@h/db', CF_ACCESS_TEAM_DOMAIN: 't.cloudflareaccess.com', CF_ACCESS_AUD: 'aud' }
 const call = (path: string, method = 'GET', e: Record<string, string | undefined> = env) =>
-  onRequest({ request: new Request(`https://x.test/api/${path}`, { method, headers: { 'cf-access-jwt-assertion': 'jwt' } }), env: e, params: { path } })
+  onRequest({ request: new Request(`https://x.test/api/${path}`, { method, headers: { 'cf-access-jwt-assertion': 'jwt' } }), env: e, params: { path: path.split('?')[0] } })
 
 beforeEach(() => {
   sqlMock.mockReset()
@@ -84,6 +84,43 @@ describe('API de leitura (Postgres)', () => {
     const textos = sqlMock.mock.calls.map((c) => (c[0] as string[]).join(' '))
     expect(textos).toHaveLength(2)
     for (const t of textos) expect(t).toMatch(/status is distinct from 'Radar-TIC'/)
+  })
+
+  it('com cache: a 2ª leitura de rows e de status não abre conexão nem consulta; ?fresco e sync vão ao banco', async () => {
+    const guardado = new Map<string, Response>()
+    vi.stubGlobal('caches', { default: { match: async (r: Request) => guardado.get(r.url)?.clone(), put: async (r: Request, res: Response) => void guardado.set(r.url, res) } })
+    try {
+      sqlMock.mockResolvedValue([{ atualizado_em: null, total: 1, linhas: '[{"ano":"2026"}]' }])
+      expect((await call('rows')).headers.get('x-radar-cache')).toBe('miss')
+      const hit = await call('rows')
+      expect(hit.headers.get('x-radar-cache')).toBe('hit')
+      expect(await hit.json()).toMatchObject({ rows: [{ ano: '2026' }] })
+      expect(sqlMock).toHaveBeenCalledTimes(1)
+      expect((await call('rows?fresco=1')).headers.get('x-radar-cache')).toBe('fresco')
+      expect(sqlMock).toHaveBeenCalledTimes(2)
+
+      sqlMock.mockResolvedValue([{ ultima_carga_em: null, total_linhas: 3, erro: null }])
+      expect((await call('status')).headers.get('x-radar-cache')).toBe('miss')
+      expect((await call('status')).headers.get('x-radar-cache')).toBe('hit')
+      expect(sqlMock).toHaveBeenCalledTimes(3)
+      expect((await call('sync', 'POST')).headers.get('x-radar-cache')).toBe('fresco')
+      expect(sqlMock).toHaveBeenCalledTimes(4)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('o cache só vale DEPOIS do Access: sem JWT válido a cópia guardada nunca é servida', async () => {
+    const guardado = new Map<string, Response>([['https://cache.radar.internal/api/rows', new Response('{"rows":["segredo"]}')]])
+    vi.stubGlobal('caches', { default: { match: async (r: Request) => guardado.get(r.url)?.clone(), put: async () => {} } })
+    try {
+      verify.mockResolvedValue(false)
+      const res = await call('rows')
+      expect(res.status).toBe(401)
+      expect(await res.text()).not.toContain('segredo')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('resposta inesperada do banco em rows (sem o texto das linhas) -> 502, nunca um JSON quebrado', async () => {
