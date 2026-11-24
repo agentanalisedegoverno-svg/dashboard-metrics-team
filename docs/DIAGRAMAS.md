@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Propósito** | Catálogo visual de todos os fluxos da aplicação, do contexto ao detalhe, para quem desenvolve, opera, audita ou aprova mudanças |
-| **Versão / atualização** | 1.3 · 28/10/2026 · cobre as migrações 001 a 020 |
+| **Versão / atualização** | 1.4 · 23/11/2026 · cobre as migrações 001 a 029 (D20 a D22: infraestrutura atual) |
 | **Fonte** | Mermaid, neste arquivo (o GitHub desenha sozinho). Todo diagrama foi validado no conector do Mermaid antes de entrar. Versões em SVG em [diagramas/](diagramas/), geradas por `npm run diagramas` |
 | **Padrão adotado** | Guia *Architecture design diagrams* da Microsoft (Well-Architected): camadas **contexto → contêiner → componente**, mais implantação, fluxo de dados com fronteiras de confiança (STRIDE), sequência por caso de uso, jornada do usuário, estado, ER e fluxo de identidade; vocabulário do **C4** (contexto/contêiner/componente) e do **UML** (sequência/estado) |
 | **Relacionados** | [ARQUITETURA.md](ARQUITETURA.md) (decisões e narrativa), [OPERACAO.md](OPERACAO.md), [TESTES.md](TESTES.md) |
@@ -47,6 +47,7 @@ flowchart LR
 | **Integrações** | [D12 Carga da planilha (descontinuada)](#d12--carga-da-planilha-descontinuada) · [D13 Planner](#d13--integração-com-o-microsoft-planner) · [D14 E-mail](#d14--e-mail-de-nova-oportunidade) |
 | **Confiabilidade** | [D15 Backup e resiliência](#d15--backup-restauração-e-resiliência) · [D16 CI/CD e testes](#d16--entrega-e-testes-cicd) |
 | **Segurança e dados** | [D17 Fluxo de dados e STRIDE](#d17--fluxo-de-dados-e-fronteiras-de-confiança-stride) · [D18 Papéis do banco](#d18--papéis-do-banco-e-privilégios) · [D19 Modelo de dados](#d19--modelo-de-dados-er) |
+| **Infraestrutura** | [D20 Arquitetura em camadas](#d20--arquitetura-em-camadas-front-workers-e-banco) · [D21 Rede e portas](#d21--rede-e-portas-quem-inicia-a-conexão-em-que-porta) · [D22 Anatomia de uma requisição](#d22--anatomia-de-uma-requisição-api-onde-cada-marca-é-criada) |
 
 ---
 
@@ -984,6 +985,146 @@ erDiagram
 
 *A tabela `oportunidades` tem ~56 colunas (as 34 da planilha, as derivadas `ano`, `mes`, `sla`, os campos novos e os metadados). As relações com `usuarios`, `linhas_torre` e `codigo_sequencia` são lógicas (aplicadas por função e gatilho), não chaves estrangeiras.*
 
+## Infraestrutura
+
+### D20 · Arquitetura em camadas (front, workers e banco)
+
+*Tipo: contêiner por camada · Escopo: as três camadas da infraestrutura atual e o que cada uma usa · Pergunta: **o que roda em cada camada e quem fala com o banco?** (requisitos por camada em [REQUISITOS-INFRA.md](REQUISITOS-INFRA.md))*
+
+```mermaid
+flowchart TB
+  classDef pessoa fill:#fff4d6,stroke:#8a6d00,color:#1a1a1a
+  classDef interno fill:#e3f0ff,stroke:#1f5fa8,color:#1a1a1a
+  classDef externo fill:#f2f2f2,stroke:#555555,stroke-dasharray:4 3,color:#1a1a1a
+  classDef dados fill:#e6f6e6,stroke:#2d7a2d,color:#1a1a1a
+  classDef agenda fill:#fde9dc,stroke:#b4561d,color:#1a1a1a
+
+  U(["Usuários do time<br/>navegador, e-mail @ctctech.com.br"]):::pessoa
+  AG(["Agentes de IA e sistemas externos<br/>chave de API rdr_..."]):::pessoa
+
+  subgraph F["1. FRONT: Cloudflare Pages (arquivos estáticos na borda global)"]
+    direction LR
+    ACC["Cloudflare Access<br/>código por e-mail, sessão de 24 h"]:::externo
+    SPA["SPA: React 19, TypeScript, Vite, Tailwind<br/>build com Node 22 no CI<br/>CSP restritiva, HSTS, noindex"]:::interno
+    ACC --> SPA
+  end
+
+  subgraph W["2. WORKERS: lógica de servidor"]
+    direction LR
+    subgraph W1["2a. Pages Functions em /api/* (runtime Workers, tempo real)"]
+      direction TB
+      MW["middleware<br/>origem, código da requisição, tempo, log"]:::interno
+      ROT["rotas: painel, cadastro, administração,<br/>CNPJ, API externa, MCP remoto, diagnóstico"]:::interno
+      PXY["proxies: PNCP, Compras.gov, ConLicitações"]:::interno
+      MW --> ROT --> PXY
+    end
+    subgraph W2["2b. GitHub Actions (runners Ubuntu, agendados ou acionados)"]
+      direction TB
+      J1{{"Planner integração<br/>e Enviar e-mails"}}:::agenda
+      J2{{"Monitoramento de licitações"}}:::agenda
+      J3{{"Backup, espelho, vigia<br/>e teste de restauração"}}:::agenda
+      J4{{"Pipeline CI/CD e migração do banco"}}:::agenda
+    end
+  end
+
+  subgraph D["3. BANCO: Azure Database for PostgreSQL 17 (Brazil South)"]
+    DB[("banco radar: tabelas, funções SECURITY DEFINER e gatilhos<br/>7 papéis de mínimo privilégio, TLS obrigatório, backup nativo de 7 dias")]:::dados
+  end
+
+  subgraph X["Serviços de apoio e fontes externas"]
+    direction LR
+    FE["PNCP, Compras.gov,<br/>ConLicitações, APIs de CNPJ"]:::externo
+    PL["Microsoft Planner<br/>e Gmail SMTP"]:::externo
+    SB[("Supabase (espelho)<br/>e Google Drive (backup cifrado)")]:::externo
+  end
+
+  U -->|"HTTPS"| F
+  F -->|"fetch /api/* com JWT"| W1
+  AG -->|"HTTPS + chave<br/>(Bypass do Access só em /api/externo/*)"| W1
+  W1 -->|"radar_leitor (painel)<br/>radar_app (cadastro)"| D
+  W1 -.->|"workflow_dispatch ao salvar"| W2
+  W2 -->|"radar_planner, radar_email, radar_monitor,<br/>radar_backup, dono (migração)"| D
+  W2 -->|"wrangler pages deploy"| F
+  PXY -->|"HTTPS"| FE
+  W2 -->|"HTTPS, SMTP 465, rclone"| X
+```
+
+### D21 · Rede e portas (quem inicia a conexão, em que porta)
+
+*Tipo: rede · Escopo: conexões de saída e de entrada por protocolo e porta · Pergunta: **que liberações de rede e que portas o ambiente precisa?***
+
+```mermaid
+flowchart LR
+  classDef pessoa fill:#fff4d6,stroke:#8a6d00,color:#1a1a1a
+  classDef interno fill:#e3f0ff,stroke:#1f5fa8,color:#1a1a1a
+  classDef externo fill:#f2f2f2,stroke:#555555,stroke-dasharray:4 3,color:#1a1a1a
+  classDef dados fill:#e6f6e6,stroke:#2d7a2d,color:#1a1a1a
+  classDef agenda fill:#fde9dc,stroke:#b4561d,color:#1a1a1a
+
+  U(["Navegador do usuário"]):::pessoa
+  AG(["Agente de IA ou sistema externo"]):::pessoa
+
+  subgraph CF["Cloudflare (saída por IPs variáveis)"]
+    PG["Pages: site e Functions<br/>nodejs_compat"]:::interno
+  end
+
+  subgraph GH["GitHub Actions (runners com IPs variáveis)"]
+    JOB{{"Rotinas: Planner, e-mails, monitor,<br/>backup, espelho, migração"}}:::agenda
+  end
+
+  PGDB[("Azure PostgreSQL<br/>radar-prevendas-pg.postgres.database.azure.com<br/>firewall aberto, protegido por TLS e senha por papel")]:::dados
+  SUP[("Supabase<br/>espelho")]:::externo
+  GHAPI["api.github.com<br/>acionar rotinas"]:::externo
+  FONTES["PNCP, Compras.gov, ConLicitações,<br/>APIs de CNPJ"]:::externo
+  GMAIL["smtp.gmail.com"]:::externo
+  MS["Microsoft Graph<br/>e login Microsoft"]:::externo
+  GD["Google Drive"]:::externo
+  VM["Máquina com IP fixo<br/>(opcional, só se a ConLicitações mantiver a restrição de IP)"]:::externo
+
+  U -->|"HTTPS 443"| PG
+  AG -->|"HTTPS 443 + chave"| PG
+  PG -->|"TCP 5432 + TLS"| PGDB
+  PG -->|"HTTPS 443"| GHAPI
+  PG -->|"HTTPS 443"| FONTES
+  JOB -->|"TCP 5432 + TLS"| PGDB
+  JOB -->|"TCP + TLS"| SUP
+  JOB -->|"SMTP 465 + TLS"| GMAIL
+  JOB -->|"HTTPS 443"| MS
+  JOB -->|"HTTPS 443"| GD
+  JOB -->|"HTTPS 443"| FONTES
+  VM -.->|"HTTPS 443 (IP fixo liberado)"| FONTES
+  VM -.->|"TCP 5432 + TLS"| PGDB
+```
+
+### D22 · Anatomia de uma requisição /api (onde cada marca é criada)
+
+*Tipo: sequência · Escopo: um GET /api/rows do navegador ao banco e de volta, com as marcas de diagnóstico · Pergunta: **por onde passa uma chamada e como saber de onde veio um erro?** (guia em [DIAGNOSTICO.md](DIAGNOSTICO.md))*
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Navegador
+  participant AC as Cloudflare Access
+  participant MW as Middleware /api
+  participant RT as Rota /api/rows
+  participant DB as Azure PostgreSQL
+
+  U->>AC: GET /api/rows com cookie de sessão
+  alt sessão inválida
+    AC-->>U: redireciona ao login ou erro do Access (sem x-radar-origem)
+  else sessão válida
+    AC->>MW: encaminha com Cf-Access-Jwt-Assertion
+    MW->>RT: next() e inicia o cronômetro
+    RT->>RT: valida o JWT do Access
+    RT->>DB: status e linhas pelo papel radar_leitor (TLS 5432)
+    DB-->>RT: linhas
+    RT-->>MW: JSON com server-timing das etapas
+    MW-->>U: resposta com x-radar-origem, x-radar-req e server-timing
+  end
+  Note over U,MW: erro sem x-radar-origem não foi gerado pelo Radar (Cloudflare, rede ou proxy)
+  Note over MW: 5xx, 429 e lentidão acima de 1,5 s vão para o log com o código da requisição
+```
+
 ## Desenhos prontos (SVG)
 
 Os mesmos diagramas como imagens, para abrir no navegador, colar em apresentação ou anexar a um documento. São **artefatos gerados** a partir do Mermaid deste arquivo (a fonte da verdade): não edite o SVG à mão.
@@ -1012,6 +1153,9 @@ Os mesmos diagramas como imagens, para abrir no navegador, colar em apresentaç�
 | D17 Fluxo de dados e STRIDE | [diagramas/D17-fluxo-de-dados-stride.svg](diagramas/D17-fluxo-de-dados-stride.svg) |
 | D18 Papéis do banco | [diagramas/D18-papeis-do-banco.svg](diagramas/D18-papeis-do-banco.svg) |
 | D19 Modelo de dados (ER) | [diagramas/D19-modelo-de-dados.svg](diagramas/D19-modelo-de-dados.svg) |
+| D20 Arquitetura em camadas (front, workers e banco) | [diagramas/D20-arquitetura-em-camadas.svg](diagramas/D20-arquitetura-em-camadas.svg) |
+| D21 Rede e portas | [diagramas/D21-rede-e-portas.svg](diagramas/D21-rede-e-portas.svg) |
+| D22 Anatomia de uma requisição /api | [diagramas/D22-anatomia-de-uma-requisicao.svg](diagramas/D22-anatomia-de-uma-requisicao.svg) |
 
 Para regenerar depois de mudar um diagrama: `npm run diagramas` (usa o Chromium do Playwright e baixa o `mermaid-cli` sob demanda). Um teste (`src/diagramas.test.ts`) falha se o número de SVG não bater com o de diagramas, se um SVG estiver malformado ou se o índice apontar para um título que não existe.
 
@@ -1029,6 +1173,7 @@ Para regenerar depois de mudar um diagrama: `npm run diagramas` (usa o Chromium 
 
 | Versão | Data | Mudança |
 |---|---|---|
+| 1.4 | 23/11/2026 | Nova seção Infraestrutura: D20 (arquitetura em camadas: front, workers e banco), D21 (rede e portas) e D22 (anatomia de uma requisição /api, com as marcas de diagnóstico) |
 | 1.3 | 28/10/2026 | API externa para criar oportunidades (D1, D2, D4, D17, D18, D19): chave por aplicação, autoria `api:<cliente>`, solicitante e idempotência |
 | 1.2 | 28/10/2026 | Rotinas na nuvem (GitHub Actions disparado pelo Radar ao salvar; sem máquina de pessoa); fim da carga da planilha (D12); espelho diário no Supabase (D2, D3, D15, D17); e-mail também na mudança de status e com todas as informações (D14); estado do Planner cifrado no banco (D13, D18, D19); novos campos (sigla, duração do contrato) |
 | 1.1 | 25/10/2026 | D10b deixa de sugerir um ciclo de status e passa a mostrar só o que o sistema faz: lista fechada sem ordem imposta, exigências por status e efeitos do status (Planner, e-mail, painel) |
