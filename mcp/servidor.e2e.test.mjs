@@ -34,7 +34,7 @@ describe.skipIf(!instalado)('servidor MCP (stdio) contra uma API falsa', () => {
     })
     client = new Client({ name: 'teste', version: '1.0.0' })
     await client.connect(transport)
-  }, 30_000)
+  }, 60_000) // subir um processo Node sob carga (suíte inteira, CI) às vezes passa de 30 s
 
   afterAll(async () => {
     await client?.close()

@@ -1,5 +1,7 @@
 import { conectar } from '../_lib/banco'
 import { verifyAccessJwt } from '../_lib/access'
+import { entradaTempo } from '../_lib/diagnostico.ts'
+import { consultarLinhas, consultarStatus } from '../_lib/painel.ts'
 
 type Env = { DATABASE_URL?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string; ACESSO_PUBLICO?: string }
 type Ctx = { request: Request; env: Env; params: { path?: string | string[] } }
@@ -32,29 +34,27 @@ export const onRequest = async ({ request, env, params }: Ctx): Promise<Response
 
   try {
     const sql = conectar(env.DATABASE_URL)
-    const [status] = (await sql`
-      -- total_linhas = oportunidades vigentes AGORA (a coluna da carga ficava velha e contava as "ausentes")
-      select greatest(ultima_carga_em, (select max(atualizado_em) from oportunidades)) as ultima_carga_em, erro,
-             (select count(*)::int from oportunidades where arquivado_em is null and not ausente_na_planilha and status is distinct from 'Radar-TIC') as total_linhas
-      from carga_status where id = 1`) as {
-      ultima_carga_em: string | null
-      total_linhas: number
-      erro: string | null
-    }[]
+    // Cada etapa é medida e vai no cabeçalho Server-Timing (ver docs/DIAGNOSTICO.md): mostra se a lentidão está no banco,
+    // na carga das linhas ou no tamanho da resposta.
+    const etapas: string[] = []
+    let t = Date.now()
+    const status = await consultarStatus(sql)
+    etapas.push(entradaTempo('status', Date.now() - t))
     const lastSyncAt = status?.ultima_carga_em ? new Date(status.ultima_carga_em).toISOString() : null
 
     if (route === 'rows') {
-      const rows = await sql`
-        select ano, mes, status, uf, torre, linha_servico as "linhaServico", vistoria, analista,
-               motivo_no_go as "motivoNoGo", motivo_lost as "motivoLost", conta_vinculada as "contaVinculada",
-               orcamento::float8 as orcamento, valor_ctc::float8 as "valorCtc", valor_vencedor::float8 as "valorVencedor",
-               sla::float8 as sla, processo, orgao, descritivo, data_pregao as "dataPregao", acao_ia as "acaoIA"
-        from oportunidades where arquivado_em is null and not ausente_na_planilha
-          and status is distinct from 'Radar-TIC' -- status Radar-TIC não entra nas métricas nem nos filtros do painel
-        order by id`
-      return send(200, { rows, updatedAt: lastSyncAt, isMock: false })
+      t = Date.now()
+      const rows = await consultarLinhas(sql)
+      etapas.push(entradaTempo('linhas', Date.now() - t, `${rows.length} linhas`))
+      t = Date.now()
+      const corpo = JSON.stringify({ rows, updatedAt: lastSyncAt, isMock: false }) // uma única serialização
+      etapas.push(entradaTempo('json', Date.now() - t, `${Math.round(corpo.length / 1024)} KB`))
+      return new Response(corpo, { status: 200, headers: { ...headers, 'server-timing': etapas.join(', ') } })
     }
-    return send(200, { lastSyncAt, rowCount: status?.total_linhas ?? 0, error: status?.erro ?? null, isMock: false })
+    return new Response(JSON.stringify({ lastSyncAt, rowCount: status?.total_linhas ?? 0, error: status?.erro ?? null, isMock: false }), {
+      status: 200,
+      headers: { ...headers, 'server-timing': etapas.join(', ') },
+    })
   } catch (error) {
     console.error('Erro na API de leitura:', error instanceof Error ? error.message : error)
     return send(502, { error: 'Não foi possível ler o banco de dados.' })

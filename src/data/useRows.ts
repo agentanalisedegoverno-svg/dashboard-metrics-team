@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAccessToken } from '@/auth/auth'
 import { DatasetSchema, type Row } from '@/domain/types'
+import { ErroApi, falhaDeExcecao, falhaDeResposta, registrarFalha } from './erroApi'
 
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 const DATA_URL = import.meta.env.VITE_DATA_URL || '/data.json'
@@ -23,22 +24,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-async function requestJson(path: string, signal: AbortSignal, init?: RequestInit): Promise<unknown> {
+async function requestJson(path: string, signal: AbortSignal, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<unknown> {
   const controller = new AbortController()
   const abortRequest = () => controller.abort(signal.reason)
   if (signal.aborted) abortRequest()
   else signal.addEventListener('abort', abortRequest, { once: true })
-  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  let estourou = false
+  const timeoutId = window.setTimeout(() => {
+    estourou = true
+    controller.abort()
+  }, timeoutMs)
+  const inicio = performance.now()
 
   try {
     const token = await getAccessToken()
-    const res = await fetch(`${API_URL}${path}`, {
-      ...init,
-      headers: token ? { ...init?.headers, authorization: `Bearer ${token}` } : init?.headers,
-      signal: controller.signal,
-      cache: 'no-cache',
-    })
-    if (!res.ok) throw new Error(`Falha na API (HTTP ${res.status})`)
+    let res: Response
+    try {
+      res = await fetch(`${API_URL}${path}`, {
+        ...init,
+        headers: token ? { ...init?.headers, authorization: `Bearer ${token}` } : init?.headers,
+        signal: controller.signal,
+        cache: 'no-cache',
+      })
+    } catch (e) {
+      if (!signal.aborted) registrarFalha(falhaDeExcecao(path, inicio, estourou)) // guarda a pista e repassa o erro original
+      throw e
+    }
+    if (!res.ok) {
+      const falha = await falhaDeResposta(res, path, inicio)
+      registrarFalha(falha)
+      throw new ErroApi(falha)
+    }
     return await res.json()
   } finally {
     window.clearTimeout(timeoutId)
@@ -79,7 +95,7 @@ async function fetchDataset(signal: AbortSignal): Promise<Dataset> {
   }
 
   if (!ALLOW_MOCK_FALLBACK) {
-    throw new Error(`API indisponível. ${apiError instanceof Error ? apiError.message : 'erro desconhecido'}`)
+    throw new Error(`API indisponível. ${apiError instanceof Error ? apiError.message : 'erro desconhecido'}`, { cause: apiError })
   }
 
   try {
@@ -123,6 +139,9 @@ export async function fetchSyncStatus(signal: AbortSignal): Promise<SyncStatus |
     isMock: value.isMock,
   }
 }
+
+/** Diagnóstico feito no servidor (config, bancos e a consulta do painel, com tempos). Mais tempo que as demais chamadas: roda consultas. */
+export const buscarDiagnostico = (signal: AbortSignal) => requestJson('/diagnostico', signal, undefined, 25_000)
 
 export const useDataset = () =>
   useQuery({
