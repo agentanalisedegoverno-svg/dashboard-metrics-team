@@ -1116,8 +1116,8 @@ sequenceDiagram
     AC->>MW: encaminha com Cf-Access-Jwt-Assertion
     MW->>RT: next() e inicia o cronômetro
     RT->>RT: valida o JWT do Access
-    RT->>DB: status e linhas pelo papel radar_leitor (TLS 5432)
-    DB-->>RT: linhas
+    RT->>DB: uma consulta pelo papel radar_leitor (TLS 5432)
+    DB-->>RT: linhas já em JSON (o Worker só repassa o texto)
     RT-->>MW: JSON com server-timing das etapas
     MW-->>U: resposta com x-radar-origem, x-radar-req e server-timing
   end

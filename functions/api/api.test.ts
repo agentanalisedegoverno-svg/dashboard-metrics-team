@@ -48,37 +48,50 @@ describe('API de leitura (Postgres)', () => {
   })
 
   it('rows devolve as linhas e a data da última carga, sem cache', async () => {
-    sqlMock
-      .mockResolvedValueOnce([{ ultima_carga_em: '2026-10-11T00:08:41.960Z', total_linhas: 1, erro: null }])
-      .mockResolvedValueOnce([{ ano: '2026', status: 'Win', orcamento: 10 }])
+    sqlMock.mockResolvedValueOnce([{ atualizado_em: '2026-10-11T00:08:41.960Z', total: 1, linhas: '[{"ano":"2026","status":"Win","orcamento":10}]' }])
     const res = await call('rows')
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toContain('no-store')
+    expect(res.headers.get('content-type')).toContain('application/json')
     expect(await res.json()).toEqual({ rows: [{ ano: '2026', status: 'Win', orcamento: 10 }], updatedAt: '2026-10-11T00:08:41.960Z', isMock: false })
   })
 
-  it('rows informa as etapas no Server-Timing (status, linhas com a contagem, json com o tamanho) e serializa uma vez', async () => {
-    sqlMock
-      .mockResolvedValueOnce([{ ultima_carga_em: null, total_linhas: 2, erro: null }])
-      .mockResolvedValueOnce([{ ano: '2026' }, { ano: '2025' }])
+  it('rows faz UMA só consulta e repassa o JSON do banco como texto (o Worker não decodifica nem serializa as linhas)', async () => {
+    const linhas = '[{"ano":"2026","descritivo":"com \\"aspas\\" e 🚀"},{"ano":"2025"}]'
+    sqlMock.mockResolvedValueOnce([{ atualizado_em: null, total: 2, linhas }])
     const res = await call('rows')
-    expect(res.headers.get('server-timing')).toMatch(/^status;dur=\d+, linhas;dur=\d+;desc="2 linhas", json;dur=\d+;desc="\d+ KB"$/)
-    expect(res.headers.get('content-type')).toContain('application/json')
-    expect(res.headers.get('cache-control')).toContain('no-store')
+    const texto = await res.text()
+    expect(sqlMock).toHaveBeenCalledTimes(1)
+    expect(texto).toBe(`{"rows":${linhas},"updatedAt":null,"isMock":false}`) // o texto das linhas passa byte a byte
+    expect(JSON.parse(texto).rows[0].descritivo).toBe('com "aspas" e 🚀')
+  })
+
+  it('rows informa a etapa no Server-Timing (consulta, com a contagem e o tamanho); status também', async () => {
+    sqlMock.mockResolvedValueOnce([{ atualizado_em: null, total: 2, linhas: '[{"ano":"2026"},{"ano":"2025"}]' }])
+    const res = await call('rows')
+    expect(res.headers.get('server-timing')).toMatch(/^consulta;dur=\d+;desc="2 linhas, \d+ KB"$/)
     sqlMock.mockResolvedValue([{ ultima_carga_em: null, total_linhas: 7, erro: null }])
     const st = await call('status')
     expect(st.headers.get('server-timing')).toMatch(/^status;dur=\d+$/)
     expect(await st.json()).toMatchObject({ rowCount: 7 })
   })
 
-  it('o status Radar-TIC fica fora das métricas: as duas consultas do painel o excluem', async () => {
-    sqlMock
-      .mockResolvedValueOnce([{ ultima_carga_em: null, total_linhas: 0, erro: null }])
-      .mockResolvedValueOnce([])
+  it('o status Radar-TIC fica fora das métricas: a consulta do painel e a do status o excluem', async () => {
+    sqlMock.mockResolvedValueOnce([{ atualizado_em: null, total: 0, linhas: '[]' }])
     await call('rows')
+    sqlMock.mockResolvedValueOnce([{ ultima_carga_em: null, total_linhas: 0, erro: null }])
+    await call('status')
     const textos = sqlMock.mock.calls.map((c) => (c[0] as string[]).join(' '))
     expect(textos).toHaveLength(2)
     for (const t of textos) expect(t).toMatch(/status is distinct from 'Radar-TIC'/)
+  })
+
+  it('resposta inesperada do banco em rows (sem o texto das linhas) -> 502, nunca um JSON quebrado', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    sqlMock.mockResolvedValueOnce([{ atualizado_em: null, total: 1, linhas: null }])
+    expect((await call('rows')).status).toBe(502)
+    sqlMock.mockResolvedValueOnce([])
+    expect((await call('rows')).status).toBe(502)
   })
 
   it('status e sync respondem com contagem e erro da última carga', async () => {

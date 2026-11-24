@@ -1,7 +1,7 @@
 import { conectar } from '../_lib/banco'
 import { verifyAccessJwt } from '../_lib/access'
 import { entradaTempo } from '../_lib/diagnostico.ts'
-import { consultarLinhas, consultarStatus } from '../_lib/painel.ts'
+import { consultarPainel, consultarStatus, corpoDoPainel } from '../_lib/painel.ts'
 
 type Env = { DATABASE_URL?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string; ACESSO_PUBLICO?: string }
 type Ctx = { request: Request; env: Env; params: { path?: string | string[] } }
@@ -34,26 +34,20 @@ export const onRequest = async ({ request, env, params }: Ctx): Promise<Response
 
   try {
     const sql = conectar(env.DATABASE_URL)
-    // Cada etapa é medida e vai no cabeçalho Server-Timing (ver docs/DIAGNOSTICO.md): mostra se a lentidão está no banco,
-    // na carga das linhas ou no tamanho da resposta.
-    const etapas: string[] = []
-    let t = Date.now()
-    const status = await consultarStatus(sql)
-    etapas.push(entradaTempo('status', Date.now() - t))
-    const lastSyncAt = status?.ultima_carga_em ? new Date(status.ultima_carga_em).toISOString() : null
-
+    // A etapa é medida e vai no cabeçalho Server-Timing (ver docs/DIAGNOSTICO.md): mostra o tempo da consulta e o tamanho da resposta.
+    const t = Date.now()
     if (route === 'rows') {
-      t = Date.now()
-      const rows = await consultarLinhas(sql)
-      etapas.push(entradaTempo('linhas', Date.now() - t, `${rows.length} linhas`))
-      t = Date.now()
-      const corpo = JSON.stringify({ rows, updatedAt: lastSyncAt, isMock: false }) // uma única serialização
-      etapas.push(entradaTempo('json', Date.now() - t, `${Math.round(corpo.length / 1024)} KB`))
-      return new Response(corpo, { status: 200, headers: { ...headers, 'server-timing': etapas.join(', ') } })
+      // Uma única consulta; o Postgres devolve as linhas já em JSON e o Worker só repassa o texto (poupa CPU: ver painel.ts).
+      const painel = await consultarPainel(sql)
+      const corpo = corpoDoPainel(painel)
+      const etapa = entradaTempo('consulta', Date.now() - t, `${painel.total} linhas, ${Math.round(corpo.length / 1024)} KB`)
+      return new Response(corpo, { status: 200, headers: { ...headers, 'server-timing': etapa } })
     }
+    const status = await consultarStatus(sql)
+    const lastSyncAt = status?.ultima_carga_em ? new Date(status.ultima_carga_em).toISOString() : null
     return new Response(JSON.stringify({ lastSyncAt, rowCount: status?.total_linhas ?? 0, error: status?.erro ?? null, isMock: false }), {
       status: 200,
-      headers: { ...headers, 'server-timing': etapas.join(', ') },
+      headers: { ...headers, 'server-timing': entradaTempo('status', Date.now() - t) },
     })
   } catch (error) {
     console.error('Erro na API de leitura:', error instanceof Error ? error.message : error)
