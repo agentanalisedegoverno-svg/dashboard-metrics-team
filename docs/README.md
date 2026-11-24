@@ -10,7 +10,7 @@
 - [PLANO-DE-ACAO-BANCO.md](PLANO-DE-ACAO-BANCO.md): Plano de ação: banco gratuito, redundância e backup
 - [INCIDENTE-2026-11-17-NEON.md](INCIDENTE-2026-11-17-NEON.md): Incidente: banco bloqueado por cota (17–18/11/2026)
 - [CONTAS-E-SERVICOS.md](CONTAS-E-SERVICOS.md): Contas e serviços (mapa para centralização)
-- [REQUISITOS-INFRA.md](REQUISITOS-INFRA.md): Radar Pré-Vendas — Requisitos mínimos de infraestrutura (máquina com IP fixo)
+- [REQUISITOS-INFRA.md](REQUISITOS-INFRA.md): Arquitetura atual (front, workers e banco) e requisitos de infraestrutura, com rede, segredos, capacidade e riscos; a Parte E traz a máquina com IP fixo
 
 ## Produto e integrações
 

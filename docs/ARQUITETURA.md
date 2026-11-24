@@ -4,7 +4,7 @@
 
 Painel interno de pré-vendas (licitações) **e** cadastro de oportunidades. O banco **Postgres (Neon)** é a fonte da verdade e é alimentado **só pelo Radar web** (desde 27/10/2026 a planilha *BaseLicitacao.xlsx* deixou de alimentá-lo: [decisão](DECISAO-FIM-DA-CARGA-DA-PLANILHA.md)). As rotinas (Planner, e-mail, backup, espelho) rodam na **nuvem do GitHub Actions**, acionadas pelo próprio Radar ao salvar, **sem depender de nenhum computador de pessoa**. Há um espelho diário do banco no Supabase.
 
-A operação do dia a dia está em [OPERACAO.md](OPERACAO.md); o que vem a seguir está em [ROADMAP.md](ROADMAP.md).
+A operação do dia a dia está em [OPERACAO.md](OPERACAO.md); o que vem a seguir está em [ROADMAP.md](ROADMAP.md). **A infraestrutura atual, separada em front, workers e banco, com requisitos, rede, segredos e riscos, está em [REQUISITOS-INFRA.md](REQUISITOS-INFRA.md)** (diagramas D20 a D22 em [DIAGRAMAS.md](DIAGRAMAS.md)).
 
 > **Catálogo completo de diagramas** (contexto, contêineres, implantação, componentes, jornada, perfis, cadastro, carga, Planner, **e-mail**, backup, CI/CD, STRIDE, papéis do banco e ER), em camadas e atualizado: [DIAGRAMAS.md](DIAGRAMAS.md). Esta página traz a narrativa e as decisões.
 
@@ -22,7 +22,7 @@ flowchart LR
     end
   end
 
-  subgraph neon["Neon Postgres (sa-east-1)"]
+  subgraph neon["Azure PostgreSQL 17 (Brazil South)"]
     DB[("oportunidades · historico<br/>opcoes · usuarios<br/>email_fila · planner_*")]
     FN["funções SECURITY DEFINER<br/>criar / atualizar / arquivar"]
   end
@@ -312,7 +312,7 @@ As funções de cadastro são `SECURITY DEFINER`: rodam com o privilégio do don
 | ~~Carga da planilha~~ | ~~máquina local do João~~ | **Desativada em 27/10/2026** (tarefa `Radar-Carga-Planilha` desativada; scripts removidos) |
 | Integração Planner | GitHub Actions | workflow `planner-integracao.yml`: disparo ao salvar + agendamento de 5 min (seg–sex, 08h–19h); código em [`planner-auto/`](../planner-auto/). A tarefa do Windows `Radar-Planner integracao` está **desativada** (contingência) |
 | E-mails | GitHub Actions | workflow `enviar-emails.yml`: disparo ao salvar + agendamento (nova oportunidade e mudança de status) |
-| Banco | Neon, `aws-sa-east-1` | projeto `radar-prevendas`, branch `main`, banco `neondb` |
+| Banco | Azure Database for PostgreSQL 17, Brazil South | servidor `radar-prevendas-pg`, banco `radar` (o Neon foi desativado em 18/11/2026; ver [MIGRACAO-AZURE.md](MIGRACAO-AZURE.md)) |
 | Hospedagem | Cloudflare Pages | `https://radar-prevendas.pages.dev` |
 | Autenticação | Cloudflare Zero Trust (Free) | time `ctctech-radar`, *One-time PIN*, política `@ctctech.com.br` |
 | Código e CI/CD | GitHub | `agentanalisedegoverno-svg/dashboard-metrics-team` |

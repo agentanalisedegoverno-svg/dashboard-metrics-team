@@ -19,11 +19,11 @@ const ancora = (titulo: string) =>
     .replace(/\s/g, '-')
 
 describe('catálogo de diagramas', () => {
-  it('tem os 19 diagramas numerados (D1 a D19) com tipo, escopo e a pergunta que respondem', () => {
+  it('tem os 22 diagramas numerados (D1 a D22) com tipo, escopo e a pergunta que respondem', () => {
     const titulos = [...doc.matchAll(/^### (D\d+) · (.+)$/gm)]
-    expect(titulos.map((t) => t[1])).toEqual(Array.from({ length: 19 }, (_, i) => `D${i + 1}`))
+    expect(titulos.map((t) => t[1])).toEqual(Array.from({ length: 22 }, (_, i) => `D${i + 1}`))
     const marcadores = [...doc.matchAll(/^\*Tipo: .+Pergunta.*\*$/gm)]
-    expect(marcadores.length).toBeGreaterThanOrEqual(19)
+    expect(marcadores.length).toBeGreaterThanOrEqual(22)
   })
 
   it('cada bloco Mermaid tem o seu SVG em docs/diagramas, e vice-versa', () => {
