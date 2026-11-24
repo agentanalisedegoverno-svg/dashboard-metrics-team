@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { EmailConfig, EmailConfigInput } from '@/domain/email'
+import { marcarDadosDesatualizados } from '@/data/useRows'
+import type { EmailConfig,EmailConfigInput } from '@/domain/email'
 import type { ErroCampo, Oportunidade, OportunidadeInput } from '@/domain/oportunidade'
 
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
@@ -77,7 +78,14 @@ export const useHistorico = (id: number | null) =>
 /** Depois de qualquer escrita, a grade e as métricas do painel precisam refletir o banco. */
 function useInvalidar() {
   const qc = useQueryClient()
-  return () => Promise.all([qc.invalidateQueries({ queryKey: ['oportunidades'] }), qc.invalidateQueries({ queryKey: ['dataset'] }), qc.invalidateQueries({ queryKey: ['historico'] }), qc.invalidateQueries({ queryKey: ['opcoes'] })])
+  return () => {
+    marcarDadosDesatualizados() // a releitura do painel pula a cópia guardada no servidor (senão mostraria o dado de antes da gravação)
+    return invalidarTudo(qc)
+  }
+}
+
+function invalidarTudo(qc: ReturnType<typeof useQueryClient>) {
+  return Promise.all([qc.invalidateQueries({ queryKey: ['oportunidades'] }), qc.invalidateQueries({ queryKey: ['dataset'] }), qc.invalidateQueries({ queryKey: ['historico'] }), qc.invalidateQueries({ queryKey: ['opcoes'] })])
 }
 
 export const useCriar = () => {
