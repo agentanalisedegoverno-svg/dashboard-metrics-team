@@ -22,7 +22,7 @@ Só a `main` (a versão em produção, `https://radar-prevendas.pages.dev`). Cor
 ## Riscos conhecidos e decisões
 - O firewall do servidor Postgres está **aberto para qualquer origem** (necessário porque o Cloudflare e o GitHub Actions têm IPs variáveis); a proteção é TLS + senha forte por papel. Mitigação planejada: Hyperdrive (`docs/PLANO-DE-ACAO-BANCO.md`, R8).
 - A `BACKUP_PASSPHRASE` precisa de custódia no cofre da empresa, com 2 pessoas (R1). Sem ela o backup do Drive não abre.
-- A `main` ainda **não tem proteção de branch**. Recomendado: exigir o check `CI ok` e pelo menos 1 revisão antes do merge.
+- A `main` ainda **não tem proteção de branch**. Recomendado: exigir PR e os checks do Pipeline e do CodeQL antes do merge (passo a passo em [`docs/OPERACAO.md`](docs/OPERACAO.md), seção 4.6).
 
 ## Se um segredo vazar
 1. Troque o segredo imediatamente (senha do papel no Postgres, token, chave) e atualize o Cloudflare/GitHub.

@@ -22,6 +22,22 @@ Estado em 28/10/2026 (monitoramento de licitações atualizado em 02/11/2026) e 
 | Carga automática da planilha (tarefa do Windows, sem IA) + alerta de carga atrasada | ✅ (22/10) → **desativada e removida em 27/10/2026** |
 | Trava final: revogar a carga total antiga do `radar_escritor` (migração 002) | ✅ (22/10) |
 
+## Profissionalização da operação (levantamento de 24/11/2026)
+
+O código, os testes, o CI/CD e a segurança do aplicativo estão num bom nível; as lacunas estão na **operação**. Prioridade sugerida:
+
+| # | Item | Tamanho | Quem decide/faz | Estado |
+|---|---|---|---|---|
+| 1 | Monitor de disponibilidade com alerta (hoje só se descobre a queda quando alguém reclama) | P | Responsável do projeto ([OPERACAO.md](OPERACAO.md) 4.6-A) | ⬜ |
+| 2 | Proteção de branch na `main` (PR + checks obrigatórios) | P | Responsável do projeto ([OPERACAO.md](OPERACAO.md) 4.6-B) | ⬜ |
+| 3 | Capacidade do Cloudflare gratuito: cache de 20 s (#165) feito; se "Exceeded CPU" persistir, Hyperdrive, depois plano pago | P a M | Time + gestão (custo) | 🟡 acompanhar Metrics |
+| 4 | Fim do teste gratuito do Azure (~17/12/2026): decidir plano do banco | M | Gestão + Infra | ⬜ **tem data** |
+| 5 | Firewall do banco aberto à internet (mitigado por TLS e senha forte); fechar com Hyperdrive ou servidor com IP fixo | M | Infra | ⬜ |
+| 6 | Custódia da `BACKUP_PASSPHRASE` com 2 pessoas no cofre | P | Responsável + gestão | confirmar |
+| 7 | Endpoint público de saúde (`/api/externo/saude`) para o monitor cobrir também o banco | P | Desenvolvimento | ⬜ |
+| 8 | Ambiente de homologação (hoje todo merge vai direto à produção; o rollback é rápido, mas a validação acontece com os usuários) | M | Time | ⬜ |
+| 9 | Limpeza: `vercel.json` e `api/pncp/` só servem à pré-visualização na Vercel (confirmar se ainda é usada antes de remover); referências a "Neon" em docs antigos | P | Desenvolvimento | ⬜ confirmar uso da Vercel |
+
 ## Monitoramento de licitações — evolução incremental
 
 | Etapa | Estado | Escopo / critério de conclusão |
