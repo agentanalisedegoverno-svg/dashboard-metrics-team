@@ -162,6 +162,7 @@ Trocar `BACKUP_PASSPHRASE` vale **só para backups novos**: guarde as senhas ant
 ### 4.4 Calendário sugerido
 | Frequência | Ação |
 |---|---|
+| Semanal | Em Cloudflare → Workers & Pages → projeto → Metrics: **Errors** (procurar "Exceeded CPU Time Limits") e **CPU time p99**; conferir se o monitor de disponibilidade (4.6) está verde |
 | Mensal | O teste de restauração roda sozinho (dia 1): conferir o resumo; revisar PRs do Dependabot |
 | Trimestral | Trocar as senhas dos papéis do banco |
 | Antes do vencimento | Renovar o token do pipeline |
@@ -172,6 +173,28 @@ Trocar `BACKUP_PASSPHRASE` vale **só para backups novos**: guarde as senhas ant
 1. **Banco:** trocar a senha do papel (4.1) imediatamente.
 2. **Token da Cloudflare, do GitHub ou do Drive:** revogar no painel correspondente e criar outro.
 3. **Dados:** o histórico do Neon (plano gratuito) é de 6 horas; se a base foi alterada indevidamente, restaurar pelo console do Neon dentro desse prazo ou pelo **backup diário** ([BACKUP.md](BACKUP.md)).
+
+### 4.6 Disponibilidade: monitor externo e proteção da `main`
+
+Hoje ninguém é avisado se o site cair; descobre-se quando alguém reclama. Duas configurações fecham isso (não exigem código e não custam nada). **Quem faz:** o responsável pelo projeto, uma única vez.
+
+**A) Monitor de disponibilidade (gratuito, ex.: UptimeRobot ou Better Stack)**
+1. Criar um monitor HTTP(S) com intervalo de 5 min e aviso por e-mail (e Teams, se a ferramenta permitir) para o responsável e um substituto.
+2. **O que monitorar:**
+   - `https://radar-prevendas.pages.dev/`: responde 302 para o login do Access e depois 200. Prova que o Cloudflare Pages e o Access estão de pé (não prova a API nem o banco).
+   - `https://radar-prevendas.pages.dev/api/externo/campos`: sem chave devolve **401 com o cabeçalho `x-radar-origem: funcao`**. Prova que as Functions estão no ar. 401 é o resultado **saudável**: a ferramenta precisa aceitar 401 como sucesso (ex.: Better Stack permite escolher o código esperado; no UptimeRobot, 4xx conta como queda, então use só o primeiro).
+3. Para cobrir também o banco, o caminho limpo é um endpoint público de saúde (`/api/externo/saude`) que só confirma a conexão e devolve `{"ok":true}`, sem dado nenhum. **Ainda não existe** (é um PR pequeno; a rota fica no Bypass do Access, como o resto de `/api/externo/*`).
+4. Quando o alerta chegar: abrir o painel e seguir [DIAGNOSTICO.md](DIAGNOSTICO.md) (origem do erro). Sem `x-radar-origem` = Cloudflare/rede, nada a reverter.
+
+**B) Proteção da `main` (GitHub → Settings → Branches → Add branch ruleset / protection rule, branch `main`)**
+1. Marcar *Require a pull request before merging*.
+2. Marcar *Require status checks to pass before merging* e escolher os checks do **Pipeline** (o job `CI`; eles só aparecem na busca depois de rodarem em algum PR) e **CodeQL**.
+3. *Require approvals*: 1 aprovação **só se houver uma segunda pessoa que revise**; com um único mantenedor, deixe 0 aprovações (as verificações automáticas já bloqueiam) para não travar os próprios merges.
+4. Marcar *Do not allow bypassing the above settings* e desmarcar *Allow force pushes* e *Allow deletions*.
+5. Conferir: um push direto na `main` deve ser recusado e o botão de merge só liberar com os checks verdes.
+
+**C) Pico de uso (erro 503 / "Exceeded CPU Time Limits")**
+O plano gratuito do Cloudflare Workers limita a CPU por requisição. `/api/rows` e `/api/status` ficam guardados por 20 s e 60 s (cabeçalho `x-radar-cache`, ver [DIAGNOSTICO.md](DIAGNOSTICO.md)). Se os "Exceeded CPU" voltarem nas Metrics: 1º Hyperdrive (camada gratuita), 2º plano pago do Workers.
 
 ## 5. Recursos e limites (planos gratuitos)
 
