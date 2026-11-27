@@ -8,6 +8,8 @@ import { verifyAccessIdentity } from './access'
 export type Env = {
   DATABASE_URL?: string
   DATABASE_URL_APP?: string
+  /** Binding do Hyperdrive (conexões abertas ao Postgres no Cloudflare). Opcional: sem ele a leitura vai direto pela DATABASE_URL. */
+  HYPERDRIVE?: { connectionString: string }
   CF_ACCESS_TEAM_DOMAIN?: string
   CF_ACCESS_AUD?: string
   ACESSO_PUBLICO?: string

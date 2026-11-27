@@ -110,6 +110,13 @@ describe('API de leitura (Postgres)', () => {
     }
   })
 
+  it('com o binding HYPERDRIVE configurado, rows continua respondendo igual (a escolha da conexão é testada em leitura.test.ts)', async () => {
+    sqlMock.mockResolvedValueOnce([{ atualizado_em: null, total: 0, linhas: '[]' }])
+    const res = await onRequest({ request: new Request('https://x.test/api/rows', { headers: { 'cf-access-jwt-assertion': 'jwt' } }), env: { ...env, HYPERDRIVE: { connectionString: 'postgres://leitor@abc.hyperdrive.local/db' } } as never, params: { path: 'rows' } })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ rows: [], isMock: false })
+  })
+
   it('o cache só vale DEPOIS do Access: sem JWT válido a cópia guardada nunca é servida', async () => {
     const guardado = new Map<string, Response>([['https://cache.radar.internal/api/rows', new Response('{"rows":["segredo"]}')]])
     vi.stubGlobal('caches', { default: { match: async (r: Request) => guardado.get(r.url)?.clone(), put: async () => {} } })

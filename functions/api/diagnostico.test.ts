@@ -29,10 +29,19 @@ describe('GET /api/diagnostico', () => {
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('private, no-store')
     const j = await res.json()
-    expect(j).toMatchObject({ ok: true, ray: 'ray-1', config: { access: true, acesso_publico: false, banco_cadastro: true, banco_painel: true } })
+    expect(j).toMatchObject({ ok: true, ray: 'ray-1', config: { access: true, acesso_publico: false, banco_cadastro: true, banco_painel: true, hyperdrive: false } })
     expect(j.checks.map((c: { nome: string }) => c.nome)).toEqual(['banco (papel do cadastro)', 'banco (papel do painel)', 'consulta do painel (/api/rows)'])
     expect(j.checks[2]).toMatchObject({ ok: true, detalhe: '2 linhas, 2 KB' })
     expect(typeof j.checks[2].ms).toBe('number')
+  })
+
+  it('com o Hyperdrive ligado o relatório diz isso e a consulta do painel passa por ele, sem vazar a string de conexão', async () => {
+    const env = { ...ENV, HYPERDRIVE: { connectionString: 'postgres://leitor:SENHA-HD@abc.hyperdrive.local:5432/db' } }
+    sqlLeitor.mockResolvedValueOnce([{ '?column?': 1 }]).mockResolvedValueOnce([{ atualizado_em: null, total: 0, linhas: '[]' }])
+    const res = await chamar(env as never)
+    const texto = await res.text()
+    expect(JSON.parse(texto)).toMatchObject({ ok: true, config: { hyperdrive: true } })
+    expect(texto).not.toMatch(/SENHA-HD|hyperdrive\.local/)
   })
 
   it('banco fora do ar: o relatório diz QUAL verificação falhou e só o tipo do erro, nunca a mensagem', async () => {

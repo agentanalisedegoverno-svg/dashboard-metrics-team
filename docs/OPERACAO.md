@@ -194,7 +194,18 @@ Hoje ninguém é avisado se o site cair; descobre-se quando alguém reclama. Dua
 5. Conferir: um push direto na `main` deve ser recusado e o botão de merge só liberar com os checks verdes.
 
 **C) Pico de uso (erro 503 / "Exceeded CPU Time Limits")**
-O plano gratuito do Cloudflare Workers limita a CPU por requisição. `/api/rows` e `/api/status` ficam guardados por 20 s e 60 s (cabeçalho `x-radar-cache`, ver [DIAGNOSTICO.md](DIAGNOSTICO.md)). Se os "Exceeded CPU" voltarem nas Metrics: 1º Hyperdrive (camada gratuita), 2º plano pago do Workers.
+O plano gratuito do Cloudflare Workers limita a CPU por requisição. `/api/rows` e `/api/status` ficam guardados por 60 s (cabeçalho `x-radar-cache`, ver [DIAGNOSTICO.md](DIAGNOSTICO.md)); o cache é **por ponto de presença**, então a 1ª leitura de cada ponto depois de expirar paga a conexão com o banco. Se os "Exceeded CPU" voltarem nas Metrics: 1º Hyperdrive (seção 4.7, camada gratuita), 2º plano pago do Workers.
+
+### 4.7 Ligar o Hyperdrive (conexões já abertas com o Postgres)
+
+O código já usa o Hyperdrive **quando o binding `HYPERDRIVE` existe** e volta para a conexão direta (`DATABASE_URL`) se ele falhar; sem o binding, nada muda. Ele tira da CPU do Worker o TLS e a autenticação por requisição, que é o que estourava o limite do plano gratuito num "miss" do cache. Camada gratuita: 100 mil consultas por dia.
+
+1. **Cloudflare → Storage & Databases → Hyperdrive → Create configuration.** Nome: `radar-leitor`. Informe o host do Azure, a porta 5432, o banco e o usuário/senha do papel **`radar_leitor`** (os mesmos da `DATABASE_URL`). A senha é digitada por você; ela não passa por chat nem por commit. Salve e copie o **ID** da configuração (o ID não é segredo).
+2. **No repositório,** em `wrangler.toml`, descomente o bloco `[[hyperdrive]]` e preencha o `id` (`binding = "HYPERDRIVE"`). Este arquivo é a fonte da verdade do projeto no Cloudflare Pages; por isso o binding entra aqui e não no painel. Abra um PR e faça o merge; o deploy leva o binding.
+3. **Conferir:** abra o painel logado e rode no Console `fetch('/api/diagnostico').then(r => r.json()).then(console.log)`. Deve aparecer `config.hyperdrive: true` e os três `checks` em `ok`. Depois acompanhe em Workers & Pages → Metrics o **Errors** ("Exceeded CPU Time Limits") e o **CPU time p99**.
+4. **Se algo der errado:** a leitura já volta sozinha para a conexão direta (o log mostra "Hyperdrive falhou; usando a conexão direta"). Para desligar de vez, comente o bloco no `wrangler.toml` e faça o deploy.
+
+Limites: o Hyperdrive aqui cobre só a **leitura do painel** (`/api/rows`, `/api/status` e `/api/diagnostico`). O cadastro e a API externa seguem pela conexão direta.
 
 ## 5. Recursos e limites (planos gratuitos)
 

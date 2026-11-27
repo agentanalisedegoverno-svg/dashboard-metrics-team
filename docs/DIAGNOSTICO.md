@@ -31,7 +31,7 @@ Toda resposta gerada pelo código do Radar (`/api/*`) leva:
 
 ### Cache de curta duração (`x-radar-cache`)
 
-`/api/rows` (20 s) e `/api/status` (60 s) são guardados no Cache API do Cloudflare, **depois** da validação do Access, para que o pico de usuários não abra uma conexão com o banco por requisição (era o que estourava o CPU: "Exceeded CPU Time Limits"). A resposta é igual para todos os usuários.
+`/api/rows` e `/api/status` (60 s cada) são guardados no Cache API do Cloudflare, **depois** da validação do Access, para que o pico de usuários não abra uma conexão com o banco por requisição (era o que estourava o CPU: "Exceeded CPU Time Limits"). A resposta é igual para todos os usuários.
 
 | `x-radar-cache` | Significa |
 |---|---|

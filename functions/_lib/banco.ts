@@ -37,10 +37,11 @@ export function parseArrayTexto(entrada: string): (string | null)[] {
 export const serializarArrayTexto = (x: unknown) =>
   Array.isArray(x) ? `{${x.map((v) => (v === null ? 'NULL' : `"${String(v).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`)).join(',')}}` : String(x)
 
-export function conectar(url: string) {
+/** `hyperdrive`: a URL é a do binding do Hyperdrive (conexão local ao proxy do Cloudflare, sem TLS; o Hyperdrive fala TLS com o banco). */
+export function conectar(url: string, opcoes: { hyperdrive?: boolean } = {}) {
   return postgres(url, {
     max: 1,
-    ssl: 'require',
+    ssl: opcoes.hyperdrive ? false : 'require',
     prepare: false,
     fetch_types: false,
     idle_timeout: 5,
