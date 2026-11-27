@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { consultarComprasGov, consultarPncp, consultarPncpUf, fonteNaoAtivada, normalizarCompras, oportunidadeDe, pncpUrl } from './MonitorLicitacoesTab'
+import { rotuloDoSite } from './noc'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -103,5 +104,17 @@ describe('consultas públicas de licitações', () => {
   it('monta o link oficial do PNCP com ano e sequencial na ordem correta', () => {
     expect(pncpUrl('12345678000199-1-000123/2026'))
       .toBe('https://pncp.gov.br/app/editais/12345678000199/2026/000123')
+  })
+})
+
+describe('site (portal) mostrado no cartão', () => {
+  it('mostra o portal cadastrado; URL vira só o domínio; vazio vira null', () => {
+    expect(rotuloDoSite('Comprasnet (Gov.br)')).toBe('Comprasnet (Gov.br)')
+    expect(rotuloDoSite('  bbmnet ')).toBe('bbmnet')
+    expect(rotuloDoSite('https://www.pncp.gov.br/app/editais/1/2026/1')).toBe('pncp.gov.br')
+    expect(rotuloDoSite('http://compras.sistemaindustria.com.br')).toBe('compras.sistemaindustria.com.br')
+    expect(rotuloDoSite('')).toBeNull()
+    expect(rotuloDoSite(null)).toBeNull()
+    expect(rotuloDoSite('   ')).toBeNull()
   })
 })
