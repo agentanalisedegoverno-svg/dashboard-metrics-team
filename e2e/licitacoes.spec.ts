@@ -9,6 +9,7 @@ const rows = [
   { ...base, id: 1, codigo: '2026-0001', status: 'Go', orgao: 'Prefeitura de Hoje', data_pregao_dt: em(0), hora_pregao: '09:30:00' },
   { ...base, id: 2, codigo: '2026-0002', status: 'Prospect', orgao: 'Câmara de Amanhã', data_pregao_dt: em(1), processo: '' },
   { ...base, id: 3, codigo: '2026-0003', status: 'Go', orgao: 'Tribunal da Semana', data_pregao_dt: em(4), site: 'https://pncp.gov.br/app/editais/1/2026/1' },
+  { ...base, id: 10, codigo: '2026-0010', status: 'Go', orgao: 'Prefeitura do Portal', data_pregao_dt: em(30), site: 'Comprasnet (Gov.br)' },
   { ...base, id: 4, codigo: '2026-0004', status: 'Prospect', orgao: 'Autarquia Distante', data_pregao_dt: em(30) },
   { ...base, id: 5, codigo: '2026-0005', status: 'Go', orgao: 'Fundação Esquecida', data_pregao_dt: em(-3) },
   { ...base, id: 6, codigo: '2026-0006', status: 'Prospect', orgao: 'Instituto Sem Data', data_pregao_dt: null },
@@ -47,6 +48,15 @@ test('painel por urgência: hoje, amanhã, semana, atrasado e sem data, com a pr
   await expect(cartao('Câmara de Amanhã')).toContainText('Sem nº do processo') // o que falta no cadastro
   await expect(cartao('Tribunal da Semana')).toContainText('Pregão em 4 dias')
   await expect(cartao('Autarquia Distante')).toContainText('Pregão em 30 dias')
+  // site (portal) em cada cartão; sem site cadastrado diz isso
+  await expect(cartao('Prefeitura do Portal')).toContainText('Site: Comprasnet (Gov.br)')
+  await expect(cartao('Tribunal da Semana')).toContainText('Site: pncp.gov.br')
+  await expect(cartao('Autarquia Distante')).toContainText('Site: não informado')
+  // alerta de prazo: pregão hoje/amanhã e até 5 dias úteis ficam em vermelho ou amarelo; 30 dias, sem cor
+  await expect(cartao('Prefeitura de Hoje')).toHaveClass(/border-l-st-critical/)
+  await expect(cartao('Câmara de Amanhã')).toHaveClass(/border-l-st-critical/)
+  await expect(cartao('Tribunal da Semana')).toHaveClass(/border-l-st-(critical|warn)/) // 4 dias corridos = no máximo 4 dias úteis
+  await expect(cartao('Autarquia Distante')).not.toHaveClass(/border-l-st-/)
   await expect(cartao('Fundação Esquecida')).toContainText('Pregão foi há 3 dias e o status segue Go')
   await expect(cartao('Instituto Sem Data')).toContainText('Sem data de pregão')
   // contratos e outros status não entram na visão de certames
@@ -66,16 +76,16 @@ test('placar por faixa: mostra a contagem, filtra ao clicar e volta ao clicar de
   await expect(faixa(/^Hoje/)).toContainText('1')
   await expect(faixa(/^Amanhã/)).toContainText('1')
   await expect(faixa(/^Pregão já passou/)).toContainText('1')
-  await expect(faixa(/^Precisam de ação/)).toContainText('5') // 4 certames (atrasado, hoje, amanhã sem processo, sem data) + o contrato suspenso
-  await expect(page.locator('article')).toHaveCount(6)
+  await expect(faixa(/^Precisam de ação/)).toContainText('6') // 5 certames (atrasado, hoje, amanhã sem processo, semana em até 5 dias úteis, sem data) + o contrato suspenso
+  await expect(page.locator('article')).toHaveCount(7)
   await faixa(/^Amanhã/).click()
   await expect(faixa(/^Amanhã/)).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('article')).toHaveCount(1)
   await expect(page.locator('article')).toContainText('Câmara de Amanhã')
   await faixa(/^Amanhã/).click()
-  await expect(page.locator('article')).toHaveCount(6)
+  await expect(page.locator('article')).toHaveCount(7)
   await faixa(/^Precisam de ação/).click()
-  await expect(page.locator('article')).toHaveCount(4)
+  await expect(page.locator('article')).toHaveCount(5)
   await expect(page.getByText(/Atualizado às \d{2}:\d{2}/)).toBeVisible()
 })
 
@@ -114,12 +124,40 @@ test('as fontes públicas só são consultadas quando o bloco é aberto', async 
   await expect.poll(() => chamadas.includes('conlicitacao')).toBe(true)
 })
 
-test('"Abrir cadastro" abre o formulário da oportunidade e o link do edital só aparece com https', async ({ page }) => {
+test('"Abrir cadastro" de um certame com pregão marcado mostra antes o checklist; Cancelar não abre, Abrir cadastro abre o formulário', async ({ page }) => {
   await abrir(page)
   const semana = page.locator('article').filter({ hasText: 'Tribunal da Semana' })
-  await expect(semana.getByRole('link', { name: /Abrir edital/ })).toHaveAttribute('href', 'https://pncp.gov.br/app/editais/1/2026/1')
-  await expect(page.locator('article').filter({ hasText: 'Prefeitura de Hoje' }).getByRole('link', { name: /Abrir edital/ })).toHaveCount(0)
+  await expect(semana.getByRole('link', { name: /Abrir site/ })).toHaveAttribute('href', 'https://pncp.gov.br/app/editais/1/2026/1') // o link só aparece se o site for https
+  await expect(page.locator('article').filter({ hasText: 'Prefeitura de Hoje' }).getByRole('link', { name: /Abrir site/ })).toHaveCount(0)
+
   await semana.getByRole('button', { name: 'Abrir cadastro' }).click()
+  const popup = page.getByRole('dialog', { name: /Antes de abrir 2026-0003/ })
+  await expect(popup).toBeVisible()
+  await expect(popup).toContainText('Site: pncp.gov.br')
+  await expect(popup.getByRole('checkbox')).toHaveCount(5)
+  await expect(popup).toContainText('Já conferiu o cadastro/credenciamento no portal')
+  await expect(popup).toContainText('Já encaminhou as informações da oportunidade para a operação?')
+  await expect(popup).toContainText('Já deu visibilidade da oportunidade para a operação')
+  await expect(popup).toContainText('atestado técnico')
+  await expect(popup).toContainText('5 itens sem marcar')
+  await popup.getByRole('checkbox').first().click()
+  await expect(popup).toContainText('4 itens sem marcar')
+  const r = await new AxeBuilder({ page }).include('[role="dialog"]').analyze()
+  expect(r.violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([])
+
+  await popup.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0) // cancelar não abre o cadastro
+
+  await semana.getByRole('button', { name: 'Abrir cadastro' }).click()
+  await page.getByRole('dialog', { name: /Antes de abrir/ }).getByRole('button', { name: 'Abrir cadastro' }).click()
+  await expect(page.getByRole('dialog', { name: /Antes de abrir/ })).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toBeVisible() // agora é o formulário da oportunidade
+})
+
+test('certame com pregão já passado e sem data abrem o cadastro direto, sem o checklist', async ({ page }) => {
+  await abrir(page)
+  await page.locator('article').filter({ hasText: 'Fundação Esquecida' }).getByRole('button', { name: 'Abrir cadastro' }).click()
+  await expect(page.getByRole('dialog', { name: /Antes de abrir/ })).toHaveCount(0)
   await expect(page.getByRole('dialog')).toBeVisible()
 })
 

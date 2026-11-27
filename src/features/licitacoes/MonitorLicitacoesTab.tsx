@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, RefreshCw, Search, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, Globe, RefreshCw, Search, ShieldAlert } from 'lucide-react'
 import { useMe, useOpcoes, useOportunidades } from '@/features/oportunidades/api'
 import { OportunidadeDrawer } from '@/features/oportunidades/OportunidadeDrawer'
 import type { Oportunidade } from '@/domain/oportunidade'
-import { FAIXAS, MOTIVOS, montar, type Faixa, type Linha, type Motivo, type Nivel } from './noc'
+import { ChecklistPregao } from './ChecklistPregao'
+import { exigeChecklist, FAIXAS, MOTIVOS, montar, rotuloDoSite, type Faixa, type Linha, type Motivo, type Nivel } from './noc'
 
 type PncpItem = {
   numeroControlePNCP?: string; numeroCompra?: string; processo?: string; objetoCompra?: string; informacaoComplementar?: string
@@ -163,7 +164,8 @@ function data(v: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? v : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(d)
 }
 
-const COR: Record<Nivel, string> = { critico: 'border-st-critical/40 bg-st-critical/5', atencao: 'border-st-warn/40 bg-st-warn/5', ok: 'border-line bg-surface' }
+// Vermelho (até 3 dias úteis do pregão) e amarelo (até 5) precisam ser vistos de longe: borda lateral grossa e fundo mais cheio.
+const COR: Record<Nivel, string> = { critico: 'border-st-critical/60 border-l-4 border-l-st-critical bg-st-critical/10', atencao: 'border-st-warn/60 border-l-4 border-l-st-warn bg-st-warn/15', ok: 'border-line bg-surface' }
 const ROTULO: Record<Nivel, string> = { critico: 'Ação agora', atencao: 'Atenção', ok: 'No prazo' }
 const PONTO: Record<Nivel, string> = { critico: 'bg-st-critical', atencao: 'bg-st-warn', ok: 'bg-st-good' }
 /** Cor do placar de cada faixa quando há itens nela. */
@@ -189,9 +191,10 @@ function BuscaPncp({ o }: { o: Oportunidade }) {
   </div>)}<p className="text-[11px] text-muted">Sugestão por semelhança: confirme o processo antes de agir.</p></div>
 }
 
-function Cartao({ l, onAbrir, procurar }: { l: Linha; onAbrir: (o: Oportunidade) => void; procurar: boolean }) {
+function Cartao({ l, onAbrir, procurar }: { l: Linha; onAbrir: (l: Linha) => void; procurar: boolean }) {
   const { o, a } = l
   const link = httpsSeguro(o.site)
+  const site = rotuloDoSite(o.site)
   const uf = (o.uf ?? '').trim().toUpperCase()
   const Icone = a.nivel === 'critico' ? AlertTriangle : a.nivel === 'atencao' ? Clock3 : CheckCircle2
   return <article className={'rounded-lg border px-3 py-2.5 ' + COR[a.nivel]}>
@@ -203,9 +206,10 @@ function Cartao({ l, onAbrir, procurar }: { l: Linha; onAbrir: (o: Oportunidade)
       </p>
       <span className="rounded-md border border-line bg-surface-2 px-2 py-0.5 text-xs text-ink">{o.status}</span>
       <span className="rounded-md border border-line px-2 py-0.5 text-xs text-muted">{data(o.data_pregao_dt)}</span>
+      <span className={'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ' + (site ? 'border-line text-ink' : 'border-dashed border-line text-muted')} title="Site (portal) onde o pregão acontece"><Globe className="size-3" aria-hidden />Site: {site ?? 'não informado'}</span>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => onAbrir(o)} className="rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-page hover:opacity-90">Abrir cadastro</button>
-        {link && <a href={link} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-ink hover:bg-surface-2">Abrir edital <ExternalLink className="size-3" aria-hidden /></a>}
+        <button type="button" onClick={() => onAbrir(l)} className="rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-page hover:opacity-90">Abrir cadastro</button>
+        {link && <a href={link} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-ink hover:bg-surface-2">Abrir site <ExternalLink className="size-3" aria-hidden /></a>}
         {procurar && /^[A-Z]{2}$/.test(uf) && <BuscaPncp o={o} />}
       </div>
     </div>
@@ -259,6 +263,9 @@ export default function MonitorLicitacoesTab() {
   const [fMotivo, setFMotivo] = useState<Motivo | ''>('')
   const [fontes, setFontes] = useState(false)
   const [editando, setEditando] = useState<Oportunidade | null | undefined>(undefined)
+  // Certame com pregão marcado: antes de abrir o cadastro, o pop-up lembra as conferências (portal, operação, atestado).
+  const [checklist, setChecklist] = useState<Linha | null>(null)
+  const abrirCadastro = (l: Linha) => (exigeChecklist(l.a) ? setChecklist(l) : setEditando(l.o))
   // Fontes públicas só rodam quando alguém abre o bloco "Fontes": a tela principal não depende delas e não faz rede à toa.
   const comprasGov = useQuery({ queryKey: ['comprasgov-licitacoes-front'], queryFn: consultarComprasGov, enabled: fontes, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
   const conlicitacao = useQuery({ queryKey: ['conlicitacao-licitacoes-front'], queryFn: consultarConlicitacao, enabled: fontes, staleTime: 5 * 60_000, gcTime: 30 * 60_000, retry: 0, refetchOnWindowFocus: false })
@@ -353,9 +360,9 @@ export default function MonitorLicitacoesTab() {
       : visao === 'certames'
         ? FAIXAS.map(f => {
           const itens = visiveis.filter(l => l.a.faixa === f.id)
-          return itens.length === 0 ? null : <div key={f.id} className="space-y-2"><h2 className="text-sm font-semibold text-ink">{f.titulo} <span className="font-normal text-muted">({itens.length})</span></h2>{itens.map(l => <Cartao key={l.o.id} l={l} onAbrir={setEditando} procurar />)}</div>
+          return itens.length === 0 ? null : <div key={f.id} className="space-y-2"><h2 className="text-sm font-semibold text-ink">{f.titulo} <span className="font-normal text-muted">({itens.length})</span></h2>{itens.map(l => <Cartao key={l.o.id} l={l} onAbrir={abrirCadastro} procurar />)}</div>
         })
-        : <div className="space-y-2">{visiveis.map(l => <Cartao key={l.o.id} l={l} onAbrir={setEditando} procurar={false} />)}</div>}
+        : <div className="space-y-2">{visiveis.map(l => <Cartao key={l.o.id} l={l} onAbrir={abrirCadastro} procurar={false} />)}</div>}
 
     <details className="rounded-xl border border-line bg-surface p-4" onToggle={e => setFontes((e.currentTarget as HTMLDetailsElement).open)}>
       <summary className="cursor-pointer text-sm font-semibold text-ink">Fontes públicas (diagnóstico)</summary>
@@ -365,6 +372,8 @@ export default function MonitorLicitacoesTab() {
         <Fonte titulo="ConLicitações · boletins da conta" query={conlicitacao} vazio="A API respondeu, mas não retornou licitações nos filtros configurados." />
       </div>
     </details>
+
+    <ChecklistPregao linha={checklist} onCancelar={() => setChecklist(null)} onContinuar={(l) => { setChecklist(null); setEditando(l.o) }} />
 
     {me.data && opcoes.data && <OportunidadeDrawer aberto={editando !== undefined} onFechar={() => setEditando(undefined)} registro={editando ?? null} opcoes={opcoes.data} me={me.data} />}
   </section>
