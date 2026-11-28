@@ -30,7 +30,7 @@ O código, os testes, o CI/CD e a segurança do aplicativo estão num bom nível
 |---|---|---|---|---|
 | 1 | Monitor de disponibilidade com alerta (hoje só se descobre a queda quando alguém reclama) | P | Responsável do projeto ([OPERACAO.md](OPERACAO.md) 4.6-A) | ⬜ |
 | 2 | Proteção de branch na `main` (PR + checks obrigatórios) | P | Responsável do projeto ([OPERACAO.md](OPERACAO.md) 4.6-B) | ⬜ |
-| 3 | Capacidade do Cloudflare gratuito: cache de 20 s (#165) feito; se "Exceeded CPU" persistir, Hyperdrive, depois plano pago | P a M | Time + gestão (custo) | 🟡 acompanhar Metrics |
+| 3 | Capacidade do Cloudflare gratuito: cache (#165, hoje 60 s) feito; **Hyperdrive** preparado no código (opcional, com volta para a conexão direta): falta criar a configuração no Cloudflare e ligar o binding ([OPERACAO.md](OPERACAO.md) 4.7); se ainda faltar folga, plano pago | P a M | Time + gestão (custo) | 🟡 acompanhar Metrics |
 | 4 | Fim do teste gratuito do Azure (~17/12/2026): decidir plano do banco | M | Gestão + Infra | ⬜ **tem data** |
 | 5 | Firewall do banco aberto à internet (mitigado por TLS e senha forte); fechar com Hyperdrive ou servidor com IP fixo | M | Infra | ⬜ |
 | 6 | Custódia da `BACKUP_PASSPHRASE` com 2 pessoas no cofre | P | Responsável + gestão | confirmar |

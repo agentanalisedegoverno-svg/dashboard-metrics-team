@@ -1,7 +1,7 @@
-import { conectar } from '../_lib/banco'
 import type { Sql } from '../_lib/cadastro.ts'
 import { dentroDoLimite, entradaTempo } from '../_lib/diagnostico.ts'
 import { bancoApp, send } from '../_lib/http.ts'
+import { comLeitura, usaHyperdrive } from '../_lib/leitura.ts'
 import { consultarPainel, corpoDoPainel } from '../_lib/painel.ts'
 import { rota } from '../_lib/rota.ts'
 
@@ -36,11 +36,11 @@ export const onRequest = rota(
       if (cadastro) checks.push(await verificar('banco (papel do cadastro)', async () => void (await cadastro`select 1`)))
       else checks.push({ nome: 'banco (papel do cadastro)', ok: false, ms: 0, erro: 'DATABASE_URL_APP ausente' })
       if (env.DATABASE_URL) {
-        const leitor = conectar(env.DATABASE_URL) as unknown as Sql
-        checks.push(await verificar('banco (papel do painel)', async () => void (await leitor`select 1`)))
+        // Pelo mesmo caminho do painel: com o Hyperdrive configurado, é por ele que a leitura passa.
+        checks.push(await verificar('banco (papel do painel)', async () => void (await comLeitura(env, (sql) => sql`select 1`))))
         checks.push(
           await verificar('consulta do painel (/api/rows)', async () => {
-            const p = await consultarPainel(leitor)
+            const p = await comLeitura(env, consultarPainel)
             return `${p.total} linhas, ${Math.round(corpoDoPainel(p).length / 1024)} KB`
           }),
         )
@@ -58,6 +58,7 @@ export const onRequest = rota(
           acesso_publico: env.ACESSO_PUBLICO === 'true',
           banco_cadastro: Boolean(env.DATABASE_URL_APP),
           banco_painel: Boolean(env.DATABASE_URL),
+          hyperdrive: usaHyperdrive(env),
         },
         checks,
       }

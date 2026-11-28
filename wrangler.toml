@@ -11,3 +11,11 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 CF_ACCESS_TEAM_DOMAIN = "ctctech-radar.cloudflareaccess.com"
 CF_ACCESS_AUD = "ef8c10001baa8332266db6f525b1bb2bf7239bc352c01c809682ae60ee22925f"
+
+# Hyperdrive (opcional): conexões já abertas com o Postgres, para poupar a CPU de TLS e autenticação a cada requisição (plano gratuito do
+# Workers: ~10 ms). Como este arquivo é a fonte da verdade do projeto, o binding entra AQUI (não no painel). Passo a passo em
+# docs/OPERACAO.md (4.7). Crie a configuração no Cloudflare com a string do papel radar_leitor e então descomente, com o ID dela
+# (o ID não é segredo). Sem isto o painel segue funcionando, direto pela DATABASE_URL.
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "<ID da configuração do Hyperdrive>"

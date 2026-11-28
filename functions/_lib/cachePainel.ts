@@ -9,7 +9,7 @@
  * SEGURANÇA: o cache só é consultado DEPOIS da validação do Access (ver [[path]].ts); sem JWT válido nada chega aqui. O que vai ao
  * navegador continua `private, no-store`; o `public, max-age` fica só na cópia interna, com chave que o usuário não controla.
  *
- * FRESCOR: o TTL é curto (rows 20 s, status 60 s). Quem acabou de gravar, ou clicou em atualizar, pede `?fresco=1`: a leitura vai ao
+ * FRESCOR: o TTL é curto (rows e status 60 s). Quem acabou de gravar, ou clicou em atualizar, pede `?fresco=1`: a leitura vai ao
  * banco e SUBSTITUI a cópia, então os demais também passam a ver o dado novo. O cache é por ponto de presença (não global).
  *
  * FALHA SEGURA: sem Cache API (testes, ambiente sem suporte) ou se ela falhar, a resposta vem do banco como antes.
@@ -17,7 +17,7 @@
  */
 import { entradaTempo } from './diagnostico.ts'
 
-export const TTL_ROWS_S = 20
+export const TTL_ROWS_S = 60
 export const TTL_STATUS_S = 60
 
 type CacheLike = { match(r: Request): Promise<Response | undefined>; put(r: Request, res: Response): Promise<void> }

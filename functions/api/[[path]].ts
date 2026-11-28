@@ -1,10 +1,10 @@
-import { conectar } from '../_lib/banco'
+import { comLeitura, type Hyperdrive } from '../_lib/leitura.ts'
 import { verifyAccessJwt } from '../_lib/access'
 import { entradaTempo } from '../_lib/diagnostico.ts'
 import { consultarPainel, consultarStatus, corpoDoPainel } from '../_lib/painel.ts'
 import { respostaComCache, TTL_ROWS_S, TTL_STATUS_S } from '../_lib/cachePainel.ts'
 
-type Env = { DATABASE_URL?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string; ACESSO_PUBLICO?: string }
+type Env = { DATABASE_URL?: string; HYPERDRIVE?: Hyperdrive; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string; ACESSO_PUBLICO?: string }
 type Ctx = { request: Request; env: Env; params: { path?: string | string[] }; waitUntil?: (p: Promise<unknown>) => void }
 
 const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'private, no-store' }
@@ -35,8 +35,6 @@ export const onRequest = async ({ request, env, params, waitUntil }: Ctx): Promi
 
   // `sync` (botão atualizar) e `?fresco=1` (logo após uma gravação) pulam a cópia guardada e a substituem (ver cachePainel.ts).
   const fresco = route === 'sync' || new URL(request.url).searchParams.has('fresco')
-  const databaseUrl = env.DATABASE_URL
-
   try {
     if (route === 'rows') {
       return await respostaComCache({
@@ -45,7 +43,7 @@ export const onRequest = async ({ request, env, params, waitUntil }: Ctx): Promi
           // A etapa é medida e vai no Server-Timing (ver docs/DIAGNOSTICO.md): tempo da consulta e tamanho da resposta.
           const t = Date.now()
           // Uma única consulta; o Postgres devolve as linhas já em JSON e o Worker só repassa o texto (poupa CPU: ver painel.ts).
-          const painel = await consultarPainel(conectar(databaseUrl))
+          const painel = await comLeitura(env, consultarPainel)
           const corpo = corpoDoPainel(painel)
           return { corpo, tempo: entradaTempo('consulta', Date.now() - t, `${painel.total} linhas, ${Math.round(corpo.length / 1024)} KB`) }
         },
@@ -55,7 +53,7 @@ export const onRequest = async ({ request, env, params, waitUntil }: Ctx): Promi
       rota: 'status', ttl: TTL_STATUS_S, fresco, cabecalhos: headers, waitUntil,
       gerar: async () => {
         const t = Date.now()
-        const status = await consultarStatus(conectar(databaseUrl))
+        const status = await comLeitura(env, consultarStatus)
         const lastSyncAt = status?.ultima_carga_em ? new Date(status.ultima_carga_em).toISOString() : null
         return {
           corpo: JSON.stringify({ lastSyncAt, rowCount: status?.total_linhas ?? 0, error: status?.erro ?? null, isMock: false }),

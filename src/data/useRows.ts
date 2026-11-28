@@ -85,7 +85,7 @@ function parseDataset(json: unknown, lastModified: string | null = null, isMockF
 }
 
 /**
- * O servidor guarda /api/rows por ~20 s (ver functions/_lib/cachePainel.ts). Depois de uma gravação a próxima leitura precisa vir
+ * O servidor guarda /api/rows por ~60 s (ver functions/_lib/cachePainel.ts). Depois de uma gravação a próxima leitura precisa vir
  * do banco, senão quem acabou de salvar veria o dado antigo: `?fresco=1` pula a cópia guardada e a substitui para todos.
  */
 let proximaLeituraFresca = false
